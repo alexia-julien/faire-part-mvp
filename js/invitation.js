@@ -18,7 +18,6 @@
     if(!raw) return fail('Ce faire-part est introuvable. Vérifiez le lien reçu.');
     var cfg = FP.sanitizeConfig(raw);
     document.title = cfg.partner1 + ' & ' + cfg.partner2 + ' — Vous êtes invités';
-    document.documentElement.setAttribute('data-theme', cfg.theme);
     FP.renderInvitation(root, cfg, {
       previousName: previous && typeof previous.name === 'string' ? previous.name.slice(0, 120) : '',
       onSubmit: function(data){
@@ -28,6 +27,12 @@
         });
       }
     });
+    // Fond de page (au-delà du faire-part) et barre du navigateur mobile assortis à la palette.
+    var paper = getComputedStyle(root).getPropertyValue('--paper').trim();
+    if(paper){
+      document.documentElement.style.backgroundColor = paper; document.body.style.backgroundColor = paper;
+      var tc = document.querySelector('meta[name=theme-color]'); if(tc) tc.setAttribute('content', paper);
+    }
   }).catch(function(){
     fail('Impossible de charger le faire-part pour le moment. Merci de réessayer dans un instant.');
   });

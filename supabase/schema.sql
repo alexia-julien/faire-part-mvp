@@ -127,25 +127,37 @@ $$;
 
 -- Réponse d'un invité (publique). Le contenu est reconstruit champ par champ : tout ce qui n'est pas prévu est
 -- ignoré. 100 réponses / heure / IP / faire-part, 1000 réponses max par faire-part.
+-- Les coordonnées (email, téléphone, adresse) sont validées ici : on refuse plutôt que d'enregistrer n'importe quoi.
 create or replace function public.submit_rsvp(p_slug text, p_data jsonb)
 returns void language plpgsql security definer set search_path = public as $$
-declare v_att text; v_guests integer;
+declare v_att text; v_yes boolean; v_guests integer; v_children integer; v_email text; v_phone text;
 begin
   perform private.rate_limit('rsvp:' || coalesce(p_slug, ''), 100);
   if p_data is null or jsonb_typeof(p_data) <> 'object' then raise exception 'invalid data'; end if;
-  if octet_length(p_data::text) > 8000 then raise exception 'too large'; end if;
+  if octet_length(p_data::text) > 12000 then raise exception 'too large'; end if;
   if not exists (select 1 from invitations where slug = p_slug) then raise exception 'not found'; end if;
   v_att := p_data->>'attendance';
   if v_att is null or v_att not in ('yes', 'no') then raise exception 'invalid attendance'; end if;
   if coalesce(btrim(p_data->>'name'), '') = '' then raise exception 'name required'; end if;
   if (select count(*) from rsvps where slug = p_slug) >= 1000 then raise exception 'too many responses'; end if;
+  v_yes := v_att = 'yes';
 
-  if v_att = 'no' then
+  v_email := left(btrim(coalesce(p_data->>'email', '')), 200);
+  if v_email <> '' and v_email !~ '^[A-Za-z0-9._%+''-]{1,64}@[A-Za-z0-9.-]{1,255}\.[A-Za-z]{2,24}$' then raise exception 'invalid email'; end if;
+  v_phone := btrim(coalesce(p_data->>'phone', ''));
+  if v_phone <> '' and v_phone !~ '^[0-9 +().-]{6,30}$' then raise exception 'invalid phone'; end if;
+
+  if not v_yes then
     v_guests := 0;
   elsif (p_data->>'guests') ~ '^[0-9]{1,2}$' then
     v_guests := least(greatest((p_data->>'guests')::integer, 1), 20);
   else
     v_guests := 1;
+  end if;
+  if v_yes and (p_data->>'children') ~ '^[0-9]{1,2}$' then
+    v_children := least((p_data->>'children')::integer, 20);
+  else
+    v_children := 0;
   end if;
 
   insert into rsvps(slug, data) values (p_slug, jsonb_build_object(
@@ -154,8 +166,14 @@ begin
     'name',       left(btrim(p_data->>'name'), 120),
     'attendance', v_att,
     'guests',     v_guests,
-    'diet',       left(coalesce(p_data->>'diet', ''), 300),
-    'brunch',     case when p_data->>'brunch' in ('yes', 'no') then p_data->>'brunch' else '' end,
+    'children',   v_children,
+    'companions', case when v_yes then left(btrim(coalesce(p_data->>'companions', '')), 300) else '' end,
+    'diet',       case when v_yes then left(coalesce(p_data->>'diet', ''), 300) else '' end,
+    'brunch',     case when v_yes and p_data->>'brunch' in ('yes', 'no') then p_data->>'brunch' else '' end,
+    'email',      v_email,
+    'phone',      v_phone,
+    'address',    left(btrim(coalesce(p_data->>'address', '')), 300),
+    'custom',     left(btrim(coalesce(p_data->>'custom', '')), 500),
     'message',    left(coalesce(p_data->>'message', ''), 1000)
   ));
 end $$;

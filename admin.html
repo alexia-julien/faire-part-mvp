@@ -16,28 +16,39 @@
 <body class="admin-page">
 <main class="admin">
   <h1 id="admin-title">Suivi des réponses</h1>
+  <p class="muted admin-sub" id="admin-sub"></p>
   <p id="state" class="muted" role="status">Chargement…</p>
   <div id="content" hidden>
     <div class="tiles" id="tiles"></div>
     <p class="hint" id="dup-note" hidden></p>
+    <section class="diet-box" id="diet-box" hidden aria-labelledby="diet-title">
+      <h2 id="diet-title">Régimes et allergies (pour le traiteur)</h2>
+      <ul id="diet-list"></ul>
+    </section>
     <div class="actions">
       <a class="btn-ghost" id="open-public" target="_blank" rel="noopener">Voir le faire-part</a>
       <a class="btn-ghost" id="edit-link">Modifier le faire-part</a>
       <button type="button" class="btn-ghost" id="csv">Exporter en CSV</button>
+      <button type="button" class="btn-ghost" id="copy-emails" hidden>Copier les emails</button>
       <button type="button" class="btn-ghost" id="refresh">Actualiser</button>
     </div>
     <p class="form-msg" id="action-msg" role="status"></p>
+    <div class="toolbar" id="toolbar">
+      <input type="search" id="search" placeholder="Rechercher un nom, un email…" aria-label="Rechercher une réponse" autocomplete="off">
+      <div class="seg" role="group" aria-label="Filtrer les réponses">
+        <button type="button" data-filter="all" aria-pressed="true">Tous</button>
+        <button type="button" data-filter="yes" aria-pressed="false">Présents</button>
+        <button type="button" data-filter="no" aria-pressed="false">Absents</button>
+      </div>
+    </div>
+    <p class="muted" id="count" role="status"></p>
     <div class="table-wrap" id="table-wrap">
       <table id="table">
-        <thead><tr>
-          <th scope="col">Reçu le</th><th scope="col">Nom</th><th scope="col">Présence</th>
-          <th scope="col" data-col="guests">Pers.</th><th scope="col" data-col="brunch">Brunch</th>
-          <th scope="col" data-col="diet">Régime</th><th scope="col" data-col="message">Message</th>
-          <th scope="col"><span class="sr-only">Actions</span></th>
-        </tr></thead>
+        <thead><tr id="thead-row"></tr></thead>
         <tbody></tbody>
       </table>
     </div>
+    <p class="muted" id="no-match" hidden>Aucune réponse ne correspond à votre recherche.</p>
     <p class="muted" id="empty" hidden>Aucune réponse pour l’instant. Partagez le lien du faire-part pour recevoir les premières.</p>
   </div>
 </main>

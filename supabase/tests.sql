@@ -1,4 +1,4 @@
--- Tests de la base, à exécuter dans Supabase > SQL Editor (ou via le connecteur) après chaque changement de schema.sql.
+-- Tests de la base (42 vérifications), à exécuter dans Supabase > SQL Editor (ou via le connecteur) après chaque changement de schema.sql.
 -- Tout s'exécute dans une transaction qui est TOUJOURS annulée à la fin : aucune donnée de test ne reste.
 -- Le résultat s'affiche dans un message d'erreur volontaire « RESULTATS » : une ligne PASS ou FAIL par vérification.
 -- Les tests se placent dans la peau du rôle « anon » (le navigateur d'un visiteur), pas du propriétaire de la base.
@@ -72,7 +72,7 @@ begin
   exception when others then r := r || case when sqlerrm = 'name required' then E'PASS nom vide refusé\n' else 'FAIL nom vide : ' || sqlerrm || E'\n' end; end;
   begin perform public.submit_rsvp('inexistant-0000', '{"name":"X","attendance":"yes"}'::jsonb); r := r || E'FAIL réponse sur faire-part inconnu acceptée\n';
   exception when others then r := r || case when sqlerrm = 'not found' then E'PASS réponse sur faire-part inconnu refusée\n' else 'FAIL inconnu : ' || sqlerrm || E'\n' end; end;
-  begin perform public.submit_rsvp(v_slug, ('{"name":"X","attendance":"yes","message":"' || repeat('a', 9000) || '"}')::jsonb); r := r || E'FAIL réponse géante acceptée\n';
+  begin perform public.submit_rsvp(v_slug, ('{"name":"X","attendance":"yes","message":"' || repeat('a', 13000) || '"}')::jsonb); r := r || E'FAIL réponse géante acceptée\n';
   exception when others then r := r || case when sqlerrm = 'too large' then E'PASS réponse géante refusée\n' else 'FAIL géante : ' || sqlerrm || E'\n' end; end;
 
   -- Lecture / suppression protégées par la clé privée
@@ -98,6 +98,29 @@ begin
   perform set_config('request.headers', '{"cf-connecting-ip":"198.51.100.9"}', true);
   begin perform public.create_invitation('qa-rl-other', v_key, '{}'::jsonb); r := r || E'PASS une autre IP n''est pas bloquée\n';
   exception when others then r := r || E'FAIL une autre IP est bloquée\n'; end;
+
+  -- Nouveaux champs : coordonnées, enfants, accompagnants, question personnalisée
+  perform public.submit_rsvp(v_slug, '{"name":"Léa","attendance":"yes","guests":2,"children":"3","companions":"  Tom Martin  ","email":"lea@example.fr","phone":"+33 6 12 34 56 78","address":"1 rue de la Paix\n75002 Paris","custom":"Dancing Queen","diet":"sans gluten"}'::jsonb);
+  v := public.list_rsvps(v_slug, v_key); v := v->(jsonb_array_length(v) - 1)->'data';
+  r := r || case when (v->>'children') = '3' and (v->>'companions') = 'Tom Martin' then E'PASS enfants et accompagnants enregistrés\n' else E'FAIL enfants/accompagnants\n' end;
+  r := r || case when (v->>'email') = 'lea@example.fr' and (v->>'phone') = '+33 6 12 34 56 78' and (v->>'address') like '1 rue de la Paix%' then E'PASS coordonnées enregistrées\n' else E'FAIL coordonnées\n' end;
+  r := r || case when (v->>'custom') = 'Dancing Queen' then E'PASS réponse à la question personnalisée enregistrée\n' else E'FAIL question personnalisée\n' end;
+  perform public.submit_rsvp(v_slug, '{"name":"Max","attendance":"no","children":2,"companions":"X","diet":"vegan","brunch":"yes","email":"max@example.com"}'::jsonb);
+  v := public.list_rsvps(v_slug, v_key); v := v->(jsonb_array_length(v) - 1)->'data';
+  r := r || case when (v->>'children') = '0' and (v->>'companions') = '' and (v->>'diet') = '' and (v->>'brunch') = '' and (v->>'email') = 'max@example.com'
+    then E'PASS absent : enfants, accompagnants, régime et brunch vidés, email conservé\n' else E'FAIL absent : champs non vidés\n' end;
+  perform public.submit_rsvp(v_slug, '{"name":"Kid","attendance":"yes","children":"99"}'::jsonb);
+  v := public.list_rsvps(v_slug, v_key); v := v->(jsonb_array_length(v) - 1)->'data';
+  r := r || case when (v->>'children') = '20' then E'PASS nombre d''enfants plafonné à 20\n' else E'FAIL plafond enfants\n' end;
+  begin perform public.submit_rsvp(v_slug, '{"name":"X","attendance":"yes","email":"pas-un-email"}'::jsonb); r := r || E'FAIL email invalide accepté\n';
+  exception when others then r := r || case when sqlerrm = 'invalid email' then E'PASS email invalide refusé\n' else 'FAIL email : ' || sqlerrm || E'\n' end; end;
+  begin perform public.submit_rsvp(v_slug, '{"name":"X","attendance":"yes","email":"a@b.c<script>"}'::jsonb); r := r || E'FAIL email piégé accepté\n';
+  exception when others then r := r || case when sqlerrm = 'invalid email' then E'PASS email piégé refusé\n' else 'FAIL email piégé : ' || sqlerrm || E'\n' end; end;
+  begin perform public.submit_rsvp(v_slug, '{"name":"X","attendance":"yes","phone":"<script>alert(1)</script>"}'::jsonb); r := r || E'FAIL téléphone invalide accepté\n';
+  exception when others then r := r || case when sqlerrm = 'invalid phone' then E'PASS téléphone invalide refusé\n' else 'FAIL téléphone : ' || sqlerrm || E'\n' end; end;
+  perform public.submit_rsvp(v_slug, ('{"name":"Long","attendance":"yes","address":"' || repeat('b', 900) || '","custom":"' || repeat('c', 900) || '","companions":"' || repeat('d', 900) || '"}')::jsonb);
+  v := public.list_rsvps(v_slug, v_key); v := v->(jsonb_array_length(v) - 1)->'data';
+  r := r || case when length(v->>'address') = 300 and length(v->>'custom') = 500 and length(v->>'companions') = 300 then E'PASS champs longs tronqués (300/500/300)\n' else E'FAIL troncature\n' end;
 
   reset role;
   r := r || case when exists (select 1 from private.rate_limits where ip_hash = '203.0.113.7') then E'FAIL IP stockée en clair\n' else E'PASS IP stockée uniquement sous forme de hash\n' end;

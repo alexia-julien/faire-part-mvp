@@ -7,7 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#F6F2EA">
 <title>Créez votre faire-part en 3 minutes</title>
-<meta name="description" content="Créez un faire-part digital avec RSVP intégré en moins de 3 minutes. Sans compte.">
+<meta name="description" content="Créez un faire-part digital avec RSVP intégré en quelques minutes. Sans compte.">
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 21s-7.05-4.35-9.5-8.5C.7 9 2.2 5 6.3 5c2 0 3.6 1.1 5.7 3.6C14.1 6.1 15.7 5 17.7 5c4.1 0 5.6 4 3.8 7.5C19.05 16.65 12 21 12 21z' fill='%235F6E4E'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -21,16 +21,17 @@
     <div class="banner" id="banner" hidden>Mode local : les données restent dans ce navigateur (aucun backend configuré).</div>
     <header class="hello">
       <h1 id="title">Votre faire-part, prêt en 3 minutes</h1>
-      <p class="muted" id="subtitle">Pas de compte à créer. Vous remplissez 4 étapes, vous obtenez un lien à envoyer à vos invités.</p>
+      <p class="muted" id="subtitle">Pas de compte à créer. Seules les deux premières étapes sont obligatoires : tout le reste est déjà prêt, vous l’ajustez si vous le souhaitez.</p>
       <p class="draft-note" id="draft-note" hidden>Votre brouillon a été restauré. <button type="button" class="link-btn" id="reset-draft">Recommencer à zéro</button></p>
       <p><a id="resume" href="#" hidden>Reprendre mon dernier faire-part publié</a></p>
     </header>
 
     <ol class="steps" id="steps" aria-label="Progression">
-      <li>Les mariés</li><li>Le lieu</li><li>Photos et textes</li><li>Réponses</li>
+      <li>Les mariés</li><li>Le lieu</li><li>Style</li><li>Textes</li><li>Réponses</li>
     </ol>
 
     <form id="wizard" novalidate>
+      <!-- 1. Les mariés -->
       <fieldset data-step="1">
         <legend tabindex="-1">Qui se marie, et quand ?</legend>
         <div class="row">
@@ -43,6 +44,7 @@
         </div>
       </fieldset>
 
+      <!-- 2. Le lieu -->
       <fieldset data-step="2" hidden>
         <legend tabindex="-1">Où ça se passe ?</legend>
         <label class="f">Nom du lieu<input type="text" data-bind="venueName" maxlength="80" placeholder="Domaine de l'Abbaye"></label>
@@ -51,34 +53,107 @@
         <p class="hint">Liens acceptés : Google Maps, Apple Plans, OpenStreetMap, Waze. Sans lien, nous en créons un automatiquement à partir du nom et de l’adresse.</p>
       </fieldset>
 
+      <!-- 3. Photos et style -->
       <fieldset data-step="3" hidden>
-        <legend tabindex="-1">Photos et textes</legend>
+        <legend tabindex="-1">Photos et style</legend>
         <div class="f">
           <span class="lab">Photos <span class="opt">(1 à 3, la première est la photo principale)</span></span>
           <div class="thumbs" id="thumbs"></div>
           <label class="btn-ghost file-btn" id="add-photo">Ajouter une photo<input type="file" id="photo-input" accept="image/*" multiple></label>
           <p class="form-msg" id="photo-msg" role="status"></p>
         </div>
+        <div class="f">
+          <span class="lab" id="lab-preset">Ambiance <span class="opt">(un clic règle couleurs, police et introduction)</span></span>
+          <div class="presets" id="presets" role="radiogroup" aria-labelledby="lab-preset"></div>
+        </div>
+        <details class="more" id="style-more">
+          <summary>Personnaliser le style</summary>
+          <div class="f"><span class="lab" id="lab-intro">Introduction</span><div class="pills" id="pick-intro" role="radiogroup" aria-labelledby="lab-intro"></div></div>
+          <div class="f"><span class="lab" id="lab-theme">Couleurs</span><div class="swatches" id="pick-theme" role="radiogroup" aria-labelledby="lab-theme"></div></div>
+          <div class="f"><span class="lab" id="lab-font">Police</span><div class="pills fonts" id="pick-font" role="radiogroup" aria-labelledby="lab-font"></div></div>
+          <div class="f"><span class="lab" id="lab-shape">Forme de la photo</span><div class="pills" id="pick-shape" role="radiogroup" aria-labelledby="lab-shape"></div></div>
+          <label class="chk"><input type="checkbox" data-bind-bool="countdown"> Afficher le compte à rebours</label>
+        </details>
+      </fieldset>
+
+      <!-- 4. Textes et sections -->
+      <fieldset data-step="4" hidden>
+        <legend tabindex="-1">Textes et sections</legend>
         <label class="f">Phrase d’introduction<input type="text" data-bind="subtitle" maxlength="100"></label>
         <label class="f">Message d’accueil<textarea data-bind="message" maxlength="600" rows="3"></textarea></label>
-        <label class="f">Infos pratiques <span class="opt">(facultatif : accès, hébergement, dress code…)</span><textarea data-bind="practical" maxlength="1200" rows="3"></textarea></label>
         <div class="f">
-          <span class="lab" id="lab-theme">Ambiance</span>
-          <div class="themes" role="radiogroup" aria-labelledby="lab-theme">
-            <label class="theme"><input type="radio" name="theme" value="sauge" checked><span class="sw sw-sauge"></span>Sauge</label>
-            <label class="theme"><input type="radio" name="theme" value="rose"><span class="sw sw-rose"></span>Rose poudré</label>
-            <label class="theme"><input type="radio" name="theme" value="nuit"><span class="sw sw-nuit"></span>Bleu nuit</label>
+          <span class="lab">Sections <span class="opt">(facultatif : activez celles qui vous servent, elles sont déjà pré-remplies)</span></span>
+          <div class="sections">
+            <div class="sec-card">
+              <label class="sec-toggle"><input type="checkbox" data-section-toggle="story"> Notre histoire</label>
+              <div class="sec-body" data-section-body="story" hidden>
+                <label class="f">Votre histoire<textarea data-sec="story.text" maxlength="1500" rows="4" placeholder="Racontez en quelques mots votre rencontre, la demande…"></textarea></label>
+              </div>
+            </div>
+            <div class="sec-card">
+              <label class="sec-toggle"><input type="checkbox" data-section-toggle="program"> Programme</label>
+              <div class="sec-body" data-section-body="program" hidden>
+                <div class="prog" id="program-items"></div>
+                <button type="button" class="btn-ghost small" id="program-add">Ajouter une étape</button>
+              </div>
+            </div>
+            <div class="sec-card">
+              <label class="sec-toggle"><input type="checkbox" data-section-toggle="dress"> Dress code</label>
+              <div class="sec-body" data-section-body="dress" hidden>
+                <label class="f">Texte<textarea data-sec="dress.text" maxlength="600" rows="2"></textarea></label>
+              </div>
+            </div>
+            <div class="sec-card">
+              <label class="sec-toggle"><input type="checkbox" data-section-toggle="lodging"> Hébergement</label>
+              <div class="sec-body" data-section-body="lodging" hidden>
+                <label class="f">Texte<textarea data-sec="lodging.text" maxlength="1200" rows="3"></textarea></label>
+                <label class="f">Lien vers une liste d’hébergements <span class="opt">(facultatif)</span><input type="url" data-sec="lodging.url" maxlength="300" inputmode="url" placeholder="https://…"></label>
+              </div>
+            </div>
+            <div class="sec-card">
+              <label class="sec-toggle"><input type="checkbox" data-section-toggle="practical"> Infos pratiques</label>
+              <div class="sec-body" data-section-body="practical" hidden>
+                <label class="f">Texte <span class="opt">(accès, parking, enfants…)</span><textarea data-sec="practical.text" maxlength="1200" rows="3"></textarea></label>
+              </div>
+            </div>
+            <div class="sec-card">
+              <label class="sec-toggle"><input type="checkbox" data-section-toggle="gifts"> Liste de mariage</label>
+              <div class="sec-body" data-section-body="gifts" hidden>
+                <label class="f">Texte<textarea data-sec="gifts.text" maxlength="600" rows="2"></textarea></label>
+                <label class="f">Lien de la cagnotte ou de la liste <span class="opt">(facultatif)</span><input type="url" data-sec="gifts.url" maxlength="300" inputmode="url" placeholder="https://…"></label>
+              </div>
+            </div>
           </div>
         </div>
       </fieldset>
 
-      <fieldset data-step="4" hidden>
+      <!-- 5. Réponses -->
+      <fieldset data-step="5" hidden>
         <legend tabindex="-1">Que voulez-vous demander à vos invités ?</legend>
         <p class="hint">Nom et présence (oui/non) sont toujours demandés. Ajoutez le reste si besoin.</p>
-        <label class="chk"><input type="checkbox" data-bind-rsvp="guests"> Nombre de personnes</label>
-        <label class="chk"><input type="checkbox" data-bind-rsvp="diet"> Régime alimentaire / allergies</label>
-        <label class="chk"><input type="checkbox" data-bind-rsvp="brunch"> Présence au brunch du lendemain</label>
-        <label class="chk"><input type="checkbox" data-bind-rsvp="message"> Message libre</label>
+        <div class="group">
+          <span class="lab">Organisation</span>
+          <div class="chks">
+            <label class="chk"><input type="checkbox" data-bind-rsvp="guests"> Nombre de personnes</label>
+            <label class="chk"><input type="checkbox" data-bind-rsvp="children"> Nombre d’enfants</label>
+            <label class="chk"><input type="checkbox" data-bind-rsvp="companions"> Noms des accompagnants</label>
+            <label class="chk"><input type="checkbox" data-bind-rsvp="diet"> Régime alimentaire / allergies</label>
+            <label class="chk"><input type="checkbox" data-bind-rsvp="brunch"> Brunch du lendemain</label>
+            <label class="chk"><input type="checkbox" data-bind-rsvp="message"> Message libre</label>
+          </div>
+        </div>
+        <div class="group">
+          <span class="lab">Coordonnées</span>
+          <div class="chks">
+            <label class="chk"><input type="checkbox" data-bind-rsvp="email"> Email</label>
+            <label class="chk"><input type="checkbox" data-bind-rsvp="phone"> Téléphone</label>
+            <label class="chk"><input type="checkbox" data-bind-rsvp="address"> Adresse postale <span class="opt">(remerciements)</span></label>
+          </div>
+        </div>
+        <div class="row">
+          <label class="f">Question personnalisée <span class="opt">(facultatif)</span><input type="text" data-bind-rsvp-text="customLabel" maxlength="80" placeholder="Une chanson qui vous fera danser ?"></label>
+          <label class="f">Date limite de réponse <span class="opt">(facultatif)</span><input type="date" data-bind-rsvp-text="deadline"></label>
+        </div>
       </fieldset>
 
       <p class="form-msg" id="step-msg" role="alert"></p>
@@ -109,8 +184,11 @@
   </main>
 
   <aside class="preview" id="preview-pane" aria-label="Aperçu du faire-part">
-    <button type="button" class="close-preview" id="close-preview">Fermer l’aperçu</button>
-    <div class="phone"><div id="preview"></div></div>
+    <div class="preview-bar">
+      <button type="button" class="close-preview" id="close-preview">Fermer l’aperçu</button>
+      <button type="button" class="replay" id="replay-intro" hidden>Revoir l’introduction</button>
+    </div>
+    <div class="phone" id="phone"><div id="preview"></div></div>
   </aside>
 </div>
 <script src="js/config.js"></script>

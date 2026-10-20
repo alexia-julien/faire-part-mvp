@@ -1,5 +1,4 @@
-/* Styles de page (hors rendu du faire-part). Dans un fichier externe pour pouvoir interdire les styles inline via la CSP. */
+/* Styles de page (hors rendu du faire-part). Dans un fichier externe pour pouvoir interdire les styles inline via la CSP.
+   La couleur de fond est ensuite alignée sur la palette du faire-part par js/invitation.js. */
 html,body{margin:0;background:#F6F2EA}
-html[data-theme="rose"],html[data-theme="rose"] body{background:#FAF3F0}
-html[data-theme="nuit"],html[data-theme="nuit"] body{background:#1F2433}
 .state{font-family:system-ui,sans-serif;text-align:center;padding:4rem 1.4rem;color:#6B6559}

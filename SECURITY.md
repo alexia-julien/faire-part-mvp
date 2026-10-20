@@ -13,6 +13,8 @@ Le repo est public et la clé Supabase `anon` est visible par tous : c'est voulu
 |---|---|
 | XSS (champs du faire-part, réponses des invités) | Tout texte est échappé ; le contenu venant de la base passe par une liste blanche (`FP.sanitizeConfig`) ; photos limitées aux data-URI JPEG/PNG/WebP ; CSP sans script ni style inline |
 | Pollution de prototype (JSON forgé avec `__proto__`) | Plus d'`Object.assign` sur des données externes : reconstruction champ par champ |
+| Liens libres (cagnotte, hébergements) | https uniquement, sans identifiants dans l'URL, `rel="noopener nofollow"`, domaine affiché à côté du bouton |
+| Coordonnées des invités (email, téléphone) | Validées côté navigateur ET serveur (formats stricts) ; visibles uniquement avec la clé privée |
 | Phishing via le bouton « Ouvrir dans Maps » | Seuls Google Maps, Apple Plans, OpenStreetMap et Waze sont acceptés (domaines exacts) |
 | Accès aux réponses / modification / suppression par un tiers | Clé privée requise, dans le fragment d'URL (`#k=`) donc jamais envoyée au serveur ni dans le `Referer` |
 | Devinette des liens publics | Suffixe aléatoire de 8 caractères (~10^12) |
@@ -29,7 +31,7 @@ Le repo est public et la clé Supabase `anon` est visible par tous : c'est voulu
 - **« Function Search Path Mutable »** sur `private.check_config` : corrigé dans `schema.sql` (rejouer le fichier pour l'appliquer).
 
 ## Tests de la base
-`supabase/tests.sql` (34 vérifications) se colle dans le SQL Editor. Il agit comme un visiteur anonyme (rôle `anon`), vérifie les accès directs interdits, la validation des entrées, la protection par clé privée et la limitation de débit, puis annule tout : aucune donnée de test ne reste. À rejouer après chaque changement de `schema.sql`.
+`supabase/tests.sql` (42 vérifications) se colle dans le SQL Editor. Il agit comme un visiteur anonyme (rôle `anon`), vérifie les accès directs interdits, la validation des entrées, la protection par clé privée et la limitation de débit, puis annule tout : aucune donnée de test ne reste. À rejouer après chaque changement de `schema.sql`.
 
 ## Limites connues
 - **Pas d'en-têtes HTTP sur GitHub Pages** : pas de `X-Frame-Options` ni de `frame-ancestors` (la protection anti-iframe est faite en JavaScript). Un hébergeur comme Netlify ou Cloudflare Pages permettrait de les ajouter.

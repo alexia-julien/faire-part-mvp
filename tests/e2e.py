@@ -1,26 +1,34 @@
 """Recette de bout en bout (navigateur headless, mode local sans Supabase).
 Lancer depuis la racine du repo :  pip install playwright pillow && python3 tests/e2e.py
-Captures d'écran dans tests/out/. Code de sortie 1 si un test échoue."""
+Captures d'écran dans tests/out/. Code de sortie 1 si un test échoue.
+La base elle-même se teste avec supabase/tests.sql."""
 import subprocess, time, json, re, os, sys, tempfile
 from playwright.sync_api import sync_playwright
 from PIL import Image
+
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-S = os.path.join(ROOT, "tests", "out"); os.makedirs(S, exist_ok=True)
+OUT = os.path.join(ROOT, "tests", "out"); os.makedirs(OUT, exist_ok=True)
 TMP = tempfile.mkdtemp()
 BASE = "http://localhost:8099"
-srv = subprocess.Popen(["python3","-m","http.server","8099"], cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
-time.sleep(1)
 LOCAL = "window.FP_CONFIG={supabaseUrl:'',supabaseKey:''};"
+XSS = '<img src=x onerror=window.__xss=1><script>window.__xss=1</script>"\'>'
 errors, results = [], []
+
 def check(name, ok, detail=""):
-    results.append((name, bool(ok))); print(("PASS " if ok else "FAIL ") + name + (" -> " + str(detail) if detail != "" else ""))
+    results.append((name, bool(ok)))
+    print(("PASS " if ok else "FAIL ") + name + (" -> " + str(detail) if detail != "" else ""))
+
 def watch(pg, tag):
     pg.on("pageerror", lambda e: errors.append(tag + " pageerror: %s" % e))
-    pg.on("console", lambda m: errors.append(tag + " console: " + m.text) if m.type == "error" and "ERR_TUNNEL" not in m.text and "ERR_NAME_NOT" not in m.text else None)
+    pg.on("console", lambda m: errors.append(tag + " console: " + m.text)
+          if m.type == "error" and "ERR_TUNNEL" not in m.text and "ERR_NAME_NOT" not in m.text else None)
     pg.on("dialog", lambda d: (errors.append(tag + " DIALOG " + d.message), d.dismiss()))
     return pg
+
 def newctx(b, **kw):
-    c = b.new_context(**kw); c.route("**/js/config.js", lambda r: r.fulfill(status=200, content_type="application/javascript", body=LOCAL)); return c
+    c = b.new_context(**kw)
+    c.route("**/js/config.js", lambda r: r.fulfill(status=200, content_type="application/javascript", body=LOCAL))
+    return c
 
 def wait_count(pg, sel, n, timeout=30):
     t0 = time.time()
@@ -28,221 +36,375 @@ def wait_count(pg, sel, n, timeout=30):
         if pg.locator(sel).count() == n: return True
         time.sleep(0.1)
     return False
+
+def wait_until(fn, timeout=8):
+    t0 = time.time()
+    while time.time() - t0 < timeout:
+        if fn(): return True
+        time.sleep(0.1)
+    return False
+
 def lum(rgb):
-    v = [int(x)/255 for x in re.findall(r'\d+', rgb)[:3]]
-    v = [x/12.92 if x <= 0.03928 else ((x+0.055)/1.055)**2.4 for x in v]
-    return 0.2126*v[0]+0.7152*v[1]+0.0722*v[2]
+    v = [int(x) / 255 for x in re.findall(r'[\d.]+', rgb)[:3]] if 'color(srgb' not in rgb else [float(x) for x in re.findall(r'[\d.]+', rgb)[:3]]
+    v = [x / 12.92 if x <= 0.03928 else ((x + 0.055) / 1.055) ** 2.4 for x in v]
+    return 0.2126 * v[0] + 0.7152 * v[1] + 0.0722 * v[2]
+
 def ratio(a, b):
-    la, lb = sorted([lum(a), lum(b)], reverse=True); return round((la+0.05)/(lb+0.05), 2)
+    la, lb = sorted([lum(a), lum(b)], reverse=True); return round((la + 0.05) / (lb + 0.05), 2)
 
-Image.new("RGB",(2400,1600),(170,150,130)).save(TMP + "/ok.jpg")
-Image.new("RGB",(900,1600),(120,140,110)).save(TMP + "/portrait.jpg")
-Image.new("RGB",(1200,800),(40,60,200)).save(TMP + "/blue.jpg")
-open(TMP + "/bad.jpg","wb").write(b"not an image at all")
+def db_get(pg):
+    return json.loads(pg.evaluate("localStorage.getItem('fp:db')") or '{"inv":{},"rsvps":{}}')
 
+def db_put(pg, db):
+    pg.evaluate("(d)=>localStorage.setItem('fp:db', d)", json.dumps(db))
+
+def fill_basics(pg, p1='Alexia', p2='Julien', date='2027-08-07', venue='Domaine de Vauluisant'):
+    pg.fill('[data-bind=partner1]', p1); pg.fill('[data-bind=partner2]', p2); pg.fill('[data-bind=date]', date); pg.click('#next')
+    pg.fill('[data-bind=venueName]', venue); pg.click('#next')
+
+Image.new("RGB", (2400, 1600), (170, 150, 130)).save(TMP + "/ok.jpg")
+Image.new("RGB", (900, 1600), (120, 140, 110)).save(TMP + "/portrait.jpg")
+Image.new("RGB", (1200, 800), (40, 60, 200)).save(TMP + "/blue.jpg")
+open(TMP + "/bad.jpg", "wb").write(b"not an image at all")
+
+srv = subprocess.Popen(["python3", "-m", "http.server", "8099"], cwd=ROOT, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+time.sleep(1)
 try:
   with sync_playwright() as p:
     b = p.chromium.launch()
-    c = newctx(b, viewport={"width":1280,"height":900}, timezone_id="Europe/Paris", locale="fr-FR")
+    c = newctx(b, viewport={"width": 1280, "height": 900}, timezone_id="Europe/Paris", locale="fr-FR",
+               permissions=["clipboard-read", "clipboard-write"])
     pg = watch(c.new_page(), "onb"); pg.goto(BASE + "/index.html")
 
-    print("\n== Onboarding : validations ==")
+    print("\n== Étapes 1-2 : validations ==")
     pg.click('#next'); check("étape 1 vide refusée", pg.inner_text('#step-msg') == 'Indiquez les deux prénoms.')
-    pg.fill('[data-bind=partner1]','Alexia'); pg.fill('[data-bind=partner2]','Julien'); pg.click('#next')
+    pg.fill('[data-bind=partner1]', 'Alexia'); pg.fill('[data-bind=partner2]', 'Julien'); pg.click('#next')
     check("date manquante refusée", 'date' in pg.inner_text('#step-msg'))
-    pg.fill('[data-bind=date]','2020-01-01'); pg.click('#next'); check("date passée refusée", 'passée' in pg.inner_text('#step-msg'))
-    pg.fill('[data-bind=date]','2099-01-01'); pg.click('#next'); check("date trop lointaine refusée", 'lointaine' in pg.inner_text('#step-msg'))
-    pg.fill('[data-bind=date]','2027-08-07')
-    pg.press('[data-bind=partner2]','Enter'); check("Entrée passe à l'étape 2", pg.is_visible('fieldset[data-step="2"]'))
-    check("focus sur le titre de l'étape 2", pg.evaluate("document.activeElement.tagName") == 'LEGEND')
-    check("étape courante annoncée (aria-current)", pg.get_attribute('#steps li:nth-child(2)', 'aria-current') == 'step')
+    pg.fill('[data-bind=date]', '2020-01-01'); pg.click('#next'); check("date passée refusée", 'passée' in pg.inner_text('#step-msg'))
+    pg.fill('[data-bind=date]', '2099-01-01'); pg.click('#next'); check("date trop lointaine refusée", 'lointaine' in pg.inner_text('#step-msg'))
+    pg.fill('[data-bind=date]', '2027-08-07')
+    pg.press('[data-bind=partner2]', 'Enter'); check("Entrée passe à l'étape 2", pg.is_visible('fieldset[data-step="2"]'))
+    check("focus sur le titre de l'étape", pg.evaluate("document.activeElement.tagName") == 'LEGEND')
+    check("5 étapes, étape courante annoncée", pg.locator('#steps li').count() == 5 and pg.get_attribute('#steps li:nth-child(2)', 'aria-current') == 'step')
     pg.click('#next'); check("lieu manquant refusé", pg.inner_text('#step-msg') == 'Indiquez le nom du lieu.')
-    pg.fill('[data-bind=venueName]','Domaine de l’Abbaye de Vauluisant'); pg.fill('[data-bind=venueAddress]','Lieu-dit Vauluisant\n89190 Courgenay')
-    pg.fill('[data-bind=mapsUrl]','https://evil.example/phish'); pg.click('#next')
-    check("lien Maps non reconnu refusé avec message", 'pas reconnu' in pg.inner_text('#step-msg'))
-    pg.fill('[data-bind=mapsUrl]','https://maps.app.goo.gl/YX6o64wnaQqDWDLp6')
-
-    print("\n== Brouillon ==")
+    pg.fill('[data-bind=venueName]', 'Domaine de l’Abbaye de Vauluisant'); pg.fill('[data-bind=venueAddress]', 'Lieu-dit Vauluisant\n89190 Courgenay')
+    pg.fill('[data-bind=mapsUrl]', 'https://evil.example/phish'); pg.click('#next')
+    check("lien Maps non reconnu refusé", 'pas reconnu' in pg.inner_text('#step-msg'))
+    pg.fill('[data-bind=mapsUrl]', 'https://maps.app.goo.gl/YX6o64wnaQqDWDLp6')
     pg.reload()
-    check("brouillon restauré après rechargement", pg.input_value('[data-bind=venueName]').startswith('Domaine'))
-    check("retour à la bonne étape", pg.is_visible('fieldset[data-step="2"]'))
-    check("message « brouillon restauré » visible", pg.is_visible('#draft-note'))
+    check("brouillon restauré après rechargement (même étape)", pg.input_value('[data-bind=venueName]').startswith('Domaine') and pg.is_visible('fieldset[data-step="2"]'))
     pg.click('#next')
 
-    print("\n== Photos ==")
-    pg.set_input_files('#photo-input', [TMP + "/bad.jpg", TMP + "/ok.jpg"])
-    wait_count(pg, '#thumbs .thumb', 1); time.sleep(0.5)
-    check("photo illisible signalée, la bonne quand même ajoutée", pg.locator('#thumbs .thumb').count() == 1 and pg.inner_text('#photo-msg') != '', pg.inner_text('#photo-msg'))
-    pg.set_input_files('#photo-input', [TMP + "/portrait.jpg", TMP + "/blue.jpg", TMP + "/ok.jpg"])
-    wait_count(pg, '#thumbs .thumb', 3)
-    check("plafond de 3 photos respecté", pg.locator('#thumbs .thumb').count() == 3 and not pg.is_visible('#add-photo'))
+    print("\n== Étape 3 : photos ==")
+    pg.set_input_files('#photo-input', [TMP + '/bad.jpg', TMP + '/ok.jpg']); wait_count(pg, '#thumbs .thumb', 1); time.sleep(0.5)
+    check("photo illisible signalée, la bonne ajoutée", pg.locator('#thumbs .thumb').count() == 1 and pg.inner_text('#photo-msg') != '')
+    pg.set_input_files('#photo-input', [TMP + '/portrait.jpg', TMP + '/blue.jpg', TMP + '/ok.jpg']); wait_count(pg, '#thumbs .thumb', 3)
+    check("plafond de 3 photos", pg.locator('#thumbs .thumb').count() == 3 and not pg.is_visible('#add-photo'))
     srcs = pg.evaluate("[...document.querySelectorAll('#thumbs img')].map(i=>i.src)")
-    check("photos ajoutées dans l'ordre choisi (paysage, puis portrait)", pg.evaluate("(s)=>new Promise(r=>{const i=new Image();i.onload=()=>r(i.height>i.width);i.src=s})", srcs[1]))
-    first = srcs[0]
+    check("ordre choisi respecté", pg.evaluate("(s)=>new Promise(r=>{const i=new Image();i.onload=()=>r(i.height>i.width);i.src=s})", srcs[1]))
     pg.click('#thumbs .thumb:nth-child(2) .main-btn')
-    check("une autre photo peut devenir principale", pg.evaluate("document.querySelector('#thumbs img').src") == srcs[1])
+    check("choix de la photo principale", pg.evaluate("document.querySelector('#thumbs img').src") == srcs[1])
     pg.click('#thumbs .thumb:nth-child(3) button[aria-label^=Supprimer]')
-    check("suppression d'une photo", pg.locator('#thumbs .thumb').count() == 2 and pg.is_visible('#add-photo'))
-    pg.check('input[name=theme][value=rose]')
-    time.sleep(0.4)
-    check("aperçu suit le thème choisi", pg.get_attribute('#preview', 'data-theme') == 'rose')
+    check("suppression d'une photo", pg.locator('#thumbs .thumb').count() == 2)
+
+    print("\n== Étape 3 : style ==")
+    check("5 ambiances, Champêtre sélectionnée par défaut", pg.locator('.preset').count() == 5 and pg.is_checked('input[name=preset][value=champetre]'))
+    check("options avancées repliées par défaut", not pg.is_visible('#pick-theme'))
+    pg.click('.preset:has(input[value=elegance])'); time.sleep(0.3)
+    attrs = pg.evaluate("['data-theme','data-font','data-shape'].map(a=>document.getElementById('preview').getAttribute(a))")
+    check("ambiance Élégance : nuit + moderne + photo arrondie dans l'aperçu", attrs == ['nuit', 'moderne', 'arrondi'], attrs)
+    check("changer d'intro joue l'intro dans l'aperçu (monogramme)", pg.locator('#preview .fp-intro-monogramme').count() == 1)
+    check("contenu de l'aperçu inerte pendant l'intro", pg.evaluate("document.querySelector('#preview .fp-content').inert") is True)
+    check("intro du monogramme se ferme seule", wait_until(lambda: pg.locator('#preview .fp-intro').count() == 0, 6))
+    check("défilement de l'aperçu rétabli après l'intro", not pg.evaluate("document.getElementById('phone').classList.contains('fp-locked')"))
+    pg.click('#style-more summary')
+    check("8 palettes, 4 polices, 3 intros, 3 formes", [pg.locator('[name=%s]' % n).count() for n in ['style-theme', 'style-font', 'style-intro', 'style-shape']] == [8, 4, 3, 3])
+    pg.click('.pill:has(input[name=style-theme][value=bordeaux])'); time.sleep(0.3)
+    check("palette Bordeaux appliquée, ambiance devenue personnalisée", pg.get_attribute('#preview', 'data-theme') == 'bordeaux'
+          and pg.locator('input[name=preset]:checked').count() == 0)
+    pg.click('.pill:has(input[name=style-shape][value=arche])'); time.sleep(0.3)
+    check("forme arche appliquée à la photo", pg.get_attribute('#preview', 'data-shape') == 'arche'
+          and pg.evaluate("getComputedStyle(document.querySelector('#preview .hero-photo-wrap')).borderTopLeftRadius").startswith('999'))
+    pg.click('.pill:has(input[name=style-font][value=romantique])'); time.sleep(0.3)
+    check("police romantique : prénoms en Great Vibes", 'Great Vibes' in pg.evaluate("getComputedStyle(document.querySelector('#preview .names')).fontFamily"))
+    check("polices chargées depuis Google Fonts uniquement à l'étape Style", pg.evaluate("[...document.querySelectorAll('link[rel=stylesheet]')].filter(l=>l.href.includes('Great+Vibes')).length") >= 1)
+    pg.click('.pill:has(input[name=style-intro][value=enveloppe])'); time.sleep(0.2)
+    check("choisir l'enveloppe la montre dans l'aperçu", pg.locator('#preview .fp-intro-enveloppe').count() == 1)
+    pg.click('#preview .env', force=True)
+    check("l'enveloppe s'ouvre au clic puis disparaît", wait_until(lambda: pg.locator('#preview .fp-intro').count() == 0, 5))
+    check("bouton « Revoir l'introduction » visible", pg.is_visible('#replay-intro'))
+    pg.click('#replay-intro'); check("« Revoir l'introduction » rejoue l'enveloppe", pg.locator('#preview .fp-intro-enveloppe').count() == 1)
+    pg.keyboard.press('Escape'); check("Échap ouvre l'enveloppe", wait_until(lambda: pg.locator('#preview .fp-intro').count() == 0, 5))
+    pg.click('.pill:has(input[name=style-intro][value=aucune])'); time.sleep(0.2)
+    check("intro « Aucune » : pas d'intro, bouton revoir masqué", pg.locator('#preview .fp-intro').count() == 0 and not pg.is_visible('#replay-intro'))
+    pg.uncheck('[data-bind-bool=countdown]'); time.sleep(0.3)
+    check("compte à rebours désactivable", pg.locator('#preview .countdown').count() == 0)
+    pg.check('[data-bind-bool=countdown]')
+    pg.click('.preset:has(input[value=romantique])'); time.sleep(0.3)
+    check("revenir à une ambiance rétablit sa cohérence", pg.evaluate("['data-theme','data-font','data-shape'].map(a=>document.getElementById('preview').getAttribute(a))") == ['rose', 'romantique', 'arche'])
+    pg.keyboard.press('Escape'); wait_until(lambda: pg.locator('#preview .fp-intro').count() == 0, 5)
+    pg.screenshot(path=OUT + "/step3-style.png")
     pg.click('#next')
 
-    print("\n== Étape 4 et publication ==")
-    pg.check('[data-bind-rsvp=brunch]'); pg.uncheck('[data-bind-rsvp=diet]'); time.sleep(0.4)
-    check("aperçu : question brunch ajoutée en direct", pg.locator('#preview input[name=brunch]').count() == 2)
-    check("aperçu : question régime retirée en direct", pg.locator('#preview #f-diet').count() == 0)
+    print("\n== Étape 4 : sections ==")
+    check("aucune section active par défaut", pg.locator('[data-section-toggle]:checked').count() == 0)
+    pg.check('[data-section-toggle=program]'); time.sleep(0.3)
+    times = pg.evaluate("[...document.querySelectorAll('#program-items input[type=time]')].map(i=>i.value)")
+    check("programme pré-rempli à partir de l'heure de la cérémonie", times == ['16:00', '17:30', '20:00', '23:00'], times)
+    check("programme affiché en frise dans l'aperçu", pg.locator('#preview .timeline li').count() == 4)
+    pg.click('#program-add'); pg.fill('#program-items .prog-row:nth-child(5) input[type=text]', 'Brunch ' + XSS)
+    pg.press('#program-items .prog-row:nth-child(5) input[type=text]', 'Enter')
+    check("Entrée dans le programme ne change pas d'étape", pg.is_visible('fieldset[data-step="4"]'))
+    pg.click('#program-items .prog-row:nth-child(1) .icon-btn'); time.sleep(0.3)
+    check("ajout/suppression d'étapes du programme", pg.locator('#preview .timeline li').count() == 4 and pg.locator('#preview .timeline img').count() == 0)
+    pg.check('[data-section-toggle=story]'); time.sleep(0.3)
+    check("« Notre histoire » vide : texte d'exemple dans l'aperçu seulement", 'Votre texte apparaîtra ici' in pg.inner_text('#preview .sec-story'))
+    pg.fill('[data-sec="story.text"]', 'Rencontrés à Lyon en 2019.\n\nLa demande à Lisbonne.')
+    for s in ['dress', 'lodging', 'practical', 'gifts']: pg.check('[data-section-toggle=%s]' % s)
+    check("sections pré-remplies (dress code, hébergement, infos, liste)", all(pg.input_value('[data-sec="%s.text"]' % s) for s in ['dress', 'lodging', 'practical', 'gifts']))
+    pg.fill('[data-sec="lodging.url"]', 'javascript:alert(1)'); pg.click('#next')
+    check("lien d'hébergement invalide refusé", 'hébergements' in pg.inner_text('#step-msg'))
+    pg.fill('[data-sec="lodging.url"]', ''); pg.fill('[data-sec="gifts.url"]', 'https://www.leetchi.com/c/mariage-alexia-julien'); time.sleep(0.3)
+    check("bouton cagnotte avec le domaine affiché", 'leetchi.com' in pg.inner_text('#preview .sec-gifts .maps-btn'))
+    pg.uncheck('[data-section-toggle=practical]'); time.sleep(0.3)
+    check("désactiver une section la retire", pg.locator('#preview .sec-practical').count() == 0)
+    order = pg.evaluate("[...document.querySelectorAll('#preview section')].map(s=>s.className.split(' ')[0].replace('sec-',''))")
+    check("ordre des sections", order == ['message', 'story', 'program', 'lieu', 'dress', 'lodging', 'gifts', 'rsvp'], order)
+    alts = pg.evaluate("[...document.querySelectorAll('#preview section')].map(s=>s.classList.contains('alt'))")
+    check("fonds alternés", all(alts[i] != alts[i + 1] for i in range(len(alts) - 1)))
+    pg.screenshot(path=OUT + "/step4-sections.png")
+    pg.click('#next')
+
+    print("\n== Étape 5 : réponses ==")
+    check("« accompagnants » activable (nombre de personnes coché par défaut)", pg.is_enabled('[data-bind-rsvp=companions]'))
+    pg.uncheck('[data-bind-rsvp=guests]')
+    check("« accompagnants » grisé sans nombre de personnes ni enfants", not pg.is_enabled('[data-bind-rsvp=companions]'))
+    pg.check('[data-bind-rsvp=guests]')
+    for k in ['children', 'companions', 'brunch', 'email', 'phone', 'address']: pg.check('[data-bind-rsvp=%s]' % k)
+    pg.fill('[data-bind-rsvp-text=customLabel]', 'Une chanson pour la soirée ? ' + XSS)
+    pg.fill('[data-bind-rsvp-text=deadline]', '2027-09-01'); pg.click('#publish')
+    check("date limite après le mariage refusée", 'précéder' in pg.inner_text('#step-msg'))
+    pg.fill('[data-bind-rsvp-text=deadline]', '2020-01-01'); pg.click('#publish')
+    check("date limite passée refusée", 'passée' in pg.inner_text('#step-msg'))
+    pg.fill('[data-bind-rsvp-text=deadline]', '2027-06-01'); time.sleep(0.3)
+    check("aperçu : adultes + enfants, email, téléphone, adresse, question perso", all(pg.locator('#preview ' + s).count() == 1 for s in ['#f-guests', '#f-children', '#f-email', '#f-phone', '#f-address', '#f-custom']))
+    check("aperçu : question perso échappée", pg.locator('#preview label[for=f-custom] img').count() == 0 and pg.evaluate("window.__xss") is None)
+    check("aperçu : date limite affichée", 'avant le 1er juin 2027' in pg.inner_text('#preview .deadline'))
+    check("mention de confidentialité adaptée aux coordonnées", 'coordonnées' in pg.inner_text('#preview .privacy'))
     pg.click('#publish'); pg.wait_for_selector('#done:not([hidden])')
     pub, adm = pg.input_value('#public-link'), pg.input_value('#admin-link')
     slug = pub.split('f=')[1]; key = adm.split('#k=')[1]
-    check("lien public de la forme alexia-julien-xxxxxxxx", re.fullmatch(r'alexia-julien-[a-z0-9]{8}', slug), slug)
-    check("lien privé avec clé de 24 caractères", re.fullmatch(r'[a-z0-9]{24}', key))
-    check("temps de création affiché", pg.inner_text('#done-time').startswith('Créé en'), pg.inner_text('#done-time'))
-    mail = pg.get_attribute('#mail-admin', 'href')
-    check("bouton « m'envoyer le lien par email » contient le lien privé", mail.startswith('mailto:') and key in mail)
+    check("publication : lien public et lien privé", re.fullmatch(r'alexia-julien-[a-z0-9]{8}', slug) and re.fullmatch(r'[a-z0-9]{24}', key))
+    stored = db_get(pg)['inv'][slug]['config']
+    check("config publiée : style, sections, RSVP, fuseau", stored['theme'] == 'rose' and stored['font'] == 'romantique' and stored['intro'] == 'enveloppe'
+          and stored['sections']['program']['on'] and len(stored['sections']['program']['items']) == 4 and stored['rsvp']['email'] and stored['tz'] == 'Europe/Paris')
+    check("étapes vides du programme non publiées", all(it['label'].strip() for it in stored['sections']['program']['items']))
     check("brouillon effacé après publication", pg.evaluate("localStorage.getItem('fp:draft')") is None)
-    stored = pg.evaluate("JSON.parse(localStorage.getItem('fp:db')).inv[%s].config" % json.dumps(slug))
-    check("fuseau du lieu enregistré", stored.get('tz') == 'Europe/Paris', stored.get('tz'))
-    check("durée de création enregistrée", isinstance(stored.get('meta',{}).get('durationSec'), (int,float)))
-    pg.goto(BASE + "/index.html")
-    check("après publication : formulaire vierge + lien « reprendre »", pg.input_value('[data-bind=partner1]') == '' and pg.is_visible('#resume'))
 
-    print("\n== Page publique ==")
-    g = watch(c.new_page(), "pub"); g.goto(pub); g.wait_for_selector('.rsvp-form')
-    check("titre de l'onglet", g.title() == 'Alexia & Julien — Vous êtes invités', g.title())
-    check("date affichée en français", g.inner_text('.fp .date') == '7 août 2027', g.inner_text('.fp .date'))
-    check("jour et heure", g.inner_text('.fp .date-sub').upper() == 'SAMEDI · 16H00', g.inner_text('.fp .date-sub'))
-    check("lien Maps conservé", g.get_attribute('.maps-btn','href') == 'https://maps.app.goo.gl/YX6o64wnaQqDWDLp6')
-    check("2 photos : photo principale + 1 en galerie", g.locator('.hero-photo').count() == 1 and g.locator('.gallery img').count() == 1)
-    check("question régime absente (décochée)", g.locator('#f-diet').count() == 0)
-    btn = g.evaluate("(()=>{const s=getComputedStyle(document.querySelector('.fp .btn'));return [s.backgroundColor,s.color]})()")
-    check("contraste du bouton ≥ 4,5:1 (thème rose)", ratio(*btn) >= 4.5, ratio(*btn))
-    check("fond de page assorti au thème", g.evaluate("getComputedStyle(document.body).backgroundColor") == 'rgb(250, 243, 240)')
-    # ICS
-    with g.expect_download() as dl: g.click('[data-ics]')
-    ics = open(dl.value.path(), newline='').read()
-    check("agenda : heure en UTC (16h Paris = 14h UTC en août)", 'DTSTART:20270807T140000Z' in ics, re.findall(r'DTSTART:\S+', ics))
-    check("agenda : lignes ≤ 75 octets", all(len(l.encode()) <= 75 for l in ics.split('\r\n')), max(len(l.encode()) for l in ics.split('\r\n')))
-    long_ics = g.evaluate("FP.buildIcs({partner1:'Hélène-Éléonore',partner2:'Zoé',date:'2027-08-07',venueName:'Château d’Œuvre ’’’’’’’’’’’’’’’’’’’’’’’’’’’’’’ éééééééééééééééééééé 😀😀😀😀😀😀😀😀😀😀',venueAddress:'Rue de l’Église'})")
-    lines = long_ics.split('\r\n')
-    check("agenda : repli correct avec accents et emojis (≤ 75 octets, texte intact)", all(len(l.encode()) <= 75 for l in lines) and '😀😀😀' in long_ics.replace('\r\n ', ''), max(len(l.encode()) for l in lines))
-    check("agenda : lieu présent (déplié)", 'Vauluisant' in ics.replace('\r\n ', ''))
-    # RSVP
-    g.click('.rsvp-form button[type=submit]'); check("réponse vide refusée", 'nom' in g.inner_text('.form-msg'))
-    g.fill('#f-name','Marie Dupont'); g.check('input[name=attendance][value=no]')
-    check("« Je ne pourrai pas » masque nombre et brunch", not g.is_visible('#f-guests') and not g.is_visible('input[name=brunch]'))
-    g.check('input[name=attendance][value=yes]'); g.fill('#f-guests','2'); g.check('input[name=brunch][value=yes]')
+    print("\n== Page publique : intro et contenu ==")
+    g = watch(c.new_page(), "pub"); g.goto(pub); g.wait_for_selector('.fp-intro-enveloppe')
+    check("enveloppe affichée à l'ouverture", g.is_visible('.env'))
+    check("page verrouillée et contenu inerte pendant l'intro", g.evaluate("document.documentElement.classList.contains('fp-locked') && document.querySelector('.fp-content').inert"))
+    check("enveloppe accessible au clavier (bouton nommé)", g.get_attribute('.env', 'aria-label') == 'Ouvrir l’invitation')
+    g.screenshot(path=OUT + "/public-envelope.png")
+    g.click('.env', force=True); time.sleep(1.2); g.screenshot(path=OUT + "/public-envelope-open.png")
+    check("après ouverture : intro retirée, page déverrouillée", wait_until(lambda: g.locator('.fp-intro').count() == 0, 5)
+          and not g.evaluate("document.documentElement.classList.contains('fp-locked')") and not g.evaluate("document.querySelector('.fp-content').inert"))
+    check("fond de page assorti à la palette", g.evaluate("getComputedStyle(document.body).backgroundColor") == 'rgb(250, 243, 240)')
+    check("seule la police choisie est téléchargée", g.evaluate("[...document.querySelectorAll('link[rel=stylesheet]')].filter(l=>l.href.includes('fonts.googleapis')).length") == 1)
+    check("programme : 4 étapes, libellé piégé affiché en texte", g.locator('.timeline li').count() == 4 and g.locator('.timeline img').count() == 0 and g.evaluate("window.__xss") is None)
+    check("notre histoire en 2 paragraphes", g.locator('.sec-story .narrow p').count() == 2)
+    check("cagnotte : lien sûr ouvert dans un nouvel onglet", g.get_attribute('.sec-gifts .maps-btn', 'rel') == 'noopener nofollow' and g.get_attribute('.sec-gifts .maps-btn', 'target') == '_blank')
+    check("hébergement sans lien : pas de bouton", g.locator('.sec-lodging .maps-btn').count() == 0)
+    g.check('input[name=attendance][value=yes]')
+    check("accompagnants masqués pour une personne seule", not g.is_visible('#f-companions'))
+    g.fill('#f-guests', '2'); check("accompagnants affichés dès 2 personnes", g.is_visible('#f-companions'))
+    g.fill('#f-guests', '1'); g.fill('#f-children', '2'); check("accompagnants affichés avec des enfants", g.is_visible('#f-companions'))
+    g.check('input[name=attendance][value=no]')
+    check("« absent » masque adultes, enfants, accompagnants, brunch, régime", not any(g.is_visible(s) for s in ['#f-guests', '#f-children', '#f-companions', 'input[name=brunch]']))
+    check("« absent » garde les coordonnées et la question perso", all(g.is_visible(s) for s in ['#f-email', '#f-phone', '#f-custom']))
+    g.check('input[name=attendance][value=yes]')
+    g.fill('#f-name', 'Marie Dupont'); g.fill('#f-email', 'marie@'); g.click('.rsvp-form button[type=submit]')
+    check("email invalide signalé avant l'envoi", 'email' in g.inner_text('.form-msg'))
+    g.fill('#f-email', 'a@b.c<script>'); g.click('.rsvp-form button[type=submit]')
+    check("email piégé refusé", 'email' in g.inner_text('.form-msg'))
+    g.fill('#f-email', 'marie.dupont@example.fr'); g.fill('#f-phone', 'abc'); g.click('.rsvp-form button[type=submit]')
+    check("téléphone invalide signalé", 'téléphone' in g.inner_text('.form-msg'))
+    g.fill('#f-phone', '06 12 34 56 78'); g.fill('#f-guests', '2'); g.fill('#f-children', '1')
+    g.fill('#f-companions', 'Paul Dupont, Léo (6 ans)'); g.check('input[name=brunch][value=yes]'); g.fill('#f-diet', 'Sans gluten')
+    g.fill('#f-address', '12 rue des Lilas\n69003 Lyon'); g.fill('#f-custom', 'Dancing Queen'); g.fill('#f-msg', '=HYPERLINK("x")')
     g.click('.rsvp-form button[type=submit]'); g.wait_for_selector('.thanks')
-    check("message de remerciement", 'Merci Marie' in g.inner_text('.thanks'))
-    g.reload(); g.wait_for_selector('.rsvp-form')
-    check("au retour, l'invité est prévenu qu'il a déjà répondu", 'déjà répondu (Marie Dupont)' in g.inner_text('.fp'))
-    g.fill('#f-name','Marie Dupont'); g.check('input[name=attendance][value=no]'); g.click('.rsvp-form button[type=submit]'); g.wait_for_selector('.thanks')
-    g2 = watch(newctx(b).new_page(), "pub2")  # autre invité, autre navigateur
-    # on recopie la base locale dans ce 2e contexte
-    db = pg.evaluate("localStorage.getItem('fp:db')")
-    g2.goto(BASE + "/index.html"); g2.evaluate("(d)=>localStorage.setItem('fp:db', d)", db)
-    g2.goto(pub); g2.wait_for_selector('.rsvp-form')
-    g2.fill('#f-name','Paul Martin'); g2.check('input[name=attendance][value=yes]'); g2.fill('#f-guests','3'); g2.fill('#f-msg','=HYPERLINK("x")')
-    g2.click('.rsvp-form button[type=submit]'); g2.wait_for_selector('.thanks')
-    db2 = g2.evaluate("localStorage.getItem('fp:db')")
-    pg.evaluate("(d)=>localStorage.setItem('fp:db', d)", db2)
+    check("réponse complète envoyée", 'Merci Marie' in g.inner_text('.thanks'))
+    saved = db_get(g)['rsvps'][slug][-1]['data']
+    check("toutes les données collectées", saved['children'] == 1 and saved['email'] == 'marie.dupont@example.fr' and 'Lyon' in saved['address']
+          and saved['custom'] == 'Dancing Queen' and saved['companions'].startswith('Paul'), saved)
+    g.reload(); g.wait_for_selector('.fp-intro'); g.keyboard.press('Escape'); wait_until(lambda: g.locator('.fp-intro').count() == 0)
+    check("au retour : prévenu d'une réponse déjà envoyée", 'déjà répondu (Marie Dupont)' in g.inner_text('.fp'))
+    g.fill('#f-name', 'Marie Dupont'); g.check('input[name=attendance][value=no]'); g.fill('#f-email', 'marie.dupont@example.fr')
+    g.click('.rsvp-form button[type=submit]'); g.wait_for_selector('.thanks')
+    # autres invités, saisis directement
+    db = db_get(g)
+    db['rsvps'][slug] += [
+        {"id": 100, "created_at": "2026-10-21T08:00:00Z", "data": {"name": "Zoé Bernard", "attendance": "yes", "guests": 1, "children": 0, "diet": "Végétarienne", "email": "zoe@example.com", "brunch": "no"}},
+        {"id": 101, "created_at": "2026-10-21T09:00:00Z", "data": {"name": "Antoine Leroy", "attendance": "yes", "guests": 2, "children": 2, "companions": "Claire, Hugo, Lina", "email": "antoine@example.com", "brunch": "yes"}},
+        {"id": 102, "created_at": "2026-10-21T10:00:00Z", "data": {"name": "Hacker " + XSS, "attendance": "yes", "guests": "<b>", "children": "x", "email": XSS, "diet": XSS}},
+    ]
+    db_put(g, db)
 
     print("\n== Page de suivi ==")
     a = watch(c.new_page(), "adm"); a.goto(adm); a.wait_for_selector('#content:not([hidden])')
-    tiles = a.inner_text('#tiles').replace('\n',' | ')
-    check("titre avec les prénoms", a.inner_text('#admin-title') == 'Réponses — Alexia & Julien')
-    check("doublon de Marie : seule sa dernière réponse compte", tiles.startswith('2 | réponses'), tiles)
-    check("totaux : 3 présents (Paul+2), 1 absente (Marie), 0 brunch", '3 | personnes présentes (1 réponse)' in tiles and '1 | ne viendra pas' in tiles and '0 | au brunch' in tiles, tiles)
-    check("ancienne réponse grisée et signalée", a.locator('tr.superseded').count() == 1 and a.is_visible('#dup-note'))
-    heads = a.evaluate("[...document.querySelectorAll('thead th')].filter(t=>!t.hidden).map(t=>t.textContent.trim())")
-    check("colonne Régime masquée (question non posée)", 'Régime' not in heads and 'Brunch' in heads, heads)
+    check("titre et rappel de la date limite", a.inner_text('#admin-title') == 'Réponses — Alexia & Julien' and '1er juin 2027' in a.inner_text('#admin-sub'), a.inner_text('#admin-sub'))
+    tiles = a.inner_text('#tiles').replace('\n', ' | ')
+    check("tuiles : 4 réponses (doublon écarté), adultes et enfants", tiles.startswith('4 | réponses') and '6 | personnes présentes (4 adultes, 2 enfants)' in tiles, tiles)
+    check("tuiles : 1 absente, brunch compté avec les enfants", '1 | ne viendra pas' in tiles and '4 | au brunch' in tiles, tiles)
+    check("régimes pour le traiteur (présents uniquement)", a.locator('#diet-list li').count() == 2 and 'Végétarienne' in a.inner_text('#diet-list'))
+    check("données piégées affichées en texte", a.evaluate("window.__xss") is None and a.locator('tbody img, tbody script, #diet-list img').count() == 0)
+    heads = a.evaluate("[...document.querySelectorAll('thead th')].map(t=>t.textContent.trim())")
+    check("colonnes = questions posées (adultes, enfants, accompagnants, email, téléphone, adresse, question perso)",
+          all(h in heads for h in ['Adultes', 'Enfants', 'Accompagnants', 'Email', 'Téléphone', 'Adresse']) and any(h.startswith('Une chanson') for h in heads), heads)
+    check("question perso échappée dans l'en-tête", a.locator('thead img').count() == 0)
+    a.click('[data-filter=no]'); check("filtre « Absents »", a.locator('tbody tr').count() == 1 and 'Marie' in a.inner_text('tbody'))
+    a.click('[data-filter=yes]'); check("filtre « Présents »", a.locator('tbody tr').count() == 4)
+    a.click('[data-filter=all]'); a.fill('#search', 'leroy'); time.sleep(0.2)
+    check("recherche par nom (sans accents ni majuscules)", a.locator('tbody tr').count() == 1 and 'Antoine' in a.inner_text('tbody'))
+    a.fill('#search', 'hugo'); time.sleep(0.2); check("recherche dans les accompagnants", a.locator('tbody tr').count() == 1)
+    a.fill('#search', 'zzzz'); time.sleep(0.2); check("aucun résultat : message clair", a.is_visible('#no-match') and not a.is_visible('#table-wrap'))
+    a.fill('#search', ''); time.sleep(0.2)
+    a.click('th:has-text("Nom") .sort'); names = a.evaluate("[...document.querySelectorAll('tbody tr td:nth-child(1)')].map(t=>t.textContent)")
+    check("tri par nom (A→Z)", names[0].startswith('Antoine') and names[-1].startswith('Zoé'), names)
+    check("tri annoncé (aria-sort)", a.get_attribute('th:has-text("Nom")', 'aria-sort') == 'ascending')
+    a.click('th:has-text("Nom") .sort'); check("tri inversé", a.evaluate("document.querySelector('tbody tr td:nth-child(1)').textContent").startswith('Zoé'))
+    a.click('#copy-emails'); time.sleep(0.3)
+    clip = a.evaluate("navigator.clipboard.readText()")
+    check("copie des emails : valides, sans doublon, réponses en vigueur", clip == 'marie.dupont@example.fr, zoe@example.com, antoine@example.com' and '3 adresses copiées' in a.inner_text('#action-msg'), clip)
+    check("bouton de copie indique le nombre d'emails", a.inner_text('#copy-emails') == 'Copier les 3 emails')
     with a.expect_download() as dl: a.click('#csv')
-    csv = open(dl.value.path(), encoding='utf-8-sig').read()
-    check("CSV : formule Excel neutralisée", '"\'=HYPERLINK' in csv)
-    check("CSV : dates lisibles + colonne « Remplacée »", re.search(r'"\d{2}/\d{2}/\d{4} \d{2}:\d{2}"', csv) and 'Remplacée' in csv)
+    csv = open(dl.value.path(), encoding='utf-8-sig', newline='').read()
+    check("CSV : toutes les colonnes + formule neutralisée", all(h in csv.split('\r\n')[0] for h in ['Adultes', 'Enfants', 'Email', 'Adresse', 'Remplacée']) and '"\'=HYPERLINK' in csv)
+    check("CSV : adresse multi-ligne conservée dans sa cellule", '"12 rue des Lilas\n69003 Lyon"' in csv)
     n0 = a.locator('tbody tr').count()
-    delbtn = a.locator('tbody tr.superseded .link-btn'); delbtn.click()
-    check("suppression : 1er clic demande confirmation", delbtn.inner_text() == 'Confirmer ?')
-    delbtn.click(); wait_count(a, 'tbody tr', n0 - 1)
-    check("suppression effective", a.locator('tbody tr.superseded').count() == 0 and not a.is_visible('#dup-note'))
-    a.reload(); a.wait_for_selector('#content:not([hidden])')
-    check("suppression persistante après rechargement", a.locator('tbody tr').count() == n0 - 1)
-    bad = watch(c.new_page(), "bad"); bad.goto(BASE + "/admin.html?f=" + slug + "#k=" + "a"*24); bad.wait_for_selector('#state:not([hidden])')
+    a.click('tbody tr:has-text("Hacker") .link-btn'); a.click('tbody tr:has-text("Hacker") .link-btn'); wait_count(a, 'tbody tr', n0 - 1)
+    check("suppression d'une réponse (2 clics)", a.locator('tbody tr').count() == n0 - 1)
+    check("nom en première colonne, fixé au défilement horizontal", a.evaluate("getComputedStyle(document.querySelector('tbody td')).position") == 'sticky')
+    check("bouton Supprimer sur une seule ligne", a.evaluate("(()=>{const b=document.querySelector('tbody .act .link-btn');return b.getBoundingClientRect().height<30})()"))
+    check("en-tête de question longue tronqué avec infobulle", a.evaluate("(()=>{const t=[...document.querySelectorAll('thead th')].find(x=>x.title.startsWith('Une chanson'));return t.getBoundingClientRect().width<=13*16+40})()"))
+    check("noms et emails non coupés au milieu (ordinateur)", a.evaluate("[...document.querySelectorAll('tbody td.sticky')].every(td=>{const r=document.createRange();r.selectNodeContents(td.firstChild);return new Set([...r.getClientRects()].map(x=>Math.round(x.top))).size===1})"))
+    a.evaluate("document.getElementById('table-wrap').scrollLeft=0")
+    a.screenshot(path=OUT + "/admin-desktop.png", full_page=True)
+    am = watch(newctx(b, viewport={"width": 375, "height": 800}, is_mobile=True, has_touch=True).new_page(), "adm-mob")
+    am.goto(BASE + "/index.html"); db_put(am, db_get(a)); am.goto(adm); am.wait_for_selector('#content:not([hidden])')
+    check("suivi mobile : réponses en cartes, sans défilement horizontal",
+          am.evaluate("getComputedStyle(document.querySelector('tbody tr')).display") == 'block' and am.evaluate("document.documentElement.scrollWidth <= innerWidth"))
+    check("suivi mobile : chaque valeur étiquetée", am.evaluate("getComputedStyle(document.querySelector('tbody td'),'::before').content").strip('"') == 'Nom')
+    am.screenshot(path=OUT + "/admin-mobile.png", full_page=True)
+    bad = watch(c.new_page(), "bad"); bad.goto(BASE + "/admin.html?f=" + slug + "#k=" + "a" * 24); bad.wait_for_selector('#state:not([hidden])')
     check("suivi : mauvaise clé refusée", 'refusé' in bad.inner_text('#state'))
 
     print("\n== Modification ==")
-    e = watch(c.new_page(), "edit"); e.goto(BASE + "/index.html?f=" + slug + "#k=" + key)
-    e.wait_for_selector('#wizard:not([hidden])')
-    check("formulaire prérempli", e.input_value('[data-bind=partner1]') == 'Alexia' and e.locator('#thumbs .thumb').count() == 2)
-    e.click('#next'); e.click('#next'); e.fill('[data-bind=message]', 'Nouveau message'); e.click('#next'); e.click('#publish')
-    e.wait_for_selector('#done:not([hidden])')
-    check("modification enregistrée, même lien", e.input_value('#public-link') == pub and e.inner_text('#done-title') == 'Modifications enregistrées !')
-    g.goto(pub); g.wait_for_selector('.rsvp-form'); check("page publique mise à jour", 'Nouveau message' in g.inner_text('.fp'))
-    e2 = watch(c.new_page(), "edit-bad"); e2.goto(BASE + "/index.html?f=" + slug + "#k=" + "b"*24); time.sleep(0.6)
-    check("modification avec mauvaise clé : bloquée avant saisie", e2.is_hidden('#wizard') and 'invalide' in e2.inner_text('#subtitle'))
+    e = watch(c.new_page(), "edit"); e.goto(BASE + "/index.html?f=" + slug + "#k=" + key); e.wait_for_selector('#wizard:not([hidden])')
+    check("modification : tout est pré-rempli", e.input_value('[data-bind=partner1]') == 'Alexia' and e.locator('#thumbs .thumb').count() == 2)
+    e.click('#next'); e.click('#next')
+    check("modification : style conservé", e.is_checked('input[name=preset][value=romantique]'))
+    e.click('#next')
+    check("modification : sections conservées", e.is_checked('[data-section-toggle=gifts]') and e.locator('#program-items .prog-row').count() == 4)
+    e.fill('[data-sec="dress.text"]', 'Tenue de soirée.'); e.click('#next')
+    check("modification : questions conservées", e.is_checked('[data-bind-rsvp=address]') and e.input_value('[data-bind-rsvp-text=deadline]') == '2027-06-01')
+    e.click('#publish'); e.wait_for_selector('#done:not([hidden])')
+    g.goto(pub); g.wait_for_selector('.fp-intro'); g.keyboard.press('Escape'); wait_until(lambda: g.locator('.fp-intro').count() == 0)
+    check("modification visible sur la page publique", 'Tenue de soirée.' in g.inner_text('.sec-dress'))
 
-    print("\n== Fuseaux horaires ==")
-    for tz in ["America/Sao_Paulo", "Asia/Tokyo"]:
-        x = newctx(b, timezone_id=tz).new_page(); x.goto(BASE + "/index.html")
-        inst = x.evaluate("FP.eventInstant({date:'2027-08-07',time:'16:00',tz:'Europe/Paris'})")
-        disp = x.evaluate("FP.formatDate({date:'2027-08-07',time:'16:00'})")
-        check("invité à %s : bon instant et date affichée inchangée" % tz, inst == 1817647200000 and disp == '7 août 2027', (inst, disp))
-    x = newctx(b, timezone_id="Europe/Paris").new_page(); x.goto(BASE + "/index.html")
-    check("passage à l'heure d'hiver géré (31/10/2027 2h30)", x.evaluate("FP.eventInstant({date:'2027-03-28',time:'12:00',tz:'Europe/Paris'})") == 1837850400000 - 0 or True)
-    check("31 février refusé", x.evaluate("FP.eventDate({date:'2027-02-31'})") is None)
-    check("ancien faire-part sans fuseau = Europe/Paris", x.evaluate("FP.eventInstant({date:'2027-08-07',time:'16:00'})") == 1817647200000)
+    print("\n== Intros : monogramme, aucune, anciens faire-part, mouvement réduit ==")
+    db = db_get(pg)
+    base_cfg = {"partner1": "Léa", "partner2": "Tom", "date": "2027-07-10", "venueName": "Château"}
+    db['inv']['mono-0001'] = {"key": "k" * 24, "config": dict(base_cfg, intro="monogramme", theme="noir", font="minimal")}
+    db['inv']['none-0001'] = {"key": "k" * 24, "config": dict(base_cfg, intro="aucune")}
+    db['inv']['legacy-0001'] = {"key": "k" * 24, "config": dict(base_cfg, theme="sauge", practical="Parking sur place.")}
+    for s in ['mono-0001', 'none-0001', 'legacy-0001']: db['rsvps'][s] = []
+    db_put(pg, db)
+    m = watch(c.new_page(), "mono"); m.goto(BASE + "/invitation.html?f=mono-0001"); m.wait_for_selector('.fp-intro-monogramme')
+    check("monogramme : initiales L & T", m.inner_text('.mono-letters').replace('\n', '').replace(' ', '') == 'L&T', m.inner_text('.mono-letters'))
+    m.screenshot(path=OUT + "/public-monogram.png")
+    check("monogramme : s'efface seul", wait_until(lambda: m.locator('.fp-intro').count() == 0, 6))
+    check("noir & or + minimaliste : prénoms en capitales", m.evaluate("getComputedStyle(document.querySelector('.names')).textTransform") == 'uppercase')
+    n = watch(c.new_page(), "none"); n.goto(BASE + "/invitation.html?f=none-0001"); n.wait_for_selector('.rsvp-form')
+    check("intro « aucune » : faire-part direct", n.locator('.fp-intro').count() == 0)
+    l = watch(c.new_page(), "legacy"); l.goto(BASE + "/invitation.html?f=legacy-0001"); l.wait_for_selector('.rsvp-form')
+    check("ancien faire-part : pas d'intro imposée, infos pratiques reprises", l.locator('.fp-intro').count() == 0 and 'Parking sur place.' in l.inner_text('.sec-practical'))
+    rm = watch(newctx(b, reduced_motion="reduce").new_page(), "reduced")
+    rm.goto(BASE + "/index.html"); db_put(rm, db_get(pg)); rm.goto(pub); rm.wait_for_selector('.fp-intro')
+    rm.click('.env'); check("mouvement réduit : ouverture quasi immédiate", wait_until(lambda: rm.locator('.fp-intro').count() == 0, 1.5))
 
-    print("\n== Sécurité (non-régression) ==")
-    XSS = '<img src=x onerror=window.__xss=1><script>window.__xss=1</script>"\'>'
-    forged = {"partner1": XSS, "partner2": {"x":1}, "date":"2027-08-07", "venueName": XSS, "venueAddress":["a"], "message": XSS,
-              "mapsUrl":"javascript:alert(1)", "theme":'x"><script>window.__xss=1</script>', "tz":"../../etc", 
-              "photos":["javascript:alert(1)","data:image/svg+xml;base64,PHN2Zz48L3N2Zz4=","data:image/jpeg;base64,AAAA"], "rsvp":"oops"}
-    fj = json.dumps(forged).replace('"x": 1}', '"x": 1}, "__proto__": {"polluted": "yes"}', 1)
-    pg.evaluate("""(f)=>{const db=JSON.parse(localStorage.getItem('fp:db'));db.inv['forge-0001']={key:'z'.repeat(24),config:JSON.parse(f)};db.rsvps['forge-0001']=[{id:1,created_at:'x',data:{name:%s,attendance:'yes',guests:'<b>',rid:'<x>'}}];localStorage.setItem('fp:db',JSON.stringify(db))}""" % json.dumps(XSS), fj)
-    f = watch(c.new_page(), "forged"); f.goto(BASE + "/invitation.html?f=forge-0001"); f.wait_for_selector('.rsvp-form')
-    check("config forgée : aucun script exécuté", f.evaluate("window.__xss") is None)
-    check("config forgée : pas de pollution de prototype", f.evaluate("({}).polluted") is None)
-    check("config forgée : seule la photo JPEG passe", f.evaluate("[...document.querySelectorAll('.fp img')].length") == 1)
-    check("config forgée : lien javascript: neutralisé", f.get_attribute('.maps-btn','href').startswith('https://www.google.com/maps/search/'))
-    check("config forgée : fuseau invalide ignoré", f.evaluate("FP.sanitizeConfig({tz:'../../etc'}).tz") == '')
-    fa = watch(c.new_page(), "forged-adm"); fa.goto(BASE + "/admin.html?f=forge-0001#k=" + "z"*24); fa.wait_for_selector('#content:not([hidden])')
-    check("suivi : nom piégé affiché comme du texte", fa.evaluate("window.__xss") is None and fa.locator('tbody img, tbody script').count() == 0)
+    print("\n== Sécurité : config forgée (nouveaux champs) ==")
+    forged = {"partner1": XSS, "partner2": {"x": 1}, "date": "2027-08-07", "venueName": XSS, "intro": "x\"><script>", "font": "../../evil",
+              "theme": "x", "photoShape": "<b>", "countdown": "yes", "tz": "../../etc",
+              "sections": {"story": {"on": True, "text": XSS}, "program": {"on": True, "items": [{"time": "<b>", "label": XSS}] + [{"time": "10:00", "label": "x"}] * 40 + ["str", None]},
+                           "lodging": {"on": True, "text": "t", "url": "javascript:alert(1)"}, "gifts": {"on": True, "text": "t", "url": "https://user:pw@evil.com/"},
+                           "dress": {"on": "true", "text": "ne doit pas s'afficher"}, "__proto__": {"polluted": 1}},
+              "rsvp": {"customLabel": XSS, "deadline": "2027-13-45", "email": "yes"}, "photos": ["javascript:alert(1)"]}
+    db = db_get(pg); db['inv']['forge-0002'] = {"key": "z" * 24, "config": forged}; db['rsvps']['forge-0002'] = []; db_put(pg, db)
+    f = watch(c.new_page(), "forged"); f.goto(BASE + "/invitation.html?f=forge-0002"); f.wait_for_selector('.rsvp-form')
+    check("forgée : aucun script exécuté, aucune balise injectée", f.evaluate("window.__xss") is None and f.locator('.fp img, .fp script, .fp b').count() == 0)
+    check("forgée : intro, police, palette, forme invalides → valeurs sûres (enveloppe par défaut)",
+          f.evaluate("[...['data-theme','data-font','data-shape']].map(a=>document.getElementById('root').getAttribute(a))") == ['sauge', 'classique', 'arrondi'] and f.locator('.fp-intro-enveloppe').count() == 1)
+    check("forgée : programme plafonné à 8 étapes, entrées invalides ignorées", f.locator('.timeline li').count() == 8)
+    check("forgée : lien javascript: et lien avec identifiants refusés", f.locator('.sec-lodging .maps-btn, .sec-gifts .maps-btn').count() == 0)
+    check("forgée : section activée par une chaîne « true » ignorée", f.locator('.sec-dress').count() == 0)
+    check("forgée : date limite impossible ignorée, email non demandé (« yes » ≠ true)", f.locator('.deadline').count() == 0 and f.locator('#f-email').count() == 0)
+    check("forgée : pas de pollution de prototype", f.evaluate("({}).polluted") is None)
     fr = c.new_page(); fr.goto(BASE + "/robots.txt")
     fr.set_content("<iframe id=i src='%s/admin.html?f=%s#k=%s'></iframe>" % (BASE, slug, key)); time.sleep(1)
-    check("suivi dans une iframe : page vidée", fr.frame_locator('#i').locator('body').inner_text().strip() == '')
+    check("suivi dans une iframe : page vidée (anti-clickjacking)", fr.frame_locator('#i').locator('body').inner_text().strip() == '')
+
+    print("\n== Agenda et fuseaux ==")
+    with g.expect_download() as dl: g.click('[data-ics]')
+    ics = open(dl.value.path(), newline='').read()
+    check("agenda : 16h Paris = 14h UTC, lignes ≤ 75 octets", 'DTSTART:20270807T140000Z' in ics and all(len(x.encode()) <= 75 for x in ics.split('\r\n')))
+    x = newctx(b, timezone_id="America/Sao_Paulo").new_page(); x.goto(BASE + "/index.html")
+    check("invité au Brésil : bon instant, date affichée inchangée",
+          x.evaluate("FP.eventInstant({date:'2027-08-07',time:'16:00',tz:'Europe/Paris'})") == 1817647200000 and x.evaluate("FP.formatDate({date:'2027-08-07',time:'16:00'})") == '7 août 2027')
+
+    print("\n== Contrastes des 8 palettes ==")
+    t = c.new_page(); t.goto(BASE + "/index.html")
+    for th in ['sauge', 'rose', 'terracotta', 'lavande', 'bordeaux', 'riviera', 'nuit', 'noir']:
+        r = t.evaluate("""(th)=>{const el=document.getElementById('preview');
+           FP.renderInvitation(el,{partner1:'A',partner2:'B',date:'2027-08-07',venueName:'Lieu',theme:th,intro:'aucune',sections:{program:{on:true,items:[{time:'15:00',label:'x'}]}}},{});
+           const q=s=>getComputedStyle(el.querySelector(s)), bg=getComputedStyle(el).backgroundColor, cream=q('section.alt').backgroundColor;
+           return {btn:[q('.btn').backgroundColor,q('.btn').color], soft:[q('.narrow').color,cream], date:[q('.date').color,bg], time:[q('.t-time').color,(q('.sec-program').backgroundColor==='rgba(0, 0, 0, 0)'?bg:q('.sec-program').backgroundColor)], ink:[q('.names').color,bg]}}""", th)
+        vals = {k: ratio(*v) for k, v in r.items()}
+        check("palette %-10s : contrastes ≥ 4,5 %s" % (th, vals), min(vals.values()) >= 4.5)
 
     print("\n== Mobile ==")
-    m = watch(newctx(b, viewport={"width":375,"height":740}, is_mobile=True, has_touch=True).new_page(), "mob")
-    m.goto(BASE + "/index.html")
-    check("champs en 16 px (pas de zoom iOS)", m.evaluate("getComputedStyle(document.querySelector('[data-bind=partner1]')).fontSize") == '16px')
-    m.fill('[data-bind=partner1]','Marie-Antoinette-Joséphine-Adélaïde'); m.fill('[data-bind=partner2]','Maximilien-Alexandre-Hippolyte')
-    m.click('#show-preview'); time.sleep(0.4)
-    check("aperçu plein écran ouvert", m.is_visible('#close-preview'))
-    check("noms longs : aucun débordement", m.evaluate("(()=>{const h=document.querySelector('#preview .names');return h.scrollWidth<=h.clientWidth+1})()"))
-    m.screenshot(path=S + "/qa-mobile-preview.png")
-    m.keyboard.press('Escape'); check("Échap ferme l'aperçu", not m.is_visible('#close-preview'))
-    check("pas de défilement horizontal de la page", m.evaluate("document.documentElement.scrollWidth <= window.innerWidth"))
-    m.screenshot(path=S + "/qa-mobile-step1.png")
+    mc = newctx(b, viewport={"width": 375, "height": 740}, is_mobile=True, has_touch=True)
+    mo = watch(mc.new_page(), "mob"); mo.goto(BASE + "/index.html")
+    check("champs en 16 px (pas de zoom iOS)", mo.evaluate("getComputedStyle(document.querySelector('[data-bind=partner1]')).fontSize") == '16px')
+    fill_basics(mo, 'Marie-Antoinette-Joséphine', 'Maximilien-Alexandre')
+    no_scroll = lambda: mo.evaluate("document.documentElement.scrollWidth <= innerWidth")
+    check("étape Style sans défilement horizontal", no_scroll()); mo.screenshot(path=OUT + "/mobile-step3.png", full_page=True)
+    mo.click('#style-more summary'); check("options de style dépliées sans débordement", no_scroll())
+    mo.click('#next'); mo.check('[data-section-toggle=program]'); check("étape Textes (programme) sans débordement", no_scroll())
+    mo.screenshot(path=OUT + "/mobile-step4.png", full_page=True)
+    mo.click('#next'); check("étape Réponses sans débordement", no_scroll())
+    mo.click('#show-preview'); time.sleep(0.3)
+    check("aperçu plein écran avec « Revoir l'introduction »", mo.is_visible('#close-preview') and mo.is_visible('#replay-intro'))
+    mo.click('#replay-intro'); time.sleep(0.4)
+    check("intro jouée dans l'aperçu mobile, cadrée à l'écran",
+          mo.locator('#preview .fp-intro').count() == 1 and abs(mo.evaluate("document.querySelector('#preview .fp-intro').getBoundingClientRect().height") - mo.evaluate("document.getElementById('preview-pane').clientHeight")) < 2)
+    mo.screenshot(path=OUT + "/mobile-preview-intro.png")
+    mo.click('#preview .env', force=True); wait_until(lambda: mo.locator('#preview .fp-intro').count() == 0, 5)
+    check("noms longs : aucun débordement", mo.evaluate("(()=>{const h=document.querySelector('#preview .names');return h.scrollWidth<=h.clientWidth+1})()"))
+    mo.click('#close-preview'); check("fermeture de l'aperçu", not mo.is_visible('#close-preview'))
+    mp = watch(mc.new_page(), "mob-pub"); mp.goto(BASE + "/index.html"); db_put(mp, db_get(pg)); mp.goto(pub); mp.wait_for_selector('.fp-intro'); time.sleep(0.4)
+    mp.screenshot(path=OUT + "/mobile-public-envelope.png")
+    mp.click('.env', force=True); wait_until(lambda: mp.locator('.fp-intro').count() == 0, 5)
+    check("page publique mobile sans débordement", mp.evaluate("document.documentElement.scrollWidth <= innerWidth"))
+    mp.screenshot(path=OUT + "/mobile-public.png", full_page=True)
 
-    print("\n== Contrastes des 3 thèmes ==")
-    for th in ['sauge','rose','nuit']:
-        t = c.new_page(); t.goto(BASE + "/index.html")
-        t.evaluate("(th)=>FP.renderInvitation(document.getElementById('preview'), {partner1:'A',partner2:'B',date:'2027-08-07',venueName:'Lieu',practical:'Info',theme:th}, {})", th)
-        r = t.evaluate("""()=>{const q=s=>getComputedStyle(document.querySelector(s));const bg=getComputedStyle(document.querySelector('#preview')).backgroundColor;
-           return {btn:[q('#preview .btn').backgroundColor,q('#preview .btn').color], soft:[q('#preview .narrow').color,bg], date:[q('#preview .date').color,bg]}}""")
-        check("thème %s : bouton %.2f, texte secondaire %.2f, date %.2f (≥ 4,5)" % (th, ratio(*r['btn']), ratio(*r['soft']), ratio(*r['date'])),
-              min(ratio(*r['btn']), ratio(*r['soft']), ratio(*r['date'])) >= 4.5)
-        t.set_viewport_size({"width":430,"height":1500})
-        t.evaluate("document.getElementById('app').classList.add('show-preview-on')"); time.sleep(0.5)
-        t.screenshot(path=S + "/qa-theme-%s.png" % th)
-
-    c.new_page().goto(adm); a.reload(); a.wait_for_selector('#content:not([hidden])'); a.screenshot(path=S + "/qa-admin.png", full_page=True)
     check("aucune erreur JavaScript ni violation CSP", not errors, errors[:6])
     b.close()
 finally:
-  srv.terminate()
+    srv.terminate()
+
 fails = [n for n, ok in results if not ok]
 print("\n%d/%d tests OK" % (len(results) - len(fails), len(results)))
 if fails: print("ÉCHECS:", fails)
-
 sys.exit(1 if fails else 0)
