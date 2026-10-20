@@ -1,0 +1,118 @@
+<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src 'self' https://*.supabase.co; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta name="referrer" content="no-referrer">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Créez votre faire-part en 3 minutes</title>
+<meta name="description" content="Créez un faire-part digital avec RSVP intégré en moins de 3 minutes. Sans compte.">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Mulish:wght@400;600;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/invitation.css">
+<link rel="stylesheet" href="css/app.css">
+</head>
+<body>
+<div class="app" id="app">
+  <section class="panel">
+    <div class="banner" id="banner" hidden>Mode local : les données restent dans ce navigateur (aucun backend configuré).</div>
+    <header class="hello">
+      <h1 id="title">Votre faire-part, prêt en 3 minutes</h1>
+      <p class="muted" id="subtitle">Pas de compte à créer. Vous remplissez 4 étapes, vous obtenez un lien à envoyer à vos invités.</p>
+      <p><a id="resume" href="#" hidden>Reprendre mon dernier faire-part</a></p>
+    </header>
+
+    <ol class="steps" id="steps" aria-label="Progression">
+      <li>Les mariés</li><li>Le lieu</li><li>Photos et textes</li><li>Réponses</li>
+    </ol>
+
+    <form id="wizard" novalidate>
+      <fieldset data-step="1">
+        <legend>Qui se marie, et quand ?</legend>
+        <div class="row">
+          <label class="f">Prénom<input type="text" data-bind="partner1" maxlength="40" autocomplete="off" placeholder="Alexia"></label>
+          <label class="f">Prénom<input type="text" data-bind="partner2" maxlength="40" autocomplete="off" placeholder="Julien"></label>
+        </div>
+        <div class="row">
+          <label class="f">Date<input type="date" data-bind="date"></label>
+          <label class="f">Heure de la cérémonie<input type="time" data-bind="time"></label>
+        </div>
+      </fieldset>
+
+      <fieldset data-step="2" hidden>
+        <legend>Où ça se passe ?</legend>
+        <label class="f">Nom du lieu<input type="text" data-bind="venueName" maxlength="80" placeholder="Domaine de l'Abbaye"></label>
+        <label class="f">Adresse<textarea data-bind="venueAddress" maxlength="200" rows="2" placeholder="Lieu-dit Vauluisant&#10;89190 Courgenay"></textarea></label>
+        <label class="f">Lien Google Maps <span class="opt">(facultatif)</span><input type="url" data-bind="mapsUrl" maxlength="300" placeholder="https://maps.app.goo.gl/…"></label>
+        <p class="hint">Sans lien, nous en créons un automatiquement à partir du nom et de l’adresse.</p>
+      </fieldset>
+
+      <fieldset data-step="3" hidden>
+        <legend>Photos et textes</legend>
+        <div class="f">
+          <span class="lab">Photos <span class="opt">(1 à 3, la première est la photo principale)</span></span>
+          <div class="thumbs" id="thumbs"></div>
+          <label class="btn-ghost file-btn" id="add-photo">Ajouter une photo<input type="file" id="photo-input" accept="image/*" multiple></label>
+          <p class="form-msg" id="photo-msg" role="status"></p>
+        </div>
+        <label class="f">Phrase d’introduction<input type="text" data-bind="subtitle" maxlength="100"></label>
+        <label class="f">Message d’accueil<textarea data-bind="message" maxlength="600" rows="3"></textarea></label>
+        <label class="f">Infos pratiques <span class="opt">(facultatif : accès, hébergement, dress code…)</span><textarea data-bind="practical" maxlength="1200" rows="3"></textarea></label>
+        <div class="f">
+          <span class="lab">Ambiance</span>
+          <div class="themes">
+            <label class="theme"><input type="radio" name="theme" value="sauge" checked><span class="sw sw-sauge"></span>Sauge</label>
+            <label class="theme"><input type="radio" name="theme" value="rose"><span class="sw sw-rose"></span>Rose poudré</label>
+            <label class="theme"><input type="radio" name="theme" value="nuit"><span class="sw sw-nuit"></span>Bleu nuit</label>
+          </div>
+        </div>
+      </fieldset>
+
+      <fieldset data-step="4" hidden>
+        <legend>Que voulez-vous demander à vos invités ?</legend>
+        <p class="hint">Nom et présence (oui/non) sont toujours demandés. Ajoutez le reste si besoin.</p>
+        <label class="chk"><input type="checkbox" data-bind-rsvp="guests"> Nombre de personnes</label>
+        <label class="chk"><input type="checkbox" data-bind-rsvp="diet"> Régime alimentaire / allergies</label>
+        <label class="chk"><input type="checkbox" data-bind-rsvp="brunch"> Présence au brunch du lendemain</label>
+        <label class="chk"><input type="checkbox" data-bind-rsvp="message"> Message libre</label>
+        <p class="form-msg" id="publish-msg" role="status"></p>
+      </fieldset>
+
+      <p class="form-msg" id="step-msg" role="status"></p>
+      <div class="nav">
+        <button type="button" class="btn-ghost" id="back" hidden>Retour</button>
+        <button type="button" class="btn-main" id="next">Continuer</button>
+        <button type="button" class="btn-main" id="publish" hidden>Publier mon faire-part</button>
+      </div>
+    </form>
+
+    <section id="done" hidden>
+      <h2>C’est publié !</h2>
+      <p class="muted" id="done-time"></p>
+      <div class="link-card">
+        <h3>1. Le lien à envoyer à vos invités</h3>
+        <div class="link-row"><input type="text" id="public-link" readonly><button type="button" class="btn-ghost" data-copy="public-link">Copier</button></div>
+        <p><a id="public-open" target="_blank" rel="noopener">Ouvrir le faire-part</a></p>
+      </div>
+      <div class="link-card warn">
+        <h3>2. Votre lien privé (à garder précieusement)</h3>
+        <p>C’est le seul moyen de voir les réponses et de modifier votre faire-part. Il n’y a pas de compte : si vous le perdez, nous ne pouvons pas le retrouver.</p>
+        <div class="link-row"><input type="text" id="admin-link" readonly><button type="button" class="btn-ghost" data-copy="admin-link">Copier</button></div>
+        <p><a id="admin-open">Ouvrir le suivi des réponses</a></p>
+      </div>
+    </section>
+  </section>
+
+  <aside class="preview" id="preview-pane" aria-label="Aperçu">
+    <button type="button" class="close-preview" id="close-preview">Fermer l’aperçu</button>
+    <div class="phone"><div id="preview"></div></div>
+  </aside>
+  <button type="button" class="show-preview" id="show-preview">Voir l’aperçu</button>
+</div>
+<script src="js/config.js"></script>
+<script src="js/api.js"></script>
+<script src="js/render.js"></script>
+<script src="js/onboarding.js"></script>
+</body>
+</html>
