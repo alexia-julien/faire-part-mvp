@@ -52,7 +52,8 @@
     submitRsvp: function(slug, data){
       var db = load();
       if(!db.inv[slug]) return Promise.reject(new Error('introuvable'));
-      db.rsvps[slug].push({ id: Date.now(), created_at: new Date().toISOString(), data: data });
+      var maxId = db.rsvps[slug].reduce(function(m, r){ return Math.max(m, +r.id || 0); }, 0);
+      db.rsvps[slug].push({ id: maxId + 1, created_at: new Date().toISOString(), data: data });
       try{ save(db); }catch(e){ return Promise.reject(e); }
       return Promise.resolve();
     },
@@ -60,6 +61,13 @@
       var i = load().inv[slug];
       if(!i || i.key !== key){ var e = new Error('forbidden'); e.forbidden = true; return Promise.reject(e); }
       return Promise.resolve(load().rsvps[slug] || []);
+    },
+    deleteRsvp: function(slug, key, id){
+      var db = load(), i = db.inv[slug];
+      if(!i || i.key !== key){ var e = new Error('forbidden'); e.forbidden = true; return Promise.reject(e); }
+      db.rsvps[slug] = (db.rsvps[slug] || []).filter(function(r){ return r.id !== id; });
+      try{ save(db); }catch(e){ return Promise.reject(e); }
+      return Promise.resolve();
     }
   };
 
@@ -78,6 +86,11 @@
       return rpc('list_rsvps', { p_slug: slug, p_key: key }).then(function(r){
         if(r === null){ var e = new Error('forbidden'); e.forbidden = true; throw e; }
         return r;
+      });
+    },
+    deleteRsvp: function(slug, key, id){
+      return rpc('delete_rsvp', { p_slug: slug, p_key: key, p_id: id }).then(function(ok){
+        if(!ok){ var e = new Error('forbidden'); e.forbidden = true; throw e; }
       });
     }
   };

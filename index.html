@@ -5,8 +5,10 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data: blob:; connect-src https://pmtwhrqfdvbxbgrzcytl.supabase.co; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#F6F2EA">
 <title>Créez votre faire-part en 3 minutes</title>
 <meta name="description" content="Créez un faire-part digital avec RSVP intégré en moins de 3 minutes. Sans compte.">
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 21s-7.05-4.35-9.5-8.5C.7 9 2.2 5 6.3 5c2 0 3.6 1.1 5.7 3.6C14.1 6.1 15.7 5 17.7 5c4.1 0 5.6 4 3.8 7.5C19.05 16.65 12 21 12 21z' fill='%235F6E4E'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Mulish:wght@400;600;700&display=swap" rel="stylesheet">
@@ -15,12 +17,13 @@
 </head>
 <body>
 <div class="app" id="app">
-  <section class="panel">
+  <main class="panel">
     <div class="banner" id="banner" hidden>Mode local : les données restent dans ce navigateur (aucun backend configuré).</div>
     <header class="hello">
       <h1 id="title">Votre faire-part, prêt en 3 minutes</h1>
       <p class="muted" id="subtitle">Pas de compte à créer. Vous remplissez 4 étapes, vous obtenez un lien à envoyer à vos invités.</p>
-      <p><a id="resume" href="#" hidden>Reprendre mon dernier faire-part</a></p>
+      <p class="draft-note" id="draft-note" hidden>Votre brouillon a été restauré. <button type="button" class="link-btn" id="reset-draft">Recommencer à zéro</button></p>
+      <p><a id="resume" href="#" hidden>Reprendre mon dernier faire-part publié</a></p>
     </header>
 
     <ol class="steps" id="steps" aria-label="Progression">
@@ -29,27 +32,27 @@
 
     <form id="wizard" novalidate>
       <fieldset data-step="1">
-        <legend>Qui se marie, et quand ?</legend>
+        <legend tabindex="-1">Qui se marie, et quand ?</legend>
         <div class="row">
-          <label class="f">Prénom<input type="text" data-bind="partner1" maxlength="40" autocomplete="off" placeholder="Alexia"></label>
-          <label class="f">Prénom<input type="text" data-bind="partner2" maxlength="40" autocomplete="off" placeholder="Julien"></label>
+          <label class="f">Premier prénom<input type="text" data-bind="partner1" maxlength="40" autocomplete="off" autocapitalize="words" placeholder="Alexia"></label>
+          <label class="f">Second prénom<input type="text" data-bind="partner2" maxlength="40" autocomplete="off" autocapitalize="words" placeholder="Julien"></label>
         </div>
         <div class="row">
-          <label class="f">Date<input type="date" data-bind="date"></label>
+          <label class="f">Date<input type="date" data-bind="date" id="date-input"></label>
           <label class="f">Heure de la cérémonie<input type="time" data-bind="time"></label>
         </div>
       </fieldset>
 
       <fieldset data-step="2" hidden>
-        <legend>Où ça se passe ?</legend>
+        <legend tabindex="-1">Où ça se passe ?</legend>
         <label class="f">Nom du lieu<input type="text" data-bind="venueName" maxlength="80" placeholder="Domaine de l'Abbaye"></label>
         <label class="f">Adresse<textarea data-bind="venueAddress" maxlength="200" rows="2" placeholder="Lieu-dit Vauluisant&#10;89190 Courgenay"></textarea></label>
-        <label class="f">Lien Google Maps <span class="opt">(facultatif)</span><input type="url" data-bind="mapsUrl" maxlength="300" placeholder="https://maps.app.goo.gl/…"></label>
-        <p class="hint">Liens acceptés : Google Maps, Apple Plans, OpenStreetMap, Waze. Sans lien valide, nous en créons un automatiquement à partir du nom et de l’adresse.</p>
+        <label class="f">Lien Google Maps <span class="opt">(facultatif)</span><input type="url" data-bind="mapsUrl" maxlength="300" inputmode="url" placeholder="https://maps.app.goo.gl/…"></label>
+        <p class="hint">Liens acceptés : Google Maps, Apple Plans, OpenStreetMap, Waze. Sans lien, nous en créons un automatiquement à partir du nom et de l’adresse.</p>
       </fieldset>
 
       <fieldset data-step="3" hidden>
-        <legend>Photos et textes</legend>
+        <legend tabindex="-1">Photos et textes</legend>
         <div class="f">
           <span class="lab">Photos <span class="opt">(1 à 3, la première est la photo principale)</span></span>
           <div class="thumbs" id="thumbs"></div>
@@ -60,8 +63,8 @@
         <label class="f">Message d’accueil<textarea data-bind="message" maxlength="600" rows="3"></textarea></label>
         <label class="f">Infos pratiques <span class="opt">(facultatif : accès, hébergement, dress code…)</span><textarea data-bind="practical" maxlength="1200" rows="3"></textarea></label>
         <div class="f">
-          <span class="lab">Ambiance</span>
-          <div class="themes">
+          <span class="lab" id="lab-theme">Ambiance</span>
+          <div class="themes" role="radiogroup" aria-labelledby="lab-theme">
             <label class="theme"><input type="radio" name="theme" value="sauge" checked><span class="sw sw-sauge"></span>Sauge</label>
             <label class="theme"><input type="radio" name="theme" value="rose"><span class="sw sw-rose"></span>Rose poudré</label>
             <label class="theme"><input type="radio" name="theme" value="nuit"><span class="sw sw-nuit"></span>Bleu nuit</label>
@@ -70,17 +73,17 @@
       </fieldset>
 
       <fieldset data-step="4" hidden>
-        <legend>Que voulez-vous demander à vos invités ?</legend>
+        <legend tabindex="-1">Que voulez-vous demander à vos invités ?</legend>
         <p class="hint">Nom et présence (oui/non) sont toujours demandés. Ajoutez le reste si besoin.</p>
         <label class="chk"><input type="checkbox" data-bind-rsvp="guests"> Nombre de personnes</label>
         <label class="chk"><input type="checkbox" data-bind-rsvp="diet"> Régime alimentaire / allergies</label>
         <label class="chk"><input type="checkbox" data-bind-rsvp="brunch"> Présence au brunch du lendemain</label>
         <label class="chk"><input type="checkbox" data-bind-rsvp="message"> Message libre</label>
-        <p class="form-msg" id="publish-msg" role="status"></p>
       </fieldset>
 
-      <p class="form-msg" id="step-msg" role="status"></p>
+      <p class="form-msg" id="step-msg" role="alert"></p>
       <div class="nav">
+        <button type="button" class="btn-ghost preview-btn" id="show-preview">Aperçu</button>
         <button type="button" class="btn-ghost" id="back" hidden>Retour</button>
         <button type="button" class="btn-main" id="next">Continuer</button>
         <button type="button" class="btn-main" id="publish" hidden>Publier mon faire-part</button>
@@ -88,27 +91,27 @@
     </form>
 
     <section id="done" hidden>
-      <h2>C’est publié !</h2>
+      <h2 id="done-title" tabindex="-1">C’est publié !</h2>
       <p class="muted" id="done-time"></p>
       <div class="link-card">
         <h3>1. Le lien à envoyer à vos invités</h3>
-        <div class="link-row"><input type="text" id="public-link" readonly><button type="button" class="btn-ghost" data-copy="public-link">Copier</button></div>
-        <p><a id="public-open" target="_blank" rel="noopener">Ouvrir le faire-part</a></p>
+        <div class="link-row"><input type="text" id="public-link" readonly aria-label="Lien du faire-part"><button type="button" class="btn-ghost" data-copy="public-link">Copier</button></div>
+        <p class="link-actions"><a id="public-open" target="_blank" rel="noopener">Ouvrir le faire-part</a><button type="button" class="link-btn" id="share-btn" hidden>Partager…</button></p>
       </div>
       <div class="link-card warn">
         <h3>2. Votre lien privé (à garder précieusement)</h3>
-        <p>C’est le seul moyen de voir les réponses et de modifier votre faire-part. Il n’y a pas de compte : si vous le perdez, nous ne pouvons pas le retrouver.</p>
-        <div class="link-row"><input type="text" id="admin-link" readonly><button type="button" class="btn-ghost" data-copy="admin-link">Copier</button></div>
-        <p><a id="admin-open">Ouvrir le suivi des réponses</a></p>
+        <p>C’est le seul moyen de voir les réponses et de modifier votre faire-part. Il n’y a pas de compte : si vous le perdez, nous ne pouvons pas le retrouver. Ne le partagez pas.</p>
+        <div class="link-row"><input type="text" id="admin-link" readonly aria-label="Lien privé de suivi"><button type="button" class="btn-ghost" data-copy="admin-link">Copier</button></div>
+        <p class="link-actions"><a id="admin-open">Ouvrir le suivi des réponses</a><a id="mail-admin">M’envoyer ce lien par email</a></p>
       </div>
+      <p><a href="index.html" id="new-one">Créer un autre faire-part</a></p>
     </section>
-  </section>
+  </main>
 
-  <aside class="preview" id="preview-pane" aria-label="Aperçu">
+  <aside class="preview" id="preview-pane" aria-label="Aperçu du faire-part">
     <button type="button" class="close-preview" id="close-preview">Fermer l’aperçu</button>
     <div class="phone"><div id="preview"></div></div>
   </aside>
-  <button type="button" class="show-preview" id="show-preview">Voir l’aperçu</button>
 </div>
 <script src="js/config.js"></script>
 <script src="js/api.js"></script>

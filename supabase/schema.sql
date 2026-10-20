@@ -149,6 +149,8 @@ begin
   end if;
 
   insert into rsvps(slug, data) values (p_slug, jsonb_build_object(
+    -- identifiant anonyme du navigateur de l'invité : sert à repérer une réponse corrigée (doublon)
+    'rid',        case when (p_data->>'rid') ~ '^[a-z0-9]{12,32}$' then p_data->>'rid' else '' end,
     'name',       left(btrim(p_data->>'name'), 120),
     'attendance', v_att,
     'guests',     v_guests,
@@ -171,7 +173,22 @@ begin
                      from rsvps where slug = p_slug), '[]'::jsonb);
 end $$;
 
--- Seules ces 5 fonctions sont appelables depuis le navigateur.
+-- Suppression d'une réponse (réponse de test, spam, doublon). Clé privée requise. Renvoie false si la clé est
+-- mauvaise. 120 appels / heure / IP.
+create or replace function public.delete_rsvp(p_slug text, p_key text, p_id bigint)
+returns boolean language plpgsql security definer set search_path = public, extensions as $$
+begin
+  perform private.rate_limit('delete', 120);
+  if not exists (select 1 from invitations where slug = p_slug and key_hash = crypt(p_key, key_hash)) then
+    return false;
+  end if;
+  delete from rsvps where slug = p_slug and id = p_id;
+  return true;
+end $$;
+
+-- Seules ces 6 fonctions sont appelables depuis le navigateur.
+revoke execute on function public.delete_rsvp(text, text, bigint) from public;
+grant execute on function public.delete_rsvp(text, text, bigint) to anon;
 revoke execute on function public.create_invitation(text, text, jsonb) from public;
 revoke execute on function public.update_invitation(text, text, jsonb) from public;
 revoke execute on function public.get_invitation(text) from public;

@@ -1,3 +1,5 @@
 /* Styles de page (hors rendu du faire-part). Dans un fichier externe pour pouvoir interdire les styles inline via la CSP. */
 html,body{margin:0;background:#F6F2EA}
-.state{font-family:system-ui,sans-serif;text-align:center;padding:4rem 1.4rem;color:#7A7468}
+html[data-theme="rose"],html[data-theme="rose"] body{background:#FAF3F0}
+html[data-theme="nuit"],html[data-theme="nuit"] body{background:#1F2433}
+.state{font-family:system-ui,sans-serif;text-align:center;padding:4rem 1.4rem;color:#6B6559}

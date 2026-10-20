@@ -3,7 +3,7 @@
 ## Modèle de menace
 Le repo est public et la clé Supabase `anon` est visible par tous : c'est voulu. La sécurité ne repose sur aucun secret côté navigateur, mais sur :
 1. des **tables verrouillées** (RLS sans policy, aucun droit direct pour `anon`) ;
-2. **5 fonctions SQL** seules appelables depuis le navigateur, qui valident tout ce qui entre ;
+2. **6 fonctions SQL** seules appelables depuis le navigateur, qui valident tout ce qui entre ;
 3. une **clé privée par faire-part** (24 caractères aléatoires, ~120 bits), stockée hashée (bcrypt), qui seule donne accès aux réponses et à la modification.
 
 **Ne jamais mettre la clé `service_role` dans ce repo** (elle contourne toute la protection). Si elle fuite : la régénérer dans Supabase > Project Settings > API.
@@ -14,7 +14,7 @@ Le repo est public et la clé Supabase `anon` est visible par tous : c'est voulu
 | XSS (champs du faire-part, réponses des invités) | Tout texte est échappé ; le contenu venant de la base passe par une liste blanche (`FP.sanitizeConfig`) ; photos limitées aux data-URI JPEG/PNG/WebP ; CSP sans script ni style inline |
 | Pollution de prototype (JSON forgé avec `__proto__`) | Plus d'`Object.assign` sur des données externes : reconstruction champ par champ |
 | Phishing via le bouton « Ouvrir dans Maps » | Seuls Google Maps, Apple Plans, OpenStreetMap et Waze sont acceptés (domaines exacts) |
-| Accès aux réponses / modification par un tiers | Clé privée requise, dans le fragment d'URL (`#k=`) donc jamais envoyée au serveur ni dans le `Referer` |
+| Accès aux réponses / modification / suppression par un tiers | Clé privée requise, dans le fragment d'URL (`#k=`) donc jamais envoyée au serveur ni dans le `Referer` |
 | Devinette des liens publics | Suffixe aléatoire de 8 caractères (~10^12) |
 | Données invalides ou hostiles en base | Validation serveur : forme, taille, 3 photos max, réponses reconstruites champ par champ |
 | Spam / remplissage de la base | Limitation par IP (hashée) : 10 créations/h, 30 modifications/h, 100 réponses/h/faire-part ; 1000 réponses max par faire-part |

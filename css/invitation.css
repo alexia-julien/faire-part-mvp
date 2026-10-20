@@ -1,7 +1,7 @@
 /* Faire-part : styles du rendu (page publique + aperçu). Tout est scopé sous .fp */
 .fp{
   --paper:#F6F2EA; --paper-2:#FFFFFF; --cream:#FBF8F2;
-  --ink:#3A362E; --ink-soft:#7A7468;
+  --ink:#3A362E; --ink-soft:#6B6559;
   --accent:#8C9B7C; --accent-deep:#5F6E4E; --blush:#CE968C; --on-accent:#fff;
   --line:#E7E0D2; --shadow:rgba(80,70,50,.09);
   --display:'Cormorant Garamond', Georgia, serif;
@@ -10,20 +10,24 @@
   background:var(--paper); color:var(--ink); font-family:var(--body);
   line-height:1.7; -webkit-font-smoothing:antialiased; overflow-x:hidden;
 }
-.fp[data-theme="rose"]{--paper:#FAF3F0;--cream:#FDF8F6;--accent:#CE968C;--accent-deep:#A8655A;--blush:#8C9B7C;--line:#EEDDD7}
+.fp[data-theme="rose"]{--paper:#FAF3F0;--cream:#FDF8F6;--accent:#CE968C;--accent-deep:#9A5A50;--blush:#8C9B7C;--line:#EEDDD7}
 .fp[data-theme="nuit"]{--paper:#1F2433;--paper-2:#283047;--cream:#232A3D;--ink:#F3EEE3;--ink-soft:#B9B6AE;--accent:#C9A86A;--accent-deep:#E2C58A;--blush:#E2C58A;--on-accent:#1F2433;--line:#3A4259;--shadow:rgba(0,0,0,.3)}
 .fp *{box-sizing:border-box}
-.fp h1,.fp h2,.fp h3{font-family:var(--display);font-weight:400;margin:0;line-height:1.08;color:var(--ink)}
+.fp h1,.fp h2,.fp h3{font-family:var(--display);font-weight:400;margin:0;line-height:1.08;color:var(--ink);overflow-wrap:break-word}
+.fp .narrow,.fp .lieu-name,.fp .lieu-address,.fp .subtitle,.fp footer .fnames{overflow-wrap:break-word}
 .fp p{margin:0 0 .8rem}
 .fp .amp{font-style:italic;color:var(--blush)}
 
-.fp .btn{display:inline-block;text-decoration:none;cursor:pointer;border:0;font-family:var(--body);font-weight:600;font-size:.8rem;letter-spacing:.12em;text-transform:uppercase;padding:.9rem 2.1rem;border-radius:999px;background:var(--accent);color:var(--on-accent);transition:filter .2s,transform .2s;box-shadow:0 6px 18px var(--shadow)}
+/* Boutons sur la teinte foncée : contraste texte/fond ≥ 4,5:1 (norme d'accessibilité WCAG AA) */
+.fp .btn{display:inline-block;text-decoration:none;cursor:pointer;border:0;font-family:var(--body);font-weight:600;font-size:.8rem;letter-spacing:.12em;text-transform:uppercase;padding:.9rem 2.1rem;border-radius:999px;background:var(--accent-deep);color:var(--on-accent);transition:filter .2s,transform .2s;box-shadow:0 6px 18px var(--shadow)}
+.fp[data-theme="nuit"] .btn{background:var(--accent)}
+.fp[data-theme="nuit"] .form-msg{color:#F2A08F}
 .fp .btn:hover{filter:brightness(.92);transform:translateY(-1px)}
 .fp .btn:disabled{opacity:.6;cursor:default;transform:none}
 
 /* Hero */
 .fp .hero-photo-wrap{width:calc(100% - 2.2rem);max-width:860px;margin:1.4rem auto 0;border-radius:22px;overflow:hidden;box-shadow:0 12px 34px var(--shadow)}
-.fp .hero-photo{width:100%;aspect-ratio:3/2;max-height:62vh;object-fit:cover;display:block}
+.fp .hero-photo{width:100%;aspect-ratio:3/2;max-height:62vh;object-fit:cover;object-position:50% 35%;display:block}
 .fp .hero-text{text-align:center;padding:2.2rem 1.4rem 1rem}
 .fp.no-photo .hero-text{padding-top:4rem}
 .fp .names{font-size:clamp(2.3rem,11vw,5.2rem);font-size:clamp(2.3rem,13cqw,5.2rem);line-height:.98;margin:.1rem 0}
@@ -58,7 +62,7 @@
 .fp .rsvp-fields{border:0;padding:0;margin:0;min-width:0}
 .fp .field{margin-bottom:1.1rem}
 .fp .field>label,.fp .field>.lab{display:block;font-weight:700;font-size:.85rem;margin-bottom:.35rem}
-.fp .field input[type=text],.fp .field input[type=number],.fp .field textarea{width:100%;font:inherit;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:.7rem .8rem}
+.fp .field input[type=text],.fp .field input[type=number],.fp .field textarea{width:100%;font:inherit;font-size:16px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:10px;padding:.7rem .8rem}
 .fp .field textarea{min-height:84px;resize:vertical}
 .fp .choices{display:flex;gap:.6rem;flex-wrap:wrap}
 .fp .choices label{display:inline-flex;align-items:center;gap:.45rem;border:1px solid var(--line);background:var(--paper);border-radius:999px;padding:.5rem 1rem;cursor:pointer;font-weight:600;font-size:.9rem}

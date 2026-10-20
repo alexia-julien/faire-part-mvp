@@ -7,6 +7,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
 <title>Suivi des réponses</title>
+<link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 21s-7.05-4.35-9.5-8.5C.7 9 2.2 5 6.3 5c2 0 3.6 1.1 5.7 3.6C14.1 6.1 15.7 5 17.7 5c4.1 0 5.6 4 3.8 7.5C19.05 16.65 12 21 12 21z' fill='%235F6E4E'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@400;600&family=Mulish:wght@400;600;700&display=swap" rel="stylesheet">
@@ -14,19 +15,26 @@
 </head>
 <body class="admin-page">
 <main class="admin">
-  <h1>Suivi des réponses</h1>
-  <p id="state" class="muted">Chargement…</p>
+  <h1 id="admin-title">Suivi des réponses</h1>
+  <p id="state" class="muted" role="status">Chargement…</p>
   <div id="content" hidden>
     <div class="tiles" id="tiles"></div>
+    <p class="hint" id="dup-note" hidden></p>
     <div class="actions">
       <a class="btn-ghost" id="open-public" target="_blank" rel="noopener">Voir le faire-part</a>
       <a class="btn-ghost" id="edit-link">Modifier le faire-part</a>
       <button type="button" class="btn-ghost" id="csv">Exporter en CSV</button>
       <button type="button" class="btn-ghost" id="refresh">Actualiser</button>
     </div>
-    <div class="table-wrap">
+    <p class="form-msg" id="action-msg" role="status"></p>
+    <div class="table-wrap" id="table-wrap">
       <table id="table">
-        <thead><tr><th>Reçu le</th><th>Nom</th><th>Présence</th><th>Pers.</th><th>Brunch</th><th>Régime</th><th>Message</th></tr></thead>
+        <thead><tr>
+          <th scope="col">Reçu le</th><th scope="col">Nom</th><th scope="col">Présence</th>
+          <th scope="col" data-col="guests">Pers.</th><th scope="col" data-col="brunch">Brunch</th>
+          <th scope="col" data-col="diet">Régime</th><th scope="col" data-col="message">Message</th>
+          <th scope="col"><span class="sr-only">Actions</span></th>
+        </tr></thead>
         <tbody></tbody>
       </table>
     </div>
@@ -35,6 +43,7 @@
 </main>
 <script src="js/config.js"></script>
 <script src="js/api.js"></script>
+<script src="js/render.js"></script>
 <script src="js/admin.js"></script>
 </body>
 </html>

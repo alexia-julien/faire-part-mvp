@@ -33,6 +33,15 @@ Si l'URL du projet Supabase change, mettre à jour **aussi** la CSP (`connect-sr
 
 Sécurité : voir [SECURITY.md](SECURITY.md) (modèle de menace, protections, limites connues).
 
+## Tests
+`python3 tests/e2e.py` (prérequis : `pip install playwright pillow`) rejoue 80 vérifications dans un navigateur headless, en mode local : parcours complet, validations, brouillon, photos, agenda (fuseaux horaires), RSVP, doublons, suppression, modification, sécurité (XSS, config forgée, clickjacking), mobile et contrastes des 3 thèmes. Captures dans `tests/out/`.
+
+## Comportements à connaître
+- **Brouillon** : la saisie est sauvegardée dans le navigateur ; un rechargement ne fait rien perdre.
+- **Fuseau horaire** : la date/heure affichée est celle du lieu ; le compte à rebours et l'agenda sont justes pour un invité à l'étranger.
+- **Réponse modifiée** : si un invité répond deux fois (même navigateur ou même nom), seule la dernière compte ; l'ancienne apparaît barrée dans le suivi.
+- **Suppression** d'une réponse (test, spam) depuis la page de suivi, en deux clics.
+
 ## Limites connues du MVP
 - Photos stockées en base (JPEG 1600 px, ~150–300 Ko chacune, 3 max). À migrer vers Supabase Storage si le volume grandit.
 - Pas d'aperçu riche (Open Graph) quand le lien est partagé sur WhatsApp : nécessite un rendu côté serveur.

@@ -54,6 +54,7 @@
       subtitle: str(c.subtitle, 100, d.subtitle), message: str(c.message, 600, d.message), practical: str(c.practical, 1200),
       photos: Array.isArray(c.photos) ? c.photos.filter(function(p){ return typeof p === 'string' && safeImg(p); }).slice(0, 3) : [],
       theme: THEMES.indexOf(c.theme) > -1 ? c.theme : 'sauge',
+      tz: /^[A-Za-z]+(\/[A-Za-z0-9_+\-]+){0,2}$/.test(str(c.tz, 64)) ? c.tz : '',
       rsvp: {}
     };
     ['guests', 'diet', 'brunch', 'message'].forEach(function(k){ out.rsvp[k] = (k in r) ? r[k] === true : d.rsvp[k]; });
@@ -76,15 +77,38 @@
       practical: '',
       photos: [],
       theme: 'sauge',
+      tz: '', // fuseau horaire du lieu (celui du créateur au moment de la création)
       rsvp: { guests: true, diet: true, brunch: false, message: true }
     };
   };
 
+  FP.isAllowedMapsUrl = function(u){ return !!safeMapsUrl(u); };
+
+  // Date « murale » du mariage (pour l'affichage : 7 août 2027, 16h00, quel que soit le pays de l'invité).
   FP.eventDate = function(cfg){
     var m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(cfg.date || '');
     if(!m) return null;
     var t = /^(\d{2}):(\d{2})$/.exec(cfg.time || '') || [0, '16', '00'];
-    return new Date(+m[1], +m[2] - 1, +m[3], +t[1], +t[2], 0);
+    var d = new Date(+m[1], +m[2] - 1, +m[3], +t[1], +t[2], 0);
+    return d.getMonth() === +m[2] - 1 ? d : null; // rejette les dates impossibles (31 février…)
+  };
+
+  // Instant absolu du mariage (pour le compte à rebours et l'agenda) : 16h00 à Paris reste 16h00 à Paris,
+  // même pour un invité au Brésil. Sans fuseau connu (anciens faire-part), on suppose Europe/Paris.
+  function tzOffset(tz, ms){
+    var p = {};
+    new Intl.DateTimeFormat('en-US', { timeZone: tz, hourCycle: 'h23', year: 'numeric', month: '2-digit', day: '2-digit',
+      hour: '2-digit', minute: '2-digit', second: '2-digit' }).formatToParts(new Date(ms)).forEach(function(x){ p[x.type] = x.value; });
+    return Date.UTC(+p.year, +p.month - 1, +p.day, +p.hour % 24, +p.minute, +p.second) - ms;
+  }
+  FP.eventInstant = function(cfg){
+    var d = FP.eventDate(cfg);
+    if(!d) return null;
+    var guess = Date.UTC(d.getFullYear(), d.getMonth(), d.getDate(), d.getHours(), d.getMinutes());
+    try{
+      var tz = cfg.tz || 'Europe/Paris', off = tzOffset(tz, guess), t = guess - off, off2 = tzOffset(tz, t);
+      return off2 === off ? t : guess - off2;
+    }catch(e){ return d.getTime(); }
   };
 
   FP.formatDate = function(cfg, withWeekday){
@@ -104,19 +128,34 @@
     return q ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q) : '';
   };
 
-  function icsStamp(d){
-    return d.getFullYear() + pad(d.getMonth() + 1) + pad(d.getDate()) + 'T' + pad(d.getHours()) + pad(d.getMinutes()) + '00';
-  }
+  // Horodatage UTC (suffixe Z) : chaque agenda le convertit dans le fuseau de l'invité.
+  function icsStamp(ms){ return new Date(ms).toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, ''); }
   function icsEsc(s){ return String(s).replace(/[\\;,]/g, '\\$&').replace(/\r?\n/g, '\\n'); }
-  function downloadIcs(cfg){
-    var start = FP.eventDate(cfg); if(!start) return;
-    var end = new Date(start.getTime() + 6 * 3600 * 1000);
-    var title = 'Mariage de ' + (cfg.partner1 || '') + ' & ' + (cfg.partner2 || '');
-    var ics = ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Faire-part//FR', 'CALSCALE:GREGORIAN', 'BEGIN:VEVENT',
-      'UID:' + start.getTime() + '@faire-part', 'DTSTAMP:' + icsStamp(new Date()),
-      'DTSTART:' + icsStamp(start), 'DTEND:' + icsStamp(end),
+  // Les lignes ICS ne doivent pas dépasser 75 octets : on les replie (norme RFC 5545).
+  // Repli compté en octets UTF-8 (un « é » ou un « ’ » pèse 2 à 3 octets), sans couper un caractère en deux.
+  function icsFold(line){
+    var out = [], cur = '', bytes = 0;
+    for(var ch of line){
+      var cp = ch.codePointAt(0), n = cp < 0x80 ? 1 : cp < 0x800 ? 2 : cp < 0x10000 ? 3 : 4;
+      if(bytes + n > 75){ out.push(cur); cur = ' '; bytes = 1; }
+      cur += ch; bytes += n;
+    }
+    out.push(cur);
+    return out.join('\r\n');
+  }
+  FP.buildIcs = function(cfg){
+    cfg = FP.sanitizeConfig(cfg);
+    var start = FP.eventInstant(cfg); if(start == null) return '';
+    var title = 'Mariage de ' + cfg.partner1 + ' & ' + cfg.partner2;
+    return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Faire-part//FR', 'CALSCALE:GREGORIAN', 'BEGIN:VEVENT',
+      'UID:' + start + '-' + FP.slugifyLite(title) + '@faire-part', 'DTSTAMP:' + icsStamp(Date.now()),
+      'DTSTART:' + icsStamp(start), 'DTEND:' + icsStamp(start + 6 * 3600 * 1000),
       'SUMMARY:' + icsEsc(title), 'LOCATION:' + icsEsc([cfg.venueName, cfg.venueAddress].filter(Boolean).join(', ')),
-      'END:VEVENT', 'END:VCALENDAR'].join('\r\n');
+      'END:VEVENT', 'END:VCALENDAR'].map(icsFold).join('\r\n');
+  };
+  FP.slugifyLite = function(s){ return String(s).normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, '-').slice(0, 40); };
+  function downloadIcs(cfg){
+    var ics = FP.buildIcs(cfg); if(!ics) return;
     var url = URL.createObjectURL(new Blob([ics], { type: 'text/calendar;charset=utf-8' }));
     var a = document.createElement('a'); a.href = url; a.download = 'mariage.ics';
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
@@ -132,11 +171,11 @@
     h += '<form class="rsvp-form" novalidate><fieldset class="rsvp-fields"' + (preview ? ' disabled' : '') + '>';
     h += '<div class="hp" aria-hidden="true"><label>Ne pas remplir<input type="text" name="website" tabindex="-1" autocomplete="off"></label></div>';
     h += '<div class="field"><label for="f-name">Nom et prénom</label><input type="text" id="f-name" name="name" maxlength="120" autocomplete="name" required></div>';
-    h += '<div class="field"><span class="lab">Serez-vous présent(e) ?</span><div class="choices">' +
+    h += '<div class="field"><span class="lab" id="lab-att">Serez-vous présent(e) ?</span><div class="choices" role="radiogroup" aria-labelledby="lab-att">' +
          '<label><input type="radio" name="attendance" value="yes"> Oui, avec plaisir</label>' +
          '<label><input type="radio" name="attendance" value="no"> Je ne pourrai pas</label></div></div>';
-    if(r.guests) h += '<div class="field when-yes"><label for="f-guests">Nombre de personnes (vous inclus)</label><input type="number" id="f-guests" name="guests" min="1" max="20" value="1"></div>';
-    if(r.brunch) h += '<div class="field when-yes"><span class="lab">Brunch du lendemain ?</span><div class="choices">' +
+    if(r.guests) h += '<div class="field when-yes"><label for="f-guests">Nombre de personnes (vous inclus)</label><input type="number" id="f-guests" name="guests" min="1" max="20" value="1" inputmode="numeric"></div>';
+    if(r.brunch) h += '<div class="field when-yes"><span class="lab" id="lab-brunch">Brunch du lendemain ?</span><div class="choices" role="radiogroup" aria-labelledby="lab-brunch">' +
          '<label><input type="radio" name="brunch" value="yes"> Oui</label>' +
          '<label><input type="radio" name="brunch" value="no"> Non</label></div></div>';
     if(r.diet) h += '<div class="field when-yes"><label for="f-diet">Régime alimentaire ou allergies</label><input type="text" id="f-diet" name="diet" maxlength="300" placeholder="Végétarien, sans gluten…"></div>';
@@ -192,7 +231,8 @@
     root.setAttribute('data-theme', theme);
 
     var p1 = esc(cfg.partner1 || 'Prénom'), p2 = esc(cfg.partner2 || 'Prénom');
-    var names = p1 + '&nbsp;<span class="amp">&amp;</span>&nbsp;' + p2;
+    // Espace normale avant « & » (la ligne peut se couper là si les prénoms sont longs), insécable après.
+    var names = p1 + ' <span class="amp">&amp;</span>&nbsp;' + p2;
     var dateLong = FP.formatDate(cfg, false), dateFull = FP.formatDate(cfg, true);
     var time = /^\d{2}:\d{2}$/.test(cfg.time || '') ? cfg.time.replace(':', 'h') : '';
     var hasDate = !!FP.eventDate(cfg);
@@ -234,6 +274,7 @@
     // RSVP
     h += '<section><div class="section-head"><h2>Merci de confirmer votre présence</h2>' + divider() + '</div>';
     if(opts.preview) h += '<p class="preview-note">Aperçu : le formulaire sera actif une fois le faire-part publié.</p>';
+    if(opts.previousName) h += '<p class="preview-note">Vous avez déjà répondu (' + esc(opts.previousName) + '). Une nouvelle réponse remplacera la précédente.</p>';
     h += '<div class="form-wrap">' + rsvpHtml(cfg, !!opts.preview) +
          '<p class="privacy">Vos réponses sont transmises uniquement aux mariés.</p></div></section>';
 
@@ -246,7 +287,7 @@
     if(ics) ics.addEventListener('click', function(){ downloadIcs(cfg); });
 
     if(hasDate){
-      var target = FP.eventDate(cfg).getTime();
+      var target = FP.eventInstant(cfg);
       var tick = function(){
         var diff = Math.max(0, target - Date.now()), s = Math.floor(diff / 1000);
         var set = function(k, v){ var el = root.querySelector('[data-cd="' + k + '"]'); if(el) el.textContent = v; };
