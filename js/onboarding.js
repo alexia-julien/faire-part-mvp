@@ -4,6 +4,8 @@
   'use strict';
   var FP = window.FP;
   var $ = function(id){ return document.getElementById(id); };
+  // Anti-clickjacking (GitHub Pages ne permet pas d'envoyer X-Frame-Options / frame-ancestors).
+  if(window.top !== window.self){ document.body.textContent = ''; return; }
   var state = FP.defaults(), startedAt = Date.now(), editing = null, step = 1, TOTAL = 4, MAX_PHOTOS = 3;
   var LAST_KEY = 'fp:last';
 
@@ -55,7 +57,7 @@
     Promise.all(files.map(function(f){ return FP.resizeImage(f); })).then(function(list){
       list.forEach(function(s){ state.photos.push(s); });
       msg.textContent = ''; renderThumbs(); preview();
-    }).catch(function(err){ msg.textContent = err.message || 'Photo non utilisable.'; });
+    }).catch(function(err){ msg.textContent = (err && err.message) || 'Photo non utilisable.'; });
     e.target.value = '';
   });
 
@@ -110,21 +112,18 @@
     var btn = $('publish'), msg = $('publish-msg');
     msg.textContent = ''; btn.disabled = true;
     var seconds = Math.round((Date.now() - startedAt) / 1000);
-    var cfg = JSON.parse(JSON.stringify(state));
-    cfg.meta = { durationSec: editing ? (cfg.meta && cfg.meta.durationSec) || null : seconds, updatedAt: new Date().toISOString() };
+    var cfg = FP.sanitizeConfig(state);
+    cfg.meta = { durationSec: editing ? (state.meta && state.meta.durationSec) || null : seconds, updatedAt: new Date().toISOString() };
 
-    function fail(e){
-      btn.disabled = false;
-      msg.textContent = e && e.forbidden ? 'Le lien privé est invalide : modification impossible.'
-        : (e && e.message && !/HTTP|fetch|Failed/i.test(e.message) ? e.message : 'La publication a échoué. Vérifiez votre connexion et réessayez.');
-    }
+    function fail(e){ btn.disabled = false; msg.textContent = FP.userError(e); }
     if(editing){
       FP.api.updateInvitation(editing.slug, editing.key, cfg).then(function(){ showDone(editing.slug, editing.key, 0); }).catch(fail);
       return;
     }
     var key = FP.randomKey(24), tries = 0;
     (function attempt(){
-      var slug = (FP.slugify(state.partner1 + '-' + state.partner2) || 'faire-part') + '-' + FP.randomKey(4);
+      // Suffixe aléatoire de 8 caractères (~10^12 possibilités) : les liens ne sont pas devinables par énumération.
+      var slug = (FP.slugify(state.partner1 + '-' + state.partner2) || 'faire-part') + '-' + FP.randomKey(8);
       FP.api.createInvitation(slug, key, cfg).then(function(){ showDone(slug, key, seconds); })
         .catch(function(e){ if(e && e.conflict && ++tries < 4) attempt(); else fail(e); });
     })();
@@ -151,12 +150,11 @@
     $('subtitle').textContent = 'Vos changements sont publiés sur le même lien.';
     FP.api.getInvitation(p.slug).then(function(cfg){
       if(!cfg) throw new Error('Faire-part introuvable.');
-      var d = FP.defaults();
-      state = Object.assign(d, cfg); state.rsvp = Object.assign(d.rsvp, cfg.rsvp || {}); state.photos = cfg.photos || [];
+      state = FP.sanitizeConfig(cfg);
       editing = { slug: p.slug, key: p.key };
       $('publish').textContent = 'Enregistrer les modifications';
       syncInputs(); preview();
-    }).catch(function(e){ $('step-msg').textContent = e.message || 'Impossible de charger le faire-part.'; });
+    }).catch(function(){ $('step-msg').textContent = 'Impossible de charger le faire-part.'; });
   } else {
     try{
       var last = JSON.parse(localStorage.getItem(LAST_KEY) || 'null');

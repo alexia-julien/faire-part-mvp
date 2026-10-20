@@ -27,7 +27,11 @@ Sans configuration, l'app tourne en **mode local** (données dans le `localStora
 3. Renseigner `supabaseUrl` et `supabaseKey` (clé `anon`) dans `js/config.js`.
 4. Déployer le dossier tel quel sur GitHub Pages (ou n'importe quel hébergeur statique).
 
-Sécurité : les tables sont verrouillées (RLS sans policy). Le navigateur n'appelle que cinq fonctions SQL : lecture publique d'un faire-part, réponse d'un invité, et (clé privée requise) création/modification/lecture des réponses.
+`schema.sql` est idempotent et transactionnel : pour appliquer une mise à jour du schéma, rejouer le fichier en entier dans le SQL Editor.
+
+Si l'URL du projet Supabase change, mettre à jour **aussi** la CSP (`connect-src`) dans `index.html`, `invitation.html` et `admin.html`.
+
+Sécurité : voir [SECURITY.md](SECURITY.md) (modèle de menace, protections, limites connues).
 
 ## Limites connues du MVP
 - Photos stockées en base (JPEG 1600 px, ~150–300 Ko chacune, 3 max). À migrer vers Supabase Storage si le volume grandit.

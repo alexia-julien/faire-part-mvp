@@ -73,24 +73,43 @@
     },
     getInvitation: function(slug){ return rpc('get_invitation', { p_slug: slug }); },
     submitRsvp: function(slug, data){ return rpc('submit_rsvp', { p_slug: slug, p_data: data }).then(function(){}); },
-    listRsvps: function(slug, key){ return rpc('list_rsvps', { p_slug: slug, p_key: key }); }
+    // Le serveur renvoie null (et non une erreur) quand la clé est mauvaise.
+    listRsvps: function(slug, key){
+      return rpc('list_rsvps', { p_slug: slug, p_key: key }).then(function(r){
+        if(r === null){ var e = new Error('forbidden'); e.forbidden = true; throw e; }
+        return r;
+      });
+    }
   };
 
   FP.api = remote ? supa : local;
 
   // Utilitaires partagés
+  // Alphabet de exactement 32 caractères (sans 0/o/1/l) : 256 est divisible par 32, donc aucun biais statistique.
   FP.randomKey = function(n){
-    var a = new Uint8Array(n), s = '', chars = 'abcdefghijkmnopqrstuvwxyz23456789';
+    var chars = 'abcdefghijkmnpqrstuvwxyz23456789', a = new Uint8Array(n), s = '';
     crypto.getRandomValues(a);
-    for(var i = 0; i < n; i++) s += chars[a[i] % chars.length];
+    for(var i = 0; i < n; i++) s += chars[a[i] & 31];
     return s;
   };
   FP.slugify = function(s){
     return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
       .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
   };
+  // Identifiant et clé lus dans l'URL, validés (format strict) avant toute utilisation.
   FP.params = function(){
-    return { slug: new URLSearchParams(location.search).get('f') || (/\/f\/([a-z0-9-]+)/.exec(location.pathname) || [])[1] || '',
-             key: new URLSearchParams(location.hash.slice(1)).get('k') || '' };
+    var slug = new URLSearchParams(location.search).get('f') || (/\/f\/([a-z0-9-]+)/.exec(location.pathname) || [])[1] || '';
+    var key = new URLSearchParams(location.hash.slice(1)).get('k') || '';
+    return { slug: /^[a-z0-9][a-z0-9-]{2,62}$/.test(slug) ? slug : '', key: /^[a-z0-9]{16,64}$/.test(key) ? key : '' };
+  };
+
+  // Messages d'erreur affichables : jamais le texte brut renvoyé par le serveur (peut révéler des détails internes).
+  FP.userError = function(e){
+    var m = String((e && e.message) || '');
+    if(e && e.forbidden) return 'Le lien privé est invalide.';
+    if(/rate limit/i.test(m)) return 'Trop de tentatives en peu de temps. Réessayez dans une heure.';
+    if(/too large|trop/i.test(m)) return 'Le faire-part est trop volumineux : essayez avec des photos plus légères.';
+    if(/Stockage local plein/.test(m)) return m;
+    return 'L’opération a échoué. Vérifiez votre connexion et réessayez.';
   };
 })();

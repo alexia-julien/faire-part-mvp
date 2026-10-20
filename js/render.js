@@ -19,6 +19,50 @@
   function safeImg(u){ return /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+\/=]+$/.test(u || '') ? u : ''; }
   function pad(n){ return (n < 10 ? '0' : '') + n; }
 
+  // Le lien « Ouvrir dans Maps » n'accepte que des services de cartographie connus : sans ça, un faire-part
+  // créé par un tiers pourrait pointer vers un site de phishing derrière un bouton à l'apparence inoffensive.
+  var TLD = '(com|fr|de|es|it|pt|be|ch|ca|co\\.uk|com\\.br)';
+  var MAPS_HOST = new RegExp('^(maps\\.app\\.goo\\.gl|goo\\.gl|maps\\.google\\.' + TLD + '|(www\\.)?google\\.' + TLD +
+    '|maps\\.apple\\.com|(www\\.)?openstreetmap\\.org|(www\\.)?waze\\.com|ul\\.waze\\.com)$', 'i');
+  function safeMapsUrl(u){
+    u = safeHttps(u);
+    if(!u) return '';
+    try{
+      var x = new URL(u);
+      if(x.username || x.password || !MAPS_HOST.test(x.hostname)) return '';
+      if(/^(www\.)?google\./i.test(x.hostname) && !/^\/maps/.test(x.pathname)) return '';
+      if(/^goo\.gl$/i.test(x.hostname) && !/^\/maps/.test(x.pathname)) return '';
+      return x.href;
+    }catch(e){ return ''; }
+  }
+
+  // Liste blanche : la config vient de la base (donc potentiellement forgée par n'importe qui). On ne garde que
+  // les champs connus, avec leur type et leur longueur maximale. Ça évite aussi la pollution de prototype
+  // (une clé "__proto__" dans le JSON) qu'un simple Object.assign aurait laissée passer.
+  var THEMES = ['sauge', 'rose', 'nuit'];
+  function str(v, max, def){ return typeof v === 'string' ? v.slice(0, max) : (def || ''); }
+  FP.sanitizeConfig = function(c){
+    var d = FP.defaults();
+    c = (c && typeof c === 'object' && !Array.isArray(c)) ? c : {};
+    var r = (c.rsvp && typeof c.rsvp === 'object') ? c.rsvp : {};
+    var out = {
+      v: 1,
+      partner1: str(c.partner1, 40), partner2: str(c.partner2, 40),
+      date: /^\d{4}-\d{2}-\d{2}$/.test(str(c.date, 10)) ? c.date : '',
+      time: /^\d{2}:\d{2}$/.test(str(c.time, 5)) ? c.time : '',
+      venueName: str(c.venueName, 80), venueAddress: str(c.venueAddress, 200), mapsUrl: str(c.mapsUrl, 300),
+      subtitle: str(c.subtitle, 100, d.subtitle), message: str(c.message, 600, d.message), practical: str(c.practical, 1200),
+      photos: Array.isArray(c.photos) ? c.photos.filter(function(p){ return typeof p === 'string' && safeImg(p); }).slice(0, 3) : [],
+      theme: THEMES.indexOf(c.theme) > -1 ? c.theme : 'sauge',
+      rsvp: {}
+    };
+    ['guests', 'diet', 'brunch', 'message'].forEach(function(k){ out.rsvp[k] = (k in r) ? r[k] === true : d.rsvp[k]; });
+    if(c.meta && typeof c.meta === 'object'){
+      out.meta = { durationSec: typeof c.meta.durationSec === 'number' ? c.meta.durationSec : null, updatedAt: str(c.meta.updatedAt, 40) };
+    }
+    return out;
+  };
+
   FP.esc = esc;
 
   FP.defaults = function(){
@@ -54,7 +98,7 @@
   };
 
   FP.mapsHref = function(cfg){
-    var u = safeHttps(cfg.mapsUrl);
+    var u = safeMapsUrl(cfg.mapsUrl);
     if(u) return u;
     var q = [cfg.venueName, cfg.venueAddress].join(' ').trim();
     return q ? 'https://www.google.com/maps/search/?api=1&query=' + encodeURIComponent(q) : '';
@@ -139,13 +183,11 @@
 
   FP.renderInvitation = function(root, cfg, opts){
     opts = opts || {};
-    var d = FP.defaults();
-    cfg = Object.assign(d, cfg || {});
-    cfg.rsvp = Object.assign(d.rsvp, (cfg.rsvp || {}));
+    cfg = FP.sanitizeConfig(cfg);
     if(timer){ clearInterval(timer); timer = null; }
 
-    var photos = (cfg.photos || []).map(safeImg).filter(Boolean);
-    var theme = ['sauge', 'rose', 'nuit'].indexOf(cfg.theme) > -1 ? cfg.theme : 'sauge';
+    var photos = cfg.photos.map(safeImg).filter(Boolean);
+    var theme = cfg.theme;
     root.className = 'fp' + (photos.length ? '' : ' no-photo');
     root.setAttribute('data-theme', theme);
 
@@ -192,7 +234,8 @@
     // RSVP
     h += '<section><div class="section-head"><h2>Merci de confirmer votre présence</h2>' + divider() + '</div>';
     if(opts.preview) h += '<p class="preview-note">Aperçu : le formulaire sera actif une fois le faire-part publié.</p>';
-    h += '<div class="form-wrap">' + rsvpHtml(cfg, !!opts.preview) + '</div></section>';
+    h += '<div class="form-wrap">' + rsvpHtml(cfg, !!opts.preview) +
+         '<p class="privacy">Vos réponses sont transmises uniquement aux mariés.</p></div></section>';
 
     h += '<footer>' + divider() + '<div class="fnames">' + names + '</div>' + (dateLong ? '<div class="fdate">' + esc(dateLong) + '</div>' : '') + '</footer>';
 
@@ -215,20 +258,29 @@
   };
 
   // Redimensionne une photo côté navigateur (JPEG, 1600 px max) pour garder un envoi léger sur mobile.
+  // Si l'image reste trop lourde, on baisse la qualité puis la taille (plafond ~700 000 caractères par photo,
+  // pour rester sous la limite de taille imposée côté serveur).
   FP.resizeImage = function(file, maxSide, quality){
     maxSide = maxSide || 1600; quality = quality || 0.82;
     return new Promise(function(resolve, reject){
-      if(!/^image\//.test(file.type)) return reject(new Error('Fichier non image'));
+      if(!/^image\/(jpeg|png|webp|heic|heif|gif)$/i.test(file.type)) return reject(new Error('Format de photo non pris en charge (JPEG, PNG ou WebP).'));
+      if(file.size > 30 * 1024 * 1024) return reject(new Error('Photo trop volumineuse (30 Mo maximum).'));
       var url = URL.createObjectURL(file), img = new Image();
       img.onload = function(){
-        var r = Math.min(1, maxSide / Math.max(img.width, img.height));
-        var c = document.createElement('canvas');
-        c.width = Math.round(img.width * r); c.height = Math.round(img.height * r);
-        c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
         URL.revokeObjectURL(url);
-        resolve(c.toDataURL('image/jpeg', quality));
+        var side = maxSide, q = quality, out = '';
+        for(var i = 0; i < 6; i++){
+          var r = Math.min(1, side / Math.max(img.width, img.height));
+          var c = document.createElement('canvas');
+          c.width = Math.max(1, Math.round(img.width * r)); c.height = Math.max(1, Math.round(img.height * r));
+          c.getContext('2d').drawImage(img, 0, 0, c.width, c.height);
+          out = c.toDataURL('image/jpeg', q);
+          if(out.length <= 700000) return resolve(out);
+          if(q > 0.6) q -= 0.1; else side = Math.round(side * 0.8);
+        }
+        reject(new Error('Photo trop lourde, essayez-en une autre.'));
       };
-      img.onerror = function(){ URL.revokeObjectURL(url); reject(new Error('Image illisible (format non pris en charge ?)')); };
+      img.onerror = function(){ URL.revokeObjectURL(url); reject(new Error('Photo illisible (format non pris en charge ?).')); };
       img.src = url;
     });
   };
