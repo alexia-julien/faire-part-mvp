@@ -83,7 +83,7 @@ end $$;
 
 -- Contrôle de forme et de taille d'un faire-part (3 photos max, 3 Mo max au total).
 create or replace function private.check_config(p_config jsonb) returns void
-language plpgsql as $$
+language plpgsql set search_path = public as $$
 begin
   if p_config is null or jsonb_typeof(p_config) <> 'object' then raise exception 'invalid config'; end if;
   if octet_length(p_config::text) > 3000000 then raise exception 'config too large'; end if;
@@ -199,5 +199,12 @@ grant execute on function public.update_invitation(text, text, jsonb) to anon;
 grant execute on function public.get_invitation(text) to anon;
 grant execute on function public.submit_rsvp(text, jsonb) to anon;
 grant execute on function public.list_rsvps(text, text) to anon;
+-- Supabase accorde par défaut l'exécution aux utilisateurs connectés : l'app n'en utilise pas, on referme.
+revoke execute on function public.create_invitation(text, text, jsonb) from authenticated;
+revoke execute on function public.update_invitation(text, text, jsonb) from authenticated;
+revoke execute on function public.get_invitation(text) from authenticated;
+revoke execute on function public.submit_rsvp(text, jsonb) from authenticated;
+revoke execute on function public.list_rsvps(text, text) from authenticated;
+revoke execute on function public.delete_rsvp(text, text, bigint) from authenticated;
 
 commit;

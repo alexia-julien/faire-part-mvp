@@ -36,6 +36,8 @@ Sécurité : voir [SECURITY.md](SECURITY.md) (modèle de menace, protections, li
 ## Tests
 `python3 tests/e2e.py` (prérequis : `pip install playwright pillow`) rejoue 80 vérifications dans un navigateur headless, en mode local : parcours complet, validations, brouillon, photos, agenda (fuseaux horaires), RSVP, doublons, suppression, modification, sécurité (XSS, config forgée, clickjacking), mobile et contrastes des 3 thèmes. Captures dans `tests/out/`.
 
+`supabase/tests.sql` teste la base elle-même (34 vérifications, tout est annulé à la fin) : à coller dans le SQL Editor après chaque changement du schéma.
+
 ## Comportements à connaître
 - **Brouillon** : la saisie est sauvegardée dans le navigateur ; un rechargement ne fait rien perdre.
 - **Fuseau horaire** : la date/heure affichée est celle du lieu ; le compte à rebours et l'agenda sont justes pour un invité à l'étranger.

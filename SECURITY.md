@@ -23,6 +23,14 @@ Le repo est public et la clé Supabase `anon` est visible par tous : c'est voulu
 | Fuite d'infos par les messages d'erreur | Messages génériques côté utilisateur |
 | Exfiltration de données | CSP `connect-src` limité à l'URL exacte du projet Supabase |
 
+## Alertes du « Security Advisor » de Supabase : lesquelles sont normales
+- **« RLS Enabled No Policy »** (info, 3 tables) : voulu. Aucune policy = aucun accès direct ; tout passe par les fonctions.
+- **« Public Can Execute SECURITY DEFINER Function »** (6 fonctions) : voulu. Ces 6 fonctions sont l'API publique de l'app ; chacune valide ses entrées et exige la clé privée quand c'est nécessaire (testé dans `supabase/tests.sql`).
+- **« Function Search Path Mutable »** sur `private.check_config` : corrigé dans `schema.sql` (rejouer le fichier pour l'appliquer).
+
+## Tests de la base
+`supabase/tests.sql` (34 vérifications) se colle dans le SQL Editor. Il agit comme un visiteur anonyme (rôle `anon`), vérifie les accès directs interdits, la validation des entrées, la protection par clé privée et la limitation de débit, puis annule tout : aucune donnée de test ne reste. À rejouer après chaque changement de `schema.sql`.
+
 ## Limites connues
 - **Pas d'en-têtes HTTP sur GitHub Pages** : pas de `X-Frame-Options` ni de `frame-ancestors` (la protection anti-iframe est faite en JavaScript). Un hébergeur comme Netlify ou Cloudflare Pages permettrait de les ajouter.
 - **Polices Google** : chargées depuis les serveurs de Google, donc l'IP des visiteurs leur est transmise. À héberger soi-même avant une vraie mise en production (RGPD).
@@ -30,4 +38,4 @@ Le repo est public et la clé Supabase `anon` est visible par tous : c'est voulu
 - **Hébergement de contenu tiers** : n'importe qui peut publier un faire-part avec du texte libre. Prévoir un moyen de signalement et de suppression avant d'ouvrir largement.
 - **Lien privé perdu = accès perdu** (pas de compte, pas d'email). Il est aussi mémorisé dans le `localStorage` du navigateur du créateur : à éviter sur un ordinateur partagé.
 - **Données personnelles** (noms, régimes alimentaires = données potentiellement sensibles) : prévoir une politique de confidentialité et une durée de conservation avant d'ouvrir au public.
-- La fonction de limitation et les fonctions SQL n'ont pas été exécutées sur un Postgres en test automatisé (voir README) : valider en réel après chaque changement du schéma.
+- La limitation par IP a été testée sur la vraie base avec une IP simulée ; le journal Supabase confirme que l'en-tête `cf-connecting-ip` accompagne bien les requêtes réelles. À surveiller malgré tout lors des premiers vrais tests à plusieurs.
