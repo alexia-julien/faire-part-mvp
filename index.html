@@ -23,7 +23,7 @@
       <h1 id="title">Votre faire-part, prêt en 3 minutes</h1>
       <p class="muted" id="subtitle">Pas de compte à créer. Seules les deux premières étapes sont obligatoires : tout le reste est déjà prêt, vous l’ajustez si vous le souhaitez.</p>
       <p class="draft-note" id="draft-note" hidden>Votre brouillon a été restauré. <button type="button" class="link-btn" id="reset-draft">Recommencer à zéro</button></p>
-      <p><a id="resume" href="#" hidden>Reprendre mon dernier faire-part publié</a></p>
+      <p><a id="mine-link" href="admin.html" hidden>Mes faire-part</a></p>
     </header>
 
     <ol class="steps" id="steps" aria-label="Progression">
@@ -39,8 +39,8 @@
           <label class="f">Second prénom<input type="text" data-bind="partner2" maxlength="40" autocomplete="off" autocapitalize="words" placeholder="Julien"></label>
         </div>
         <div class="row">
-          <label class="f">Date<input type="date" data-bind="date" id="date-input"></label>
-          <label class="f">Heure de la cérémonie<input type="time" data-bind="time"></label>
+          <label class="f">Date<input type="date" data-bind="date" id="date-input" max="2050-12-31"></label>
+          <label class="f">Heure de la cérémonie <span class="opt">(facultatif)</span><input type="time" data-bind="time"></label>
         </div>
       </fieldset>
 
@@ -152,7 +152,7 @@
         </div>
         <div class="row">
           <label class="f">Question personnalisée <span class="opt">(facultatif)</span><input type="text" data-bind-rsvp-text="customLabel" maxlength="80" placeholder="Une chanson qui vous fera danser ?"></label>
-          <label class="f">Date limite de réponse <span class="opt">(facultatif)</span><input type="date" data-bind-rsvp-text="deadline"></label>
+          <label class="f">Date limite de réponse <span class="opt">(facultatif)</span><input type="date" data-bind-rsvp-text="deadline" id="deadline-input" max="2050-12-31"></label>
         </div>
       </fieldset>
 
@@ -179,14 +179,18 @@
         <div class="link-row"><input type="text" id="admin-link" readonly aria-label="Lien privé de suivi"><button type="button" class="btn-ghost" data-copy="admin-link">Copier</button></div>
         <p class="link-actions"><a id="admin-open">Ouvrir le suivi des réponses</a><a id="mail-admin">M’envoyer ce lien par email</a></p>
       </div>
-      <p><a href="index.html" id="new-one">Créer un autre faire-part</a></p>
+      <p class="link-actions"><a href="admin.html" id="go-mine">Voir tous mes faire-part</a><a href="index.html" id="new-one">Créer un autre faire-part</a></p>
     </section>
   </main>
 
   <aside class="preview" id="preview-pane" aria-label="Aperçu du faire-part">
     <div class="preview-bar">
-      <button type="button" class="close-preview" id="close-preview">Fermer l’aperçu</button>
-      <button type="button" class="replay" id="replay-intro" hidden>Revoir l’introduction</button>
+      <button type="button" class="close-preview" id="close-preview" aria-label="Fermer l’aperçu">Fermer</button>
+      <div class="seg device" role="group" aria-label="Format de l’aperçu">
+        <button type="button" data-device="mobile" aria-pressed="true">Mobile</button>
+        <button type="button" data-device="desktop" aria-pressed="false">Ordinateur</button>
+      </div>
+      <button type="button" class="replay" id="replay-intro" aria-label="Revoir l’introduction" hidden>Revoir l’intro</button>
     </div>
     <div class="phone" id="phone"><div id="preview"></div></div>
   </aside>

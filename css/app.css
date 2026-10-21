@@ -137,16 +137,28 @@ details.more .chk{margin-bottom:0}
 .app.show-preview-on .phone{margin:0 auto;max-width:480px}
 .close-preview,.replay{border:0;font:inherit;font-weight:700;cursor:pointer}
 .close-preview{display:none}
-.app.show-preview-on .close-preview{display:block;flex:1;background:var(--sage-deep);color:#fff;padding:.8rem;text-align:left}
+.app.show-preview-on .close-preview{display:block;flex:1;min-width:0;background:var(--sage-deep);color:#fff;padding:.8rem .7rem;text-align:left;white-space:nowrap}
+.replay{white-space:nowrap;padding:.8rem .7rem}
+@media (max-width:420px){.preview-bar{gap:.2rem}.seg.device{margin:0 .1rem}.seg.device button{padding:.4rem .55rem}.app.show-preview-on .close-preview,.replay{padding:.8rem .5rem}}
 .replay{background:transparent;color:#fff;padding:.8rem;text-decoration:underline}
 body:has(.app.show-preview-on){overflow:hidden}
 .phone.fp-locked,.preview.fp-locked{overflow:hidden!important}
+/* Bascule Mobile / Ordinateur */
+.seg.device{flex:none;align-self:center;margin:0 .4rem}
+.seg.device button{padding:.4rem .8rem;font-size:.78rem}
+/* Aperçu « Ordinateur » : le faire-part est rendu en 1280 px de large puis réduit par zoom (voir onboarding.js) */
+.phone.desktop #preview{width:1280px}
+.phone.desktop{border-radius:12px;border:1px solid #CFC8BA;border-top:26px solid #E4DFD5;background:#fff}
+.app.show-preview-on .phone.desktop{max-width:none}
 
 @media (min-width:980px){
   .app{grid-template-columns:minmax(0,1fr) 440px;gap:2rem;padding:0 2rem}
   .panel{margin:0 0 0 auto;padding-top:2.4rem}
   .preview{display:flex;flex-direction:column;position:sticky;top:1.2rem;align-self:start;height:calc(100vh - 2.4rem);margin:1.2rem 0}
-  .preview-bar{justify-content:flex-end;min-height:2.2rem}
+  .preview-bar{justify-content:space-between;align-items:center;min-height:2.6rem;margin-bottom:.4rem}
+  .seg.device{margin:0}
+  .app.preview-desktop{grid-template-columns:minmax(0,1fr) min(56vw,760px)}
+  .phone.desktop{flex:0 1 auto;aspect-ratio:16/10;border-width:1px;border-top-width:26px;border-radius:12px}
   .replay{color:var(--sage-deep);padding:.3rem .2rem;font-size:.85rem}
   .phone{flex:1;min-height:0;border:10px solid #2B2B2B;border-radius:34px;overflow:auto;background:#fff;box-shadow:0 20px 50px rgba(0,0,0,.18)}
   .preview-btn,.close-preview{display:none!important}
@@ -156,6 +168,27 @@ body:has(.app.show-preview-on){overflow:hidden}
   .nav{position:static;background:none}
   .panel{padding-bottom:3rem}
 }
+
+/* ------------------------------------------------------------ Mes faire-part */
+.dash-head{display:flex;justify-content:space-between;align-items:flex-start;gap:1rem;flex-wrap:wrap;margin-bottom:1rem}
+.fp-cards{display:grid;grid-template-columns:repeat(auto-fill,minmax(290px,1fr));gap:1rem;margin:1rem 0 1.4rem}
+.fp-card{position:relative;background:var(--white);border:1px solid var(--line);border-radius:16px;padding:1.4rem 1.2rem 1.1rem;overflow:hidden;display:flex;flex-direction:column;gap:.15rem}
+.fp-card h2{font-size:1.6rem;margin:0;overflow-wrap:break-word}
+.fp-card.invalid{border-style:dashed}
+.fp-card.invalid h2{font-family:var(--body);font-size:1rem;font-weight:700}
+.card-sw{position:absolute;inset:0 0 auto 0;height:6px}
+.acc-sauge{background:#8C9B7C}.acc-rose{background:#CE968C}.acc-terracotta{background:#D08B6C}.acc-lavande{background:#A99BC9}
+.acc-bordeaux{background:#7A2E3E}.acc-riviera{background:#7FA8B6}.acc-nuit{background:#1F2433}.acc-noir{background:#141414}
+.card-date{margin:0 0 .4rem;font-size:.9rem}
+.card-stat{margin:0 0 .8rem;font-size:.9rem}
+.card-stat strong{font-size:1.1rem}
+.card-actions{display:flex;align-items:center;gap:.4rem 1rem;flex-wrap:wrap;margin-top:auto;font-size:.88rem}
+.card-actions .btn-main{padding:.6rem 1.2rem}
+.empty-box{background:var(--white);border:1px dashed var(--line);border-radius:16px;padding:2rem 1.4rem;text-align:center;margin:1rem 0 1.4rem}
+.form-msg.ok{color:#3E6B3A}
+.back-row{margin:0 0 .6rem}
+.back{font-weight:700;text-decoration:none}
+.back:hover{text-decoration:underline}
 
 /* ------------------------------------------------------------ Page de suivi */
 .admin-page .admin{max-width:1100px;margin:0 auto;padding:1.6rem 1.2rem 4rem}

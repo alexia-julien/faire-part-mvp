@@ -9,7 +9,7 @@
   // Anti-clickjacking (GitHub Pages ne permet pas d'envoyer X-Frame-Options / frame-ancestors).
   if(window.top !== window.self){ document.body.textContent = ''; return; }
 
-  var LAST_KEY = 'fp:last', DRAFT_KEY = 'fp:draft', TOTAL = 5, MAX_PHOTOS = 3, MAX_PROGRAM = 8;
+  var DRAFT_KEY = 'fp:draft', TOTAL = 5, MAX_PHOTOS = 3, MAX_PROGRAM = 8, MAX_YEAR = 2050;
   var state = FP.defaults(), startedAt = Date.now(), editing = null, step = 1, pendingPhotos = 0;
 
   function storeGet(k){ try{ return JSON.parse(localStorage.getItem(k) || 'null'); }catch(e){ return null; } }
@@ -33,6 +33,29 @@
   }
   function updateReplay(){ $('replay-intro').hidden = state.intro === 'aucune'; }
   $('replay-intro').addEventListener('click', function(){ preview(true); });
+
+  // Format de l'aperçu : « Mobile » (téléphone) ou « Ordinateur » (rendu réel en 1280 px, réduit pour tenir à l'écran).
+  var DESKTOP_W = 1280, device = 'mobile';
+  try{ if(localStorage.getItem('fp:device') === 'desktop') device = 'desktop'; }catch(e){}
+  function fitPreview(){
+    var pv = $('preview');
+    pv.style.zoom = device === 'desktop' ? String($('phone').clientWidth / DESKTOP_W) : '';
+  }
+  function applyDevice(){
+    var desk = device === 'desktop';
+    $('phone').classList.toggle('desktop', desk); $('app').classList.toggle('preview-desktop', desk);
+    $$('[data-device]').forEach(function(b){ b.setAttribute('aria-pressed', String(b.getAttribute('data-device') === device)); });
+    fitPreview();
+  }
+  $$('[data-device]').forEach(function(b){
+    b.addEventListener('click', function(){
+      device = b.getAttribute('data-device');
+      try{ localStorage.setItem('fp:device', device); }catch(e){}
+      applyDevice(); preview();
+    });
+  });
+  if(window.ResizeObserver) new ResizeObserver(fitPreview).observe($('phone'));
+  applyDevice();
 
   // ---------- Brouillon : sauvegardé automatiquement, restauré si la page est rechargée ----------
   var draftTimer = 0, draftDirty = false, published = false;
@@ -226,10 +249,12 @@
   function validate(n){
     if(n === 1){
       if(!state.partner1.trim() || !state.partner2.trim()) return 'Indiquez les deux prénoms.';
+      var y = /^(\d+)-/.exec(state.date || '');
+      if(y && +y[1] > MAX_YEAR) return 'L’année ne peut pas dépasser ' + MAX_YEAR + ' : vérifiez la date.';
+      if(!state.date && $('date-input').validity.badInput) return 'La date est incomplète : vérifiez le jour, le mois et l’année.';
       var d = FP.eventDate(state);
       if(!d) return 'Indiquez la date du mariage.';
       if(!editing && d < today()) return 'Cette date est déjà passée : vérifiez l’année.';
-      if(d.getFullYear() > today().getFullYear() + 5) return 'Cette date semble bien lointaine : vérifiez l’année.';
     }
     if(n === 2){
       if(!state.venueName.trim()) return 'Indiquez le nom du lieu.';
@@ -244,6 +269,7 @@
         if(s.on && s.url.trim() && !FP.isValidLink(s.url.trim())) return 'Le lien « ' + links[i][1] + ' » n’est pas valide : il doit commencer par https://';
       }
     }
+    if(n === 5 && !state.rsvp.deadline && $('deadline-input').validity.badInput) return 'La date limite de réponse est incomplète.';
     if(n === 5 && state.rsvp.deadline){
       var dl = FP.parseDate(state.rsvp.deadline), wd = FP.eventDate(state);
       if(!dl) return 'La date limite de réponse n’est pas valide.';
@@ -306,7 +332,7 @@
   }
   function showDone(slug, key, seconds){
     var l = links(slug, key);
-    $('wizard').hidden = true; $('steps').hidden = true; $('draft-note').hidden = true; $('resume').hidden = true;
+    $('wizard').hidden = true; $('steps').hidden = true; $('draft-note').hidden = true; $('mine-link').hidden = true;
     $('done').hidden = false; $('app').classList.add('done'); $('app').classList.remove('show-preview-on');
     $('done-title').textContent = editing ? 'Modifications enregistrées !' : 'C’est publié !';
     $('public-link').value = l.pub; $('public-open').href = l.pub;
@@ -321,7 +347,7 @@
         navigator.share({ title: state.partner1 + ' & ' + state.partner2, text: 'Vous êtes invités à notre mariage !', url: l.pub }).catch(function(){});
       };
     }
-    storeSet(LAST_KEY, { slug: slug, key: key });
+    FP.mine.add(slug, key); // retrouvable ensuite dans « Mes faire-part »
     published = true; clearTimeout(draftTimer); storeDel(DRAFT_KEY);
     window.scrollTo({ top: 0 }); $('done-title').focus({ preventScroll: true });
   }
@@ -381,6 +407,7 @@
       if(!res[1]) throw new Error('introuvable');
       state = FP.sanitizeConfig(res[1]);
       editing = { slug: p.slug, key: p.key };
+      FP.mine.add(p.slug, p.key);
       $('publish').textContent = 'Enregistrer les modifications';
       wizard.hidden = false; $('steps').hidden = false;
       syncInputs(); show(1); preview();
@@ -399,11 +426,11 @@
       step = Math.min(Math.max(parseInt(draft.step, 10) || 1, 1), TOTAL);
     }
     $('reset-draft').addEventListener('click', function(){ storeDel(DRAFT_KEY); location.replace('index.html'); });
-    var last = storeGet(LAST_KEY);
-    if(last && /^[a-z0-9-]{3,63}$/.test(last.slug || '') && /^[a-z0-9]{16,64}$/.test(last.key || '')){
-      var a = $('resume'); a.hidden = false;
-      a.href = 'index.html?f=' + encodeURIComponent(last.slug) + '#k=' + encodeURIComponent(last.key);
-    }
+    var mine = FP.mine.list().length;
+    if(mine){ var a = $('mine-link'); a.hidden = false; a.textContent = 'Mes faire-part (' + mine + ')'; }
+    // Pas de date passée ni au-delà de 2050 dans le calendrier du navigateur
+    var t0 = today(), iso = t0.getFullYear() + '-' + ('0' + (t0.getMonth() + 1)).slice(-2) + '-' + ('0' + t0.getDate()).slice(-2);
+    $('date-input').min = iso; $('deadline-input').min = iso;
     syncInputs(); show(step); preview();
   }
 })();

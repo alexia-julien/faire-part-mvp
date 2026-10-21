@@ -19,6 +19,7 @@
           var err = new Error((body && body.message) || ('HTTP ' + r.status));
           err.conflict = r.status === 409 || (body && body.code === '23505');
           err.forbidden = r.status === 403 || (body && body.code === '42501');
+          err.missing = r.status === 404 || (body && body.code === 'PGRST202'); // fonction SQL pas encore déployée
           throw err;
         }
         return body;
@@ -68,6 +69,16 @@
       db.rsvps[slug] = (db.rsvps[slug] || []).filter(function(r){ return r.id !== id; });
       try{ save(db); }catch(e){ return Promise.reject(e); }
       return Promise.resolve();
+    },
+    summarize: function(items){
+      var db = load();
+      return Promise.resolve(items.map(function(it){
+        var i = db.inv[it.slug];
+        if(!i || i.key !== it.key) return { slug: it.slug, invalid: true };
+        var rs = db.rsvps[it.slug] || [], c = i.config || {};
+        return { slug: it.slug, partner1: c.partner1, partner2: c.partner2, date: c.date, theme: c.theme, responses: rs.length,
+                 last_response: rs.length ? rs[rs.length - 1].created_at : null };
+      }));
     }
   };
 
@@ -92,10 +103,62 @@
       return rpc('delete_rsvp', { p_slug: slug, p_key: key, p_id: id }).then(function(ok){
         if(!ok){ var e = new Error('forbidden'); e.forbidden = true; throw e; }
       });
+    },
+    // Résumé de plusieurs faire-part en UN appel (liste « Mes faire-part ») : chaque clé est vérifiée côté serveur.
+    // Si la fonction n'est pas encore déployée, on se rabat sur la lecture publique (sans le nombre de réponses).
+    summarize: function(items){
+      return rpc('summarize_invitations', { p_items: items }).catch(function(e){
+        if(!e.missing) throw e;
+        return Promise.all(items.map(function(it){
+          return supa.getInvitation(it.slug).then(function(c){
+            return c ? { slug: it.slug, partner1: c.partner1, partner2: c.partner2, date: c.date, theme: c.theme, responses: null }
+                     : { slug: it.slug, invalid: true };
+          }, function(){ return { slug: it.slug, responses: null }; });
+        }));
+      });
     }
   };
 
   FP.api = remote ? supa : local;
+
+  // ---------- « Mes faire-part » : la liste des faire-part gérés depuis CE navigateur (pas de compte) ----------
+  var MINE_KEY = 'fp:mine', SLUG_RE = /^[a-z0-9][a-z0-9-]{2,62}$/, KEY_RE = /^[a-z0-9]{16,64}$/;
+  function mineRead(){
+    var list = [];
+    try{ list = JSON.parse(localStorage.getItem(MINE_KEY) || '[]'); }catch(e){}
+    list = Array.isArray(list) ? list.filter(function(x){ return x && SLUG_RE.test(x.slug) && KEY_RE.test(x.key); }) : [];
+    // Reprise de l'ancien format (un seul « dernier faire-part publié »)
+    try{
+      var last = JSON.parse(localStorage.getItem('fp:last') || 'null');
+      if(last && SLUG_RE.test(last.slug || '') && KEY_RE.test(last.key || '') && !list.some(function(x){ return x.slug === last.slug; })){
+        list.push({ slug: last.slug, key: last.key, addedAt: new Date().toISOString() });
+        localStorage.setItem(MINE_KEY, JSON.stringify(list));
+      }
+    }catch(e){}
+    return list;
+  }
+  function mineWrite(list){ try{ localStorage.setItem(MINE_KEY, JSON.stringify(list)); return true; }catch(e){ return false; } }
+  FP.mine = {
+    list: mineRead,
+    add: function(slug, key){
+      if(!SLUG_RE.test(slug) || !KEY_RE.test(key)) return false;
+      var list = mineRead().filter(function(x){ return x.slug !== slug; });
+      list.unshift({ slug: slug, key: key, addedAt: new Date().toISOString() });
+      return mineWrite(list.slice(0, 100));
+    },
+    remove: function(slug){
+      mineWrite(mineRead().filter(function(x){ return x.slug !== slug; }));
+      try{ var last = JSON.parse(localStorage.getItem('fp:last') || 'null'); if(last && last.slug === slug) localStorage.removeItem('fp:last'); }catch(e){}
+    }
+  };
+  // Lit un lien privé collé (…admin.html?f=…#k=… ou …index.html?f=…#k=…).
+  FP.parsePrivateLink = function(text){
+    try{
+      var u = new URL(String(text || '').trim(), location.href);
+      var slug = u.searchParams.get('f') || '', key = new URLSearchParams(u.hash.slice(1)).get('k') || '';
+      return SLUG_RE.test(slug) && KEY_RE.test(key) ? { slug: slug, key: key } : null;
+    }catch(e){ return null; }
+  };
 
   // Utilitaires partagés
   // Alphabet de exactement 32 caractères (sans 0/o/1/l) : 256 est divisible par 32, donc aucun biais statistique.

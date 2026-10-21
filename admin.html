@@ -6,7 +6,7 @@
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<title>Suivi des réponses</title>
+<title>Mes faire-part</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 21s-7.05-4.35-9.5-8.5C.7 9 2.2 5 6.3 5c2 0 3.6 1.1 5.7 3.6C14.1 6.1 15.7 5 17.7 5c4.1 0 5.6 4 3.8 7.5C19.05 16.65 12 21 12 21z' fill='%235F6E4E'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -15,46 +15,80 @@
 </head>
 <body class="admin-page">
 <main class="admin">
-  <h1 id="admin-title">Suivi des réponses</h1>
-  <p class="muted admin-sub" id="admin-sub"></p>
-  <p id="state" class="muted" role="status">Chargement…</p>
-  <div id="content" hidden>
-    <div class="tiles" id="tiles"></div>
-    <p class="hint" id="dup-note" hidden></p>
-    <section class="diet-box" id="diet-box" hidden aria-labelledby="diet-title">
-      <h2 id="diet-title">Régimes et allergies (pour le traiteur)</h2>
-      <ul id="diet-list"></ul>
-    </section>
-    <div class="actions">
-      <a class="btn-ghost" id="open-public" target="_blank" rel="noopener">Voir le faire-part</a>
-      <a class="btn-ghost" id="edit-link">Modifier le faire-part</a>
-      <button type="button" class="btn-ghost" id="csv">Exporter en CSV</button>
-      <button type="button" class="btn-ghost" id="copy-emails" hidden>Copier les emails</button>
-      <button type="button" class="btn-ghost" id="refresh">Actualiser</button>
-    </div>
-    <p class="form-msg" id="action-msg" role="status"></p>
-    <div class="toolbar" id="toolbar">
-      <input type="search" id="search" placeholder="Rechercher un nom, un email…" aria-label="Rechercher une réponse" autocomplete="off">
-      <div class="seg" role="group" aria-label="Filtrer les réponses">
-        <button type="button" data-filter="all" aria-pressed="true">Tous</button>
-        <button type="button" data-filter="yes" aria-pressed="false">Présents</button>
-        <button type="button" data-filter="no" aria-pressed="false">Absents</button>
+
+  <!-- Écran 1 : la liste des faire-part -->
+  <section id="dashboard" hidden aria-labelledby="dash-title">
+    <div class="dash-head">
+      <div>
+        <h1 id="dash-title">Mes faire-part</h1>
+        <p class="muted admin-sub">Choisissez un faire-part pour voir ses réponses.</p>
       </div>
+      <a class="btn-main" href="index.html">Créer un faire-part</a>
     </div>
-    <p class="muted" id="count" role="status"></p>
-    <div class="table-wrap" id="table-wrap">
-      <table id="table">
-        <thead><tr id="thead-row"></tr></thead>
-        <tbody></tbody>
-      </table>
+    <p id="dash-state" class="muted" role="status"></p>
+    <div class="fp-cards" id="fp-cards"></div>
+    <div class="empty-box" id="dash-empty" hidden>
+      <h2>Aucun faire-part pour l’instant</h2>
+      <p class="muted">Créez votre premier faire-part en quelques minutes : il apparaîtra ici automatiquement.</p>
+      <a class="btn-main" href="index.html">Créer mon faire-part</a>
     </div>
-    <p class="muted" id="no-match" hidden>Aucune réponse ne correspond à votre recherche.</p>
-    <p class="muted" id="empty" hidden>Aucune réponse pour l’instant. Partagez le lien du faire-part pour recevoir les premières.</p>
+    <details class="more" id="add-box">
+      <summary>Ajouter un faire-part avec son lien privé</summary>
+      <p class="hint">Collez le lien privé reçu à la publication (il contient « #k= »). Pratique pour retrouver vos faire-part sur un autre appareil.</p>
+      <div class="link-row">
+        <input type="url" id="add-link" placeholder="https://…/admin.html?f=…#k=…" aria-label="Lien privé du faire-part" autocomplete="off">
+        <button type="button" class="btn-ghost" id="add-btn">Ajouter</button>
+      </div>
+      <p class="form-msg" id="add-msg" role="status"></p>
+    </details>
+    <p class="hint">Cette liste est enregistrée dans ce navigateur uniquement. Sur un autre appareil, ouvrez une fois votre lien privé : le faire-part s’y ajoutera.</p>
+  </section>
+
+  <!-- Écran 2 : les réponses d'un faire-part -->
+  <div id="detail" hidden>
+    <p class="back-row"><a class="back" href="admin.html">← Mes faire-part</a></p>
+    <h1 id="admin-title">Suivi des réponses</h1>
+    <p class="muted admin-sub" id="admin-sub"></p>
+    <p id="state" class="muted" role="status">Chargement…</p>
+    <div id="content" hidden>
+      <div class="tiles" id="tiles"></div>
+      <p class="hint" id="dup-note" hidden></p>
+      <section class="diet-box" id="diet-box" hidden aria-labelledby="diet-title">
+        <h2 id="diet-title">Régimes et allergies (pour le traiteur)</h2>
+        <ul id="diet-list"></ul>
+      </section>
+      <div class="actions">
+        <a class="btn-ghost" id="open-public" target="_blank" rel="noopener">Voir le faire-part</a>
+        <a class="btn-ghost" id="edit-link">Modifier le faire-part</a>
+        <button type="button" class="btn-ghost" id="csv">Exporter en CSV</button>
+        <button type="button" class="btn-ghost" id="copy-emails" hidden>Copier les emails</button>
+        <button type="button" class="btn-ghost" id="refresh">Actualiser</button>
+      </div>
+      <p class="form-msg" id="action-msg" role="status"></p>
+      <div class="toolbar" id="toolbar">
+        <input type="search" id="search" placeholder="Rechercher un nom, un email…" aria-label="Rechercher une réponse" autocomplete="off">
+        <div class="seg" role="group" aria-label="Filtrer les réponses">
+          <button type="button" data-filter="all" aria-pressed="true">Tous</button>
+          <button type="button" data-filter="yes" aria-pressed="false">Présents</button>
+          <button type="button" data-filter="no" aria-pressed="false">Absents</button>
+        </div>
+      </div>
+      <p class="muted" id="count" role="status"></p>
+      <div class="table-wrap" id="table-wrap">
+        <table id="table">
+          <thead><tr id="thead-row"></tr></thead>
+          <tbody></tbody>
+        </table>
+      </div>
+      <p class="muted" id="no-match" hidden>Aucune réponse ne correspond à votre recherche.</p>
+      <p class="muted" id="empty" hidden>Aucune réponse pour l’instant. Partagez le lien du faire-part pour recevoir les premières.</p>
+    </div>
   </div>
 </main>
 <script src="js/config.js"></script>
 <script src="js/api.js"></script>
 <script src="js/render.js"></script>
+<script src="js/dashboard.js"></script>
 <script src="js/admin.js"></script>
 </body>
 </html>

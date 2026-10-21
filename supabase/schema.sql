@@ -204,7 +204,38 @@ begin
   return true;
 end $$;
 
--- Seules ces 6 fonctions sont appelables depuis le navigateur.
+-- Résumé de plusieurs faire-part en un appel (liste « Mes faire-part »). Chaque élément doit fournir la bonne clé
+-- privée, sinon il est renvoyé comme « invalide » (sans aucune donnée). 100 faire-part max, 120 appels / heure / IP.
+create or replace function public.summarize_invitations(p_items jsonb)
+returns jsonb language plpgsql security definer set search_path = public, extensions as $$
+declare it jsonb; v_cfg jsonb; v_out jsonb := '[]'::jsonb;
+begin
+  perform private.rate_limit('summary', 120);
+  if p_items is null or jsonb_typeof(p_items) <> 'array' then raise exception 'invalid data'; end if;
+  if jsonb_array_length(p_items) > 100 then raise exception 'too many'; end if;
+  for it in select value from jsonb_array_elements(p_items) loop
+    v_cfg := null;
+    if jsonb_typeof(it) = 'object' then
+      select config into v_cfg from invitations
+       where slug = it->>'slug' and key_hash = crypt(coalesce(it->>'key', ''), key_hash);
+    end if;
+    if v_cfg is null then
+      v_out := v_out || jsonb_build_array(jsonb_build_object('slug', left(coalesce(it->>'slug', ''), 63), 'invalid', true));
+    else
+      v_out := v_out || jsonb_build_array(jsonb_build_object(
+        'slug', it->>'slug',
+        'partner1', v_cfg->>'partner1', 'partner2', v_cfg->>'partner2', 'date', v_cfg->>'date', 'theme', v_cfg->>'theme',
+        'responses', (select count(*) from rsvps where slug = it->>'slug'),
+        'last_response', (select max(created_at) from rsvps where slug = it->>'slug')));
+    end if;
+  end loop;
+  return v_out;
+end $$;
+
+-- Seules ces 7 fonctions sont appelables depuis le navigateur.
+revoke execute on function public.summarize_invitations(jsonb) from public;
+grant execute on function public.summarize_invitations(jsonb) to anon;
+revoke execute on function public.summarize_invitations(jsonb) from authenticated;
 revoke execute on function public.delete_rsvp(text, text, bigint) from public;
 grant execute on function public.delete_rsvp(text, text, bigint) to anon;
 revoke execute on function public.create_invitation(text, text, jsonb) from public;

@@ -108,7 +108,7 @@
     return {
       v: 2,
       partner1: '', partner2: '',
-      date: '', time: '16:00',
+      date: '', time: '', // heure facultative
       venueName: '', venueAddress: '', mapsUrl: '',
       subtitle: 'vous invitent à célébrer leur mariage',
       message: 'Nous serions très heureux de partager ce jour unique avec vous.',
@@ -131,7 +131,7 @@
   // Contenu proposé quand on active une section (modifiable ; « Notre histoire » reste vide : c'est personnel).
   FP.sectionDefaults = function(id, cfg){
     if(id === 'program'){
-      var t = /^(\d{2}):(\d{2})$/.exec((cfg && cfg.time) || '') || [0, '16', '00'];
+      var t = /^(\d{2}):(\d{2})$/.exec((cfg && cfg.time) || '') || [0, '15', '00']; // sans heure de cérémonie : 15h
       var base = (+t[1]) * 60 + (+t[2]);
       var at = function(m){ m = (base + m) % 1440; return pad(Math.floor(m / 60)) + ':' + pad(m % 60); };
       return { on: true, items: [
@@ -214,11 +214,13 @@
     return d.getMonth() === +m[2] - 1 ? d : null; // rejette les dates impossibles (31 février…)
   }
   FP.parseDate = parseDate;
+  FP.hasTime = function(cfg){ return TIME_RE.test(cfg.time || ''); };
   // Date « murale » du mariage (pour l'affichage : 7 août 2027, 16h00, quel que soit le pays de l'invité).
+  // Sans heure (facultative), on prend le début de la journée.
   FP.eventDate = function(cfg){
     var d = parseDate(cfg.date);
     if(!d) return null;
-    var t = /^(\d{2}):(\d{2})$/.exec(cfg.time || '') || [0, '16', '00'];
+    var t = /^(\d{2}):(\d{2})$/.exec(cfg.time || '') || [0, '00', '00'];
     d.setHours(+t[1], +t[2], 0, 0);
     return d;
   };
@@ -280,12 +282,17 @@
   FP.buildIcs = function(cfg){
     cfg = FP.sanitizeConfig(cfg);
     var start = FP.eventInstant(cfg); if(start == null) return '';
-    var title = 'Mariage de ' + cfg.partner1 + ' & ' + cfg.partner2;
+    var title = 'Mariage de ' + cfg.partner1 + ' & ' + cfg.partner2, when;
+    if(FP.hasTime(cfg)) when = ['DTSTART:' + icsStamp(start), 'DTEND:' + icsStamp(start + 6 * 3600 * 1000)];
+    else { // sans heure : événement sur la journée entière
+      var d = FP.eventDate(cfg), n = new Date(d.getFullYear(), d.getMonth(), d.getDate() + 1);
+      var ymd = function(x){ return x.getFullYear() + pad(x.getMonth() + 1) + pad(x.getDate()); };
+      when = ['DTSTART;VALUE=DATE:' + ymd(d), 'DTEND;VALUE=DATE:' + ymd(n)];
+    }
     return ['BEGIN:VCALENDAR', 'VERSION:2.0', 'PRODID:-//Faire-part//FR', 'CALSCALE:GREGORIAN', 'BEGIN:VEVENT',
-      'UID:' + start + '-' + FP.slugifyLite(title) + '@faire-part', 'DTSTAMP:' + icsStamp(Date.now()),
-      'DTSTART:' + icsStamp(start), 'DTEND:' + icsStamp(start + 6 * 3600 * 1000),
+      'UID:' + start + '-' + FP.slugifyLite(title) + '@faire-part', 'DTSTAMP:' + icsStamp(Date.now())].concat(when, [
       'SUMMARY:' + icsEsc(title), 'LOCATION:' + icsEsc([cfg.venueName, cfg.venueAddress].filter(Boolean).join(', ')),
-      'END:VEVENT', 'END:VCALENDAR'].map(icsFold).join('\r\n');
+      'END:VEVENT', 'END:VCALENDAR']).map(icsFold).join('\r\n');
   };
   function downloadIcs(cfg){
     var ics = FP.buildIcs(cfg); if(!ics) return;
@@ -417,7 +424,9 @@
     }
     if(container){
       container.scrollTop = 0;
-      ov.style.height = container.clientHeight + 'px'; // CSSOM : autorisé par la CSP (≠ attribut style)
+      // Aperçu « ordinateur » : le faire-part est rendu en 1280 px puis réduit (zoom) ; l'intro doit couvrir l'écran visible.
+      var z = parseFloat(getComputedStyle(root).zoom) || 1;
+      ov.style.height = (container.clientHeight / z) + 'px'; // CSSOM : autorisé par la CSP (≠ attribut style)
       container.classList.add('fp-locked');
     } else {
       document.documentElement.classList.add('fp-locked');
@@ -477,7 +486,7 @@
     if(cfg.subtitle) h += '<div class="subtitle">' + esc(cfg.subtitle) + '</div>';
     h += '<div class="rule"></div>';
     h += '<div class="date">' + (dateLong ? esc(dateLong) : 'Date à venir') + '</div>';
-    if(hasDate && time) h += '<div class="date-sub">' + esc(dateFull.split(' ')[0]) + ' · ' + esc(time) + '</div>';
+    if(hasDate) h += '<div class="date-sub">' + esc(dateFull.split(' ')[0]) + (time ? ' · ' + esc(time) : '') + '</div>';
     if(hasDate && cfg.countdown){
       h += '<div class="countdown" aria-hidden="true">' +
         ['days:jours', 'hours:heures', 'mins:minutes', 'secs:secondes'].map(function(x){

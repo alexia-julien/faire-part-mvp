@@ -7,6 +7,9 @@
   // Anti-clickjacking (GitHub Pages ne permet pas d'envoyer X-Frame-Options / frame-ancestors).
   if(window.top !== window.self){ document.body.textContent = ''; return; }
 
+  // Sans faire-part dans l'adresse, c'est la liste « Mes faire-part » (js/dashboard.js) qui s'affiche.
+  if(!new URLSearchParams(location.search).get('f')) return;
+  $('detail').hidden = false;
   function state(msg){ $('state').textContent = msg; $('state').hidden = !msg; }
   if(!p.slug || !p.key){ state('Lien privé incomplet. Utilisez le lien de suivi complet que vous avez reçu à la publication.'); return; }
 
@@ -222,6 +225,7 @@
     state('Chargement…'); $('action-msg').textContent = '';
     Promise.all([FP.api.listRsvps(p.slug, p.key), FP.api.getInvitation(p.slug).catch(function(){ return null; })]).then(function(res){
       rows = (Array.isArray(res[0]) ? res[0] : []).filter(function(r){ return r && r.data && typeof r.data === 'object'; });
+      FP.mine.add(p.slug, p.key); // clé valide : le faire-part rejoint « Mes faire-part » sur cet appareil
       if(res[1]){
         cfg = FP.sanitizeConfig(res[1]);
         $('admin-title').textContent = 'Réponses — ' + cfg.partner1 + ' & ' + cfg.partner2;

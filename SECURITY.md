@@ -3,7 +3,7 @@
 ## Modèle de menace
 Le repo est public et la clé Supabase `anon` est visible par tous : c'est voulu. La sécurité ne repose sur aucun secret côté navigateur, mais sur :
 1. des **tables verrouillées** (RLS sans policy, aucun droit direct pour `anon`) ;
-2. **6 fonctions SQL** seules appelables depuis le navigateur, qui valident tout ce qui entre ;
+2. **7 fonctions SQL** seules appelables depuis le navigateur, qui valident tout ce qui entre ;
 3. une **clé privée par faire-part** (24 caractères aléatoires, ~120 bits), stockée hashée (bcrypt), qui seule donne accès aux réponses et à la modification.
 
 **Ne jamais mettre la clé `service_role` dans ce repo** (elle contourne toute la protection). Si elle fuite : la régénérer dans Supabase > Project Settings > API.
@@ -31,7 +31,7 @@ Le repo est public et la clé Supabase `anon` est visible par tous : c'est voulu
 - **« Function Search Path Mutable »** sur `private.check_config` : corrigé dans `schema.sql` (rejouer le fichier pour l'appliquer).
 
 ## Tests de la base
-`supabase/tests.sql` (42 vérifications) se colle dans le SQL Editor. Il agit comme un visiteur anonyme (rôle `anon`), vérifie les accès directs interdits, la validation des entrées, la protection par clé privée et la limitation de débit, puis annule tout : aucune donnée de test ne reste. À rejouer après chaque changement de `schema.sql`.
+`supabase/tests.sql` (47 vérifications) se colle dans le SQL Editor. Il agit comme un visiteur anonyme (rôle `anon`), vérifie les accès directs interdits, la validation des entrées, la protection par clé privée et la limitation de débit, puis annule tout : aucune donnée de test ne reste. À rejouer après chaque changement de `schema.sql`.
 
 ## Limites connues
 - **Pas d'en-têtes HTTP sur GitHub Pages** : pas de `X-Frame-Options` ni de `frame-ancestors` (la protection anti-iframe est faite en JavaScript). Un hébergeur comme Netlify ou Cloudflare Pages permettrait de les ajouter.

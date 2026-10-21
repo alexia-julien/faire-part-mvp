@@ -1,4 +1,4 @@
--- Tests de la base (42 vérifications), à exécuter dans Supabase > SQL Editor (ou via le connecteur) après chaque changement de schema.sql.
+-- Tests de la base (47 vérifications), à exécuter dans Supabase > SQL Editor (ou via le connecteur) après chaque changement de schema.sql.
 -- Tout s'exécute dans une transaction qui est TOUJOURS annulée à la fin : aucune donnée de test ne reste.
 -- Le résultat s'affiche dans un message d'erreur volontaire « RESULTATS » : une ligne PASS ou FAIL par vérification.
 -- Les tests se placent dans la peau du rôle « anon » (le navigateur d'un visiteur), pas du propriétaire de la base.
@@ -121,6 +121,16 @@ begin
   perform public.submit_rsvp(v_slug, ('{"name":"Long","attendance":"yes","address":"' || repeat('b', 900) || '","custom":"' || repeat('c', 900) || '","companions":"' || repeat('d', 900) || '"}')::jsonb);
   v := public.list_rsvps(v_slug, v_key); v := v->(jsonb_array_length(v) - 1)->'data';
   r := r || case when length(v->>'address') = 300 and length(v->>'custom') = 500 and length(v->>'companions') = 300 then E'PASS champs longs tronqués (300/500/300)\n' else E'FAIL troncature\n' end;
+
+  -- « Mes faire-part » : résumé de plusieurs faire-part en un appel
+  v := public.summarize_invitations(jsonb_build_array(jsonb_build_object('slug', v_slug, 'key', v_key), jsonb_build_object('slug', v_slug, 'key', v_bad), '"pas-un-objet"'::jsonb, jsonb_build_object('slug', 'inexistant-0000', 'key', v_key)));
+  r := r || case when jsonb_array_length(v) = 4 and v->0->>'partner1' = 'Alexia' and (v->0->>'responses')::int > 0 then E'PASS résumé : bonne clé → prénoms et nombre de réponses\n' else 'FAIL résumé : ' || coalesce((v->0)::text, 'null') || E'\n' end;
+  r := r || case when (v->1->>'invalid')::boolean and not (v->1 ? 'partner1') then E'PASS résumé : mauvaise clé → invalide, aucune donnée\n' else E'FAIL résumé mauvaise clé\n' end;
+  r := r || case when (v->2->>'invalid')::boolean and (v->3->>'invalid')::boolean then E'PASS résumé : élément non objet ou inconnu → invalide\n' else E'FAIL résumé éléments invalides\n' end;
+  begin perform public.summarize_invitations((select jsonb_agg(jsonb_build_object('slug', 'x', 'key', 'y')) from generate_series(1, 101))); r := r || E'FAIL résumé : 101 éléments acceptés\n';
+  exception when others then r := r || case when sqlerrm = 'too many' then E'PASS résumé : plus de 100 éléments refusés\n' else 'FAIL résumé 101 : ' || sqlerrm || E'\n' end; end;
+  begin perform public.summarize_invitations('{"a":1}'::jsonb); r := r || E'FAIL résumé : objet accepté\n';
+  exception when others then r := r || case when sqlerrm = 'invalid data' then E'PASS résumé : paramètre non tableau refusé\n' else 'FAIL résumé objet : ' || sqlerrm || E'\n' end; end;
 
   reset role;
   r := r || case when exists (select 1 from private.rate_limits where ip_hash = '203.0.113.7') then E'FAIL IP stockée en clair\n' else E'PASS IP stockée uniquement sous forme de hash\n' end;
