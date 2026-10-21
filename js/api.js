@@ -106,16 +106,20 @@
     },
     // Résumé de plusieurs faire-part en UN appel (liste « Mes faire-part ») : chaque clé est vérifiée côté serveur.
     // Si la fonction n'est pas encore déployée, on se rabat sur la lecture publique (sans le nombre de réponses).
+    // Résumé de la liste « Mes faire-part », calculé dans le navigateur à partir des fonctions déjà en place
+    // (get_invitation + list_rsvps, clé vérifiée côté serveur) : aucune nouvelle fonction SQL à déployer.
     summarize: function(items){
-      return rpc('summarize_invitations', { p_items: items }).catch(function(e){
-        if(!e.missing) throw e;
-        return Promise.all(items.map(function(it){
-          return supa.getInvitation(it.slug).then(function(c){
-            return c ? { slug: it.slug, partner1: c.partner1, partner2: c.partner2, date: c.date, theme: c.theme, responses: null }
-                     : { slug: it.slug, invalid: true };
-          }, function(){ return { slug: it.slug, responses: null }; });
-        }));
-      });
+      return Promise.all(items.map(function(it){
+        return Promise.all([supa.getInvitation(it.slug), supa.listRsvps(it.slug, it.key)]).then(function(res){
+          var c = res[0], rs = res[1];
+          if(!c || !Array.isArray(rs)) return { slug: it.slug, invalid: true };
+          var last = rs.reduce(function(m, r){ return r && r.created_at > m ? r.created_at : m; }, '');
+          return { slug: it.slug, partner1: c.partner1, partner2: c.partner2, date: c.date, theme: c.theme,
+                   responses: rs.length, last_response: last || null };
+        }, function(e){
+          return e && e.forbidden ? { slug: it.slug, invalid: true } : { slug: it.slug, responses: null };
+        });
+      }));
     }
   };
 

@@ -35,6 +35,8 @@ Sans configuration, l'app tourne en **mode local** (données dans le `localStora
 
 `schema.sql` est idempotent et transactionnel : pour appliquer une mise à jour du schéma, rejouer le fichier en entier dans le SQL Editor.
 
+La liste « Mes faire-part » n'a besoin d'aucune fonction supplémentaire : le nombre de réponses est calculé dans le navigateur à partir de `get_invitation` et `list_rsvps` (clé vérifiée côté serveur). `summarize_invitations` reste dans `schema.sql` mais n'est plus appelée par le site ; elle pourra servir plus tard si le nombre de faire-part par utilisateur devient grand.
+
 Si l'URL du projet Supabase change, mettre à jour **aussi** la CSP (`connect-src`) dans `index.html`, `invitation.html` et `admin.html`.
 
 Sécurité : voir [SECURITY.md](SECURITY.md) (modèle de menace, protections, limites connues).
