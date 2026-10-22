@@ -155,14 +155,6 @@
       try{ var last = JSON.parse(localStorage.getItem('fp:last') || 'null'); if(last && last.slug === slug) localStorage.removeItem('fp:last'); }catch(e){}
     }
   };
-  // Lit un lien privé collé (…admin.html?f=…#k=… ou …index.html?f=…#k=…).
-  FP.parsePrivateLink = function(text){
-    try{
-      var u = new URL(String(text || '').trim(), location.href);
-      var slug = u.searchParams.get('f') || '', key = new URLSearchParams(u.hash.slice(1)).get('k') || '';
-      return SLUG_RE.test(slug) && KEY_RE.test(key) ? { slug: slug, key: key } : null;
-    }catch(e){ return null; }
-  };
 
   // Utilitaires partagés
   // Alphabet de exactement 32 caractères (sans 0/o/1/l) : 256 est divisible par 32, donc aucun biais statistique.

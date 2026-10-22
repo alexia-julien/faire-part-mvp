@@ -83,7 +83,6 @@
     var items = FP.mine.list(), box = $('fp-cards'), st = $('dash-state');
     box.innerHTML = '';
     $('dash-empty').hidden = items.length > 0;
-    $('add-box').open = false;
     if(!items.length){ st.textContent = ''; return; }
     st.textContent = 'Chargement…';
     FP.api.summarize(items.map(function(x){ return { slug: x.slug, key: x.key }; })).then(function(list){
@@ -100,21 +99,5 @@
     });
   }
 
-  // Ajout d'un faire-part avec son lien privé : la clé est vérifiée avant de l'enregistrer.
-  function add(){
-    var msg = $('add-msg'), parsed = FP.parsePrivateLink($('add-link').value);
-    msg.classList.remove('ok');
-    if(!parsed){ msg.textContent = 'Ce n’est pas un lien privé valide : il doit contenir « ?f=… » et « #k=… ».'; return; }
-    $('add-btn').disabled = true; msg.textContent = 'Vérification…';
-    FP.api.listRsvps(parsed.slug, parsed.key).then(function(){
-      FP.mine.add(parsed.slug, parsed.key);
-      $('add-link').value = ''; msg.textContent = 'Faire-part ajouté.'; msg.classList.add('ok');
-      load(); $('add-box').open = true;
-    }).catch(function(e){
-      msg.textContent = e && e.forbidden ? 'Ce lien privé est invalide.' : FP.userError(e);
-    }).then(function(){ $('add-btn').disabled = false; });
-  }
-  $('add-btn').addEventListener('click', add);
-  $('add-link').addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); add(); } });
   load();
 })();
