@@ -79,6 +79,26 @@
         return { slug: it.slug, partner1: c.partner1, partner2: c.partner2, date: c.date, theme: c.theme, responses: rs.length,
                  last_response: rs.length ? rs[rs.length - 1].created_at : null };
       }));
+    },
+    // Espaces testeurs : en local, db.testers = { <jeton>: { name, disabled, items: { <slug>: <clé> } } } (créés à la main / par les tests).
+    testerWorkspace: function(token){
+      var t = (load().testers || {})[token];
+      if(!t || t.disabled) return Promise.resolve(null);
+      return Promise.resolve({ name: t.name, items: Object.keys(t.items || {}).map(function(s){ return { slug: s, key: t.items[s] }; }) });
+    },
+    testerAttach: function(token, slug, key){
+      var db = load(), t = (db.testers || {})[token], i = db.inv[slug];
+      if(!t || t.disabled || !i || i.key !== key){ var e = new Error('forbidden'); e.forbidden = true; return Promise.reject(e); }
+      t.items = t.items || {}; t.items[slug] = key;
+      try{ save(db); }catch(e){ return Promise.reject(e); }
+      return Promise.resolve();
+    },
+    testerDetach: function(token, slug){
+      var db = load(), t = (db.testers || {})[token];
+      if(!t || t.disabled){ var e = new Error('forbidden'); e.forbidden = true; return Promise.reject(e); }
+      if(t.items) delete t.items[slug];
+      try{ save(db); }catch(e){ return Promise.reject(e); }
+      return Promise.resolve();
     }
   };
 
@@ -104,11 +124,19 @@
         if(!ok){ var e = new Error('forbidden'); e.forbidden = true; throw e; }
       });
     },
-    // Résumé de plusieurs faire-part en UN appel (liste « Mes faire-part ») : chaque clé est vérifiée côté serveur.
-    // Si la fonction n'est pas encore déployée, on se rabat sur la lecture publique (sans le nombre de réponses).
-    // Résumé de la liste « Mes faire-part », calculé dans le navigateur à partir des fonctions déjà en place
-    // (get_invitation + list_rsvps, clé vérifiée côté serveur) : aucune nouvelle fonction SQL à déployer.
+    // Résumé de la liste « Mes faire-part » en UN appel (summarize_invitations, chaque clé vérifiée côté serveur) :
+    // un espace testeur peut contenir des dizaines de faire-part. Si la fonction n'est pas déployée, on se rabat sur
+    // get_invitation + list_rsvps, faire-part par faire-part.
     summarize: function(items){
+      return rpc('summarize_invitations', { p_items: items }).then(function(list){
+        if(!Array.isArray(list)) throw new Error('invalid');
+        return list;
+      }).catch(function(e){
+        if(e && /rate limit/i.test(e.message)) throw e;
+        return supa.summarizeEach(items);
+      });
+    },
+    summarizeEach: function(items){
       return Promise.all(items.map(function(it){
         return Promise.all([supa.getInvitation(it.slug), supa.listRsvps(it.slug, it.key)]).then(function(res){
           var c = res[0], rs = res[1];
@@ -120,6 +148,18 @@
           return e && e.forbidden ? { slug: it.slug, invalid: true } : { slug: it.slug, responses: null };
         });
       }));
+    },
+    // Espaces testeurs. Le serveur renvoie null / false (et non une erreur) quand le jeton ou la clé est mauvais.
+    testerWorkspace: function(token){ return rpc('tester_workspace', { p_token: token }); },
+    testerAttach: function(token, slug, key){
+      return rpc('tester_attach', { p_token: token, p_slug: slug, p_key: key }).then(function(ok){
+        if(!ok){ var e = new Error('forbidden'); e.forbidden = true; throw e; }
+      });
+    },
+    testerDetach: function(token, slug){
+      return rpc('tester_detach', { p_token: token, p_slug: slug }).then(function(ok){
+        if(!ok){ var e = new Error('forbidden'); e.forbidden = true; throw e; }
+      });
     }
   };
 
@@ -154,6 +194,29 @@
       mineWrite(mineRead().filter(function(x){ return x.slug !== slug; }));
       try{ var last = JSON.parse(localStorage.getItem('fp:last') || 'null'); if(last && last.slug === slug) localStorage.removeItem('fp:last'); }catch(e){}
     }
+  };
+
+  // ---------- Espace testeur : lien personnel (admin.html#t=<jeton>) qui retrouve tous les faire-part d'un testeur ----------
+  // Le jeton est lu dans le fragment d'URL (jamais envoyé au serveur dans l'adresse), puis mémorisé dans ce navigateur :
+  // tout faire-part créé ou ouvert ensuite est rattaché automatiquement à l'espace.
+  var TESTER_KEY = 'fp:tester', TOKEN_RE = /^[a-z0-9]{32}$/;
+  (function(){
+    var t = new URLSearchParams(location.hash.slice(1)).get('t') || '';
+    if(TOKEN_RE.test(t)){ try{ localStorage.setItem(TESTER_KEY, t); }catch(e){} }
+  })();
+  FP.tester = {
+    token: function(){ var t = ''; try{ t = localStorage.getItem(TESTER_KEY) || ''; }catch(e){} return TOKEN_RE.test(t) ? t : ''; },
+    link: function(){
+      var t = FP.tester.token(); if(!t) return '';
+      var u = new URL('admin.html', location.href); u.search = ''; u.hash = 't=' + t; return u.href;
+    },
+    // Rattache un faire-part à l'espace (silencieux : renvoie une promesse qui ne rejette jamais ; true si rattaché).
+    attach: function(slug, key){
+      var t = FP.tester.token();
+      if(!t || !SLUG_RE.test(slug) || !KEY_RE.test(key)) return Promise.resolve(false);
+      return FP.api.testerAttach(t, slug, key).then(function(){ return true; }, function(){ return false; });
+    },
+    forget: function(){ try{ localStorage.removeItem(TESTER_KEY); }catch(e){} }
   };
 
   // Utilitaires partagés

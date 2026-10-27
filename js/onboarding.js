@@ -348,6 +348,18 @@
       };
     }
     FP.mine.add(slug, key); // retrouvable ensuite dans « Mes faire-part »
+    // Testeur (lien personnel ouvert dans ce navigateur) : le faire-part rejoint son espace, le lien privé n'est plus
+    // le seul moyen de le retrouver. Si le rattachement échoue, on garde l'avertissement habituel.
+    if(FP.tester.token()){
+      FP.tester.attach(slug, key).then(function(ok){
+        if(!ok) return;
+        $('admin-card').classList.remove('warn');
+        $('admin-card-title').textContent = '2. Retrouvez-le dans votre espace';
+        $('admin-card-text').textContent = 'Ce faire-part est enregistré dans votre espace : ouvrez votre lien personnel, sur n’importe quel appareil, pour voir les réponses et le modifier. Le lien ci-dessous ne donne accès qu’à ce faire-part (à transmettre aux mariés s’ils veulent suivre leurs réponses).';
+        var so = $('space-open'); so.href = FP.tester.link(); so.hidden = false;
+        $('mail-admin').hidden = true;
+      });
+    }
     published = true; clearTimeout(draftTimer); storeDel(DRAFT_KEY);
     window.scrollTo({ top: 0 }); $('done-title').focus({ preventScroll: true });
   }
@@ -407,7 +419,7 @@
       if(!res[1]) throw new Error('introuvable');
       state = FP.sanitizeConfig(res[1]);
       editing = { slug: p.slug, key: p.key };
-      FP.mine.add(p.slug, p.key);
+      FP.mine.add(p.slug, p.key); FP.tester.attach(p.slug, p.key);
       $('publish').textContent = 'Enregistrer les modifications';
       wizard.hidden = false; $('steps').hidden = false;
       syncInputs(); show(1); preview();
@@ -427,7 +439,7 @@
     }
     $('reset-draft').addEventListener('click', function(){ storeDel(DRAFT_KEY); location.replace('index.html'); });
     var mine = FP.mine.list().length;
-    if(mine){ var a = $('mine-link'); a.hidden = false; a.textContent = 'Mes faire-part (' + mine + ')'; }
+    if(mine || FP.tester.token()){ var a = $('mine-link'); a.hidden = false; a.textContent = FP.tester.token() ? 'Mon espace' + (mine ? ' (' + mine + ')' : '') : 'Mes faire-part (' + mine + ')'; }
     // Pas de date passée ni au-delà de 2050 dans le calendrier du navigateur
     var t0 = today(), iso = t0.getFullYear() + '-' + ('0' + (t0.getMonth() + 1)).slice(-2) + '-' + ('0' + t0.getDate()).slice(-2);
     $('date-input').min = iso; $('deadline-input').min = iso;

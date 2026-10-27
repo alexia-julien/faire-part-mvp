@@ -232,7 +232,105 @@ begin
   return v_out;
 end $$;
 
--- Seules ces 7 fonctions sont appelables depuis le navigateur.
+-- ---------------------------------------------------------------- Espaces testeurs (wedding planners)
+-- Chaque testeur reçoit un lien personnel (admin.html#t=<jeton>) qui retrouve TOUS ses faire-part, sur n'importe
+-- quel appareil. Le jeton (32 caractères aléatoires, ~160 bits) n'est stocké que hashé (SHA-256). Les clés privées
+-- des faire-part rattachés sont stockées CHIFFRÉES avec ce jeton (pgp_sym_encrypt) : sans le lien du testeur,
+-- même une copie de la base ne permet pas de les relire.
+-- Création d'un testeur : dans le SQL Editor, select private.create_tester('Nom du testeur');  → renvoie le jeton.
+-- Désactiver un testeur : update private.testers set disabled = true where name = '...';
+create table if not exists private.testers (
+  id           bigint generated always as identity primary key,
+  name         text not null check (length(btrim(name)) between 1 and 80),
+  token_hash   text not null unique,
+  disabled     boolean not null default false,
+  created_at   timestamptz not null default now(),
+  last_seen_at timestamptz
+);
+create table if not exists private.tester_invitations (
+  tester_id bigint not null references private.testers(id) on delete cascade,
+  slug      text not null references public.invitations(slug) on delete cascade,
+  key_enc   bytea not null,
+  added_at  timestamptz not null default now(),
+  primary key (tester_id, slug)
+);
+revoke all on private.testers, private.tester_invitations from public, anon, authenticated;
+
+-- Jeton → identifiant du testeur actif (null si jeton mal formé, inconnu ou désactivé).
+create or replace function private.tester_id(p_token text) returns bigint
+language sql stable set search_path = public, extensions as $$
+  select id from private.testers
+   where coalesce(p_token, '') ~ '^[a-z0-9]{32}$'
+     and token_hash = encode(digest(p_token, 'sha256'), 'hex') and not disabled;
+$$;
+
+-- Réservé au propriétaire (SQL Editor) : crée un testeur et renvoie son jeton, affiché UNE seule fois.
+create or replace function private.create_tester(p_name text) returns text
+language plpgsql set search_path = public, extensions as $$
+declare v_chars text := 'abcdefghijkmnpqrstuvwxyz23456789'; v_bytes bytea := gen_random_bytes(32); v_token text := '';
+begin
+  for i in 0..31 loop v_token := v_token || substr(v_chars, (get_byte(v_bytes, i) & 31) + 1, 1); end loop;
+  insert into private.testers(name, token_hash) values (btrim(p_name), encode(digest(v_token, 'sha256'), 'hex'));
+  return v_token;
+end $$;
+
+revoke all on function private.tester_id(text) from public, anon, authenticated;
+revoke all on function private.create_tester(text) from public, anon, authenticated;
+
+-- Espace d'un testeur : son nom et ses faire-part (avec leurs clés privées). Null si le jeton est invalide.
+-- 120 appels / heure / IP.
+create or replace function public.tester_workspace(p_token text)
+returns jsonb language plpgsql security definer set search_path = public, extensions as $$
+declare v_id bigint; v_name text;
+begin
+  perform private.rate_limit('tester', 120);
+  v_id := private.tester_id(p_token);
+  if v_id is null then return null; end if;
+  update private.testers set last_seen_at = now() where id = v_id returning name into v_name;
+  return jsonb_build_object('name', v_name, 'items', coalesce((
+    select jsonb_agg(jsonb_build_object('slug', ti.slug, 'key', pgp_sym_decrypt(ti.key_enc, p_token)) order by ti.added_at desc)
+      from private.tester_invitations ti where ti.tester_id = v_id), '[]'::jsonb));
+end $$;
+
+-- Rattache un faire-part à l'espace (jeton du testeur ET clé privée du faire-part requis). Idempotent.
+-- 200 faire-part max par espace, 60 appels / heure / IP. Renvoie false si le jeton ou la clé est mauvais.
+create or replace function public.tester_attach(p_token text, p_slug text, p_key text)
+returns boolean language plpgsql security definer set search_path = public, extensions as $$
+declare v_id bigint;
+begin
+  perform private.rate_limit('tester-attach', 60);
+  v_id := private.tester_id(p_token);
+  if v_id is null or coalesce(p_key, '') !~ '^[a-z0-9]{16,64}$' then return false; end if;
+  if not exists (select 1 from invitations where slug = p_slug and key_hash = crypt(p_key, key_hash)) then return false; end if;
+  if not exists (select 1 from private.tester_invitations where tester_id = v_id and slug = p_slug)
+     and (select count(*) from private.tester_invitations where tester_id = v_id) >= 200 then
+    raise exception 'too many';
+  end if;
+  insert into private.tester_invitations(tester_id, slug, key_enc) values (v_id, p_slug, pgp_sym_encrypt(p_key, p_token))
+  on conflict (tester_id, slug) do nothing;
+  return true;
+end $$;
+
+-- Retire un faire-part de l'espace (ne supprime PAS le faire-part). Renvoie false si le jeton est mauvais.
+create or replace function public.tester_detach(p_token text, p_slug text)
+returns boolean language plpgsql security definer set search_path = public, extensions as $$
+declare v_id bigint;
+begin
+  perform private.rate_limit('tester-attach', 60);
+  v_id := private.tester_id(p_token);
+  if v_id is null then return false; end if;
+  delete from private.tester_invitations where tester_id = v_id and slug = p_slug;
+  return true;
+end $$;
+
+revoke execute on function public.tester_workspace(text) from public, authenticated;
+revoke execute on function public.tester_attach(text, text, text) from public, authenticated;
+revoke execute on function public.tester_detach(text, text) from public, authenticated;
+grant execute on function public.tester_workspace(text) to anon;
+grant execute on function public.tester_attach(text, text, text) to anon;
+grant execute on function public.tester_detach(text, text) to anon;
+
+-- Seules ces 10 fonctions sont appelables depuis le navigateur (les 7 ci-dessous + les 3 des espaces testeurs).
 revoke execute on function public.summarize_invitations(jsonb) from public;
 grant execute on function public.summarize_invitations(jsonb) to anon;
 revoke execute on function public.summarize_invitations(jsonb) from authenticated;

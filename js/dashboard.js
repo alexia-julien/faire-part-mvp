@@ -38,11 +38,14 @@
     b.addEventListener('click', function(){
       if(!b.classList.contains('confirm')){
         b.classList.add('confirm'); b.textContent = 'Confirmer le retrait ?';
-        b.title = 'Le faire-part et ses réponses ne sont pas supprimés : seul ce raccourci disparaît de ce navigateur.';
+        b.title = tester ? 'Le faire-part et ses réponses ne sont pas supprimés : il disparaît seulement de votre espace.'
+                         : 'Le faire-part et ses réponses ne sont pas supprimés : seul ce raccourci disparaît de ce navigateur.';
         setTimeout(function(){ if(b.isConnected){ b.classList.remove('confirm'); b.textContent = 'Retirer de la liste'; } }, 4000);
         return;
       }
-      FP.mine.remove(item.slug); load();
+      FP.mine.remove(item.slug);
+      // Dans un espace testeur, le faire-part quitte aussi l'espace (sinon il reviendrait au prochain chargement).
+      (tester ? FP.api.testerDetach(tester, item.slug).catch(function(){}) : Promise.resolve()).then(load);
     });
     return b;
   }
@@ -79,11 +82,62 @@
     return c;
   }
 
+  // ---------- Espace testeur ----------
+  var tester = FP.tester.token(), spaceMsg = '';
+  function showSpace(name){
+    $('space-box').hidden = false;
+    $('space-link').value = FP.tester.link();
+    $('dash-title').textContent = 'Mes faire-part';
+    $('dash-sub').textContent = 'Espace de ' + String(name || '').slice(0, 80) + ' · choisissez un faire-part pour voir ses réponses.';
+    $('dash-hint').textContent = 'Vos faire-part sont enregistrés dans votre espace : votre lien personnel les retrouve sur n’importe quel appareil.';
+  }
+  // Fusionne l'espace (serveur) et la liste de ce navigateur, dans les deux sens : un faire-part créé ici avant
+  // d'ouvrir le lien personnel rejoint aussi l'espace. En cas d'échec réseau, on affiche la liste locale.
+  function syncSpace(){
+    if(!tester) return Promise.resolve();
+    return FP.api.testerWorkspace(tester).then(function(ws){
+      if(!ws || typeof ws !== 'object'){
+        FP.tester.forget(); tester = '';
+        spaceMsg = 'Ce lien personnel n’est plus valide : demandez-en un nouveau.';
+        return;
+      }
+      showSpace(ws.name);
+      var remote = {};
+      (Array.isArray(ws.items) ? ws.items : []).forEach(function(it){
+        if(it && typeof it.slug === 'string' && typeof it.key === 'string' && FP.mine.add(it.slug, it.key) !== false) remote[it.slug] = true;
+      });
+      return Promise.all(FP.mine.list().filter(function(x){ return !remote[x.slug]; })
+        .map(function(x){ return FP.tester.attach(x.slug, x.key); }));
+    }).catch(function(){});
+  }
+  $('copy-space').addEventListener('click', function(){
+    var b = this, input = $('space-link');
+    var ok = function(){ b.textContent = 'Copié ✓'; setTimeout(function(){ b.textContent = 'Copier'; }, 1500); };
+    if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(input.value).then(ok, function(){ input.focus(); input.select(); });
+    else { input.focus(); input.select(); }
+  });
+  $('space-link').addEventListener('focus', function(){ this.select(); });
+  // Ordinateur partagé : on oublie le lien ET la liste sur cet appareil (tout reste dans l'espace, côté serveur).
+  $('leave-space').addEventListener('click', function(){
+    var b = this;
+    if(!b.classList.contains('confirm')){
+      b.classList.add('confirm'); b.textContent = 'Confirmer : oublier l’espace sur cet appareil ?';
+      setTimeout(function(){ if(b.isConnected){ b.classList.remove('confirm'); b.textContent = 'Quitter l’espace sur cet appareil'; } }, 4000);
+      return;
+    }
+    FP.tester.forget(); FP.mine.list().forEach(function(x){ FP.mine.remove(x.slug); });
+    location.replace('admin.html');
+  });
+
   function load(){
+    if(tester){ $('dash-state').textContent = 'Chargement…'; $('dash-empty').hidden = true; }
+    syncSpace().then(render);
+  }
+  function render(){
     var items = FP.mine.list(), box = $('fp-cards'), st = $('dash-state');
     box.innerHTML = '';
     $('dash-empty').hidden = items.length > 0;
-    if(!items.length){ st.textContent = ''; return; }
+    if(!items.length){ st.textContent = spaceMsg; return; }
     st.textContent = 'Chargement…';
     FP.api.summarize(items.map(function(x){ return { slug: x.slug, key: x.key }; })).then(function(list){
       var by = {};
@@ -92,7 +146,7 @@
       var rank = function(it){ var s = by[it.slug]; if(!s || s.invalid) return [2, 0]; var d = when(s.date).days; return d >= 0 ? [0, d] : [1, -d]; };
       items.sort(function(a, b){ var x = rank(a), y = rank(b); return x[0] - y[0] || x[1] - y[1]; });
       items.forEach(function(it){ box.appendChild(card(it, by[it.slug])); });
-      st.textContent = items.length > 1 ? items.length + ' faire-part' : '';
+      st.textContent = [spaceMsg, items.length > 1 ? items.length + ' faire-part' : ''].filter(Boolean).join(' ');
     }).catch(function(e){
       st.textContent = FP.userError(e);
       items.forEach(function(it){ box.appendChild(card(it, { slug: it.slug, responses: null })); });

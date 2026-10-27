@@ -21,9 +21,15 @@
     <div class="dash-head">
       <div>
         <h1 id="dash-title">Mes faire-part</h1>
-        <p class="muted admin-sub">Choisissez un faire-part pour voir ses réponses.</p>
+        <p class="muted admin-sub" id="dash-sub">Choisissez un faire-part pour voir ses réponses.</p>
       </div>
       <a class="btn-main" href="index.html">Créer un faire-part</a>
+    </div>
+    <div class="link-card space-card" id="space-box" hidden>
+      <h3>Votre lien personnel</h3>
+      <p>Tous les faire-part que vous créez sont enregistrés dans votre espace. Ouvrez ce lien sur n’importe quel appareil pour les retrouver. Gardez-le pour vous : il donne accès aux réponses de vos invités.</p>
+      <div class="link-row"><input type="text" id="space-link" readonly aria-label="Votre lien personnel"><button type="button" class="btn-ghost" id="copy-space">Copier</button></div>
+      <p class="link-actions"><button type="button" class="link-btn" id="leave-space">Quitter l’espace sur cet appareil</button></p>
     </div>
     <p id="dash-state" class="muted" role="status"></p>
     <div class="fp-cards" id="fp-cards"></div>
@@ -32,7 +38,7 @@
       <p class="muted">Créez votre premier faire-part en quelques minutes : il apparaîtra ici automatiquement.</p>
       <a class="btn-main" href="index.html">Créer mon faire-part</a>
     </div>
-    <p class="hint">Cette liste est enregistrée dans ce navigateur uniquement. Sur un autre appareil, ouvrez une fois votre lien privé : le faire-part s’y ajoutera.</p>
+    <p class="hint" id="dash-hint">Cette liste est enregistrée dans ce navigateur uniquement. Sur un autre appareil, ouvrez une fois votre lien privé : le faire-part s’y ajoutera.</p>
   </section>
 
   <!-- Écran 2 : les réponses d'un faire-part -->

@@ -17,6 +17,30 @@ Projet indépendant du site du mariage d'Alexia & Julien (aucun lien avec ce rep
 
 La clé privée est dans le fragment d'URL (`#k=…`), donc jamais envoyée au serveur. Elle est stockée hashée (bcrypt) côté base.
 
+## Espaces testeurs (wedding planners)
+Chaque testeur reçoit un **lien personnel** (`admin.html#t=<jeton>`) qui retrouve **tous** ses faire-part, sur n'importe quel appareil, sans compte :
+- à la première ouverture, le lien est mémorisé dans le navigateur ; tout faire-part **créé** ou **ouvert via son lien privé** ensuite est rattaché automatiquement à l'espace (ceux déjà présents dans « Mes faire-part » aussi) ;
+- à la publication, la carte « Votre lien privé (à garder précieusement) » devient **« Retrouvez-le dans votre espace »** (le lien privé reste affiché, pour le transmettre aux mariés) ;
+- « Retirer de la liste » retire aussi le faire-part de l'espace (sans le supprimer) ; « Quitter l'espace sur cet appareil » oublie le lien sur un ordinateur partagé.
+
+Créer un lien testeur (SQL Editor de Supabase) :
+
+```sql
+select private.create_tester('Nom de l''agence');  -- renvoie le jeton, affiché une seule fois
+-- Lien à envoyer : https://<adresse du site>/admin.html#t=<jeton>
+```
+
+Suivre ou couper l'accès :
+
+```sql
+select t.name, t.created_at, t.last_seen_at, count(ti.slug) as faire_part
+  from private.testers t left join private.tester_invitations ti on ti.tester_id = t.id
+ group by t.id order by t.created_at;
+update private.testers set disabled = true where name = 'Nom de l''agence';
+```
+
+Le jeton n'est stocké que hashé ; les clés privées des faire-part rattachés sont chiffrées avec ce jeton. Un lien perdu ne se retrouve donc pas : on en crée un nouveau (les faire-part restent accessibles par leurs liens privés).
+
 ## Lancer en local
 Site 100 % statique :
 
@@ -35,16 +59,16 @@ Sans configuration, l'app tourne en **mode local** (données dans le `localStora
 
 `schema.sql` est idempotent et transactionnel : pour appliquer une mise à jour du schéma, rejouer le fichier en entier dans le SQL Editor.
 
-La liste « Mes faire-part » n'a besoin d'aucune fonction supplémentaire : le nombre de réponses est calculé dans le navigateur à partir de `get_invitation` et `list_rsvps` (clé vérifiée côté serveur). `summarize_invitations` reste dans `schema.sql` mais n'est plus appelée par le site ; elle pourra servir plus tard si le nombre de faire-part par utilisateur devient grand.
+La liste « Mes faire-part » utilise `summarize_invitations` (un seul appel, chaque clé vérifiée côté serveur), indispensable pour un espace testeur qui contient beaucoup de faire-part. Si la fonction n'est pas déployée, le site se rabat sur `get_invitation` + `list_rsvps` faire-part par faire-part.
 
 Si l'URL du projet Supabase change, mettre à jour **aussi** la CSP (`connect-src`) dans `index.html`, `invitation.html` et `admin.html`.
 
 Sécurité : voir [SECURITY.md](SECURITY.md) (modèle de menace, protections, limites connues).
 
 ## Tests
-`python3 tests/e2e.py` (prérequis : `pip install playwright pillow`) rejoue 182 vérifications dans un navigateur headless, en mode local : parcours complet, validations, brouillon, photos, ambiances et réglages de style, intros (enveloppe, monogramme, mouvement réduit), sections, RSVP enrichi, suivi (filtres, tri, recherche, régimes, copie des emails, CSV, cartes mobiles), modification, anciens faire-part, agenda (fuseaux horaires), sécurité (XSS, config forgée, clickjacking), mobile et contrastes des 8 palettes. Captures dans `tests/out/`.
+`python3 tests/e2e.py` (prérequis : `pip install playwright pillow`) rejoue 202 vérifications dans un navigateur headless, en mode local : parcours complet, validations, brouillon, photos, ambiances et réglages de style, intros (enveloppe, monogramme, mouvement réduit), sections, RSVP enrichi, suivi (filtres, tri, recherche, régimes, copie des emails, CSV, cartes mobiles), modification, anciens faire-part, agenda (fuseaux horaires), sécurité (XSS, config forgée, clickjacking), espaces testeurs, mobile et contrastes des 8 palettes. Captures dans `tests/out/`.
 
-`supabase/tests.sql` teste la base elle-même (47 vérifications, tout est annulé à la fin) : à coller dans le SQL Editor après chaque changement du schéma.
+`supabase/tests.sql` teste la base elle-même (62 vérifications, tout est annulé à la fin) : à coller dans le SQL Editor après chaque changement du schéma.
 
 ## Comportements à connaître
 - **Brouillon** : la saisie est sauvegardée dans le navigateur ; un rechargement ne fait rien perdre.
@@ -55,7 +79,7 @@ Sécurité : voir [SECURITY.md](SECURITY.md) (modèle de menace, protections, li
 ## Limites connues du MVP
 - Photos stockées en base (JPEG 1600 px, ~150–300 Ko chacune, 3 max). À migrer vers Supabase Storage si le volume grandit.
 - Pas d'aperçu riche (Open Graph) quand le lien est partagé sur WhatsApp : nécessite un rendu côté serveur.
-- Pas d'envoi d'email : le couple doit conserver son lien privé (bouton « M'envoyer ce lien par email » à la publication).
+- Pas d'envoi d'email : hors espace testeur, le couple doit conserver son lien privé (bouton « M'envoyer ce lien par email » à la publication).
 - Polices Google chargées depuis les serveurs de Google (seule la police choisie sur la page publique).
 - Protection anti-spam minimale (champ piège + plafond de 1000 réponses par faire-part).
 - RGPD : le formulaire peut collecter email, téléphone et adresse. Une mention courte est affichée, mais avant d'ouvrir à des inconnus il faut une vraie politique de confidentialité et une durée de conservation (suppression automatique après le mariage).
