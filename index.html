@@ -63,16 +63,37 @@
           <p class="form-msg" id="photo-msg" role="status"></p>
         </div>
         <div class="f">
-          <span class="lab" id="lab-preset">Ambiance <span class="opt">(un clic règle couleurs, police et introduction)</span></span>
+          <span class="lab" id="lab-preset">Ambiance <span class="opt">(un clic règle couleurs, police, ornements et finitions)</span></span>
           <div class="presets" id="presets" role="radiogroup" aria-labelledby="lab-preset"></div>
         </div>
         <details class="more" id="style-more">
           <summary>Personnaliser le style</summary>
-          <div class="f"><span class="lab" id="lab-intro">Introduction</span><div class="pills" id="pick-intro" role="radiogroup" aria-labelledby="lab-intro"></div></div>
-          <div class="f"><span class="lab" id="lab-theme">Couleurs</span><div class="swatches" id="pick-theme" role="radiogroup" aria-labelledby="lab-theme"></div></div>
-          <div class="f"><span class="lab" id="lab-font">Police</span><div class="pills fonts" id="pick-font" role="radiogroup" aria-labelledby="lab-font"></div></div>
-          <div class="f"><span class="lab" id="lab-shape">Forme de la photo</span><div class="pills" id="pick-shape" role="radiogroup" aria-labelledby="lab-shape"></div></div>
-          <label class="chk"><input type="checkbox" data-bind-bool="countdown"> Afficher le compte à rebours</label>
+          <div class="style-tabs" role="tablist" aria-label="Personnaliser le style">
+            <button type="button" role="tab" id="tab-colors" aria-controls="panel-colors" aria-selected="true">Couleurs</button>
+            <button type="button" role="tab" id="tab-font" aria-controls="panel-font" aria-selected="false" tabindex="-1">Typographie</button>
+            <button type="button" role="tab" id="tab-decor" aria-controls="panel-decor" aria-selected="false" tabindex="-1">Ornements</button>
+            <button type="button" role="tab" id="tab-finish" aria-controls="panel-finish" aria-selected="false" tabindex="-1">Finitions</button>
+            <button type="button" role="tab" id="tab-intro" aria-controls="panel-intro" aria-selected="false" tabindex="-1">Intro et photo</button>
+          </div>
+          <div class="style-panel" role="tabpanel" id="panel-colors" aria-labelledby="tab-colors">
+            <div class="swatches" id="pick-theme" role="radiogroup" aria-labelledby="tab-colors"></div>
+          </div>
+          <div class="style-panel" role="tabpanel" id="panel-font" aria-labelledby="tab-font" hidden>
+            <div class="font-cards" id="pick-font" role="radiogroup" aria-labelledby="tab-font"></div>
+          </div>
+          <div class="style-panel" role="tabpanel" id="panel-decor" aria-labelledby="tab-decor" hidden>
+            <div class="decor-cards" id="pick-decor" role="radiogroup" aria-labelledby="tab-decor"></div>
+          </div>
+          <div class="style-panel" role="tabpanel" id="panel-finish" aria-labelledby="tab-finish" hidden>
+            <span class="lab" id="lab-foil">Impression des prénoms</span>
+            <div class="foils" id="pick-foil" role="radiogroup" aria-labelledby="lab-foil"></div>
+            <label class="chk"><input type="checkbox" data-bind-bool="texture"> Papier texturé</label>
+          </div>
+          <div class="style-panel" role="tabpanel" id="panel-intro" aria-labelledby="tab-intro" hidden>
+            <div class="f"><span class="lab" id="lab-intro">Introduction</span><div class="pills" id="pick-intro" role="radiogroup" aria-labelledby="lab-intro"></div></div>
+            <div class="f"><span class="lab" id="lab-shape">Forme de la photo</span><div class="pills" id="pick-shape" role="radiogroup" aria-labelledby="lab-shape"></div></div>
+            <label class="chk"><input type="checkbox" data-bind-bool="countdown"> Afficher le compte à rebours</label>
+          </div>
         </details>
       </fieldset>
 

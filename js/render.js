@@ -29,14 +29,26 @@
     { id: 'bordeaux',   label: 'Bordeaux',     sw: ['#FAF6F3', '#7A2E3E'] },
     { id: 'riviera',    label: 'Riviera',      sw: ['#F3F7F8', '#7FA8B6'] },
     { id: 'nuit',       label: 'Bleu nuit',    sw: ['#1F2433', '#C9A86A'] },
-    { id: 'noir',       label: 'Noir & or',    sw: ['#141414', '#C9A86A'] }
+    { id: 'noir',       label: 'Noir & or',    sw: ['#141414', '#C9A86A'] },
+    { id: 'ivoire',     label: 'Ivoire',       sw: ['#FBF8F1', '#C2A468'] },
+    { id: 'olive',      label: 'Olivier',      sw: ['#F5F3EA', '#8E8B57'] },
+    { id: 'porcelaine', label: 'Porcelaine',   sw: ['#F6F8FB', '#2F4C8C'] },
+    { id: 'emeraude',   label: 'Émeraude',     sw: ['#133A31', '#C9A86A'] }
   ];
+  // Troisième teinte de chaque palette (nuancier du sélecteur) : la couleur d'encre des titres et boutons.
+  var DEEP = { sauge: '#5F6E4E', rose: '#9A5A50', terracotta: '#9A4E33', lavande: '#65558F', bordeaux: '#7A2E3E', riviera: '#3B6876',
+    nuit: '#E2C58A', noir: '#E2C58A', ivoire: '#7E6328', olive: '#5B5930', porcelaine: '#2F4C8C', emeraude: '#E2C58A' };
+  FP.PALETTES.forEach(function(x){ x.deep = DEEP[x.id]; });
   var GF = 'https://fonts.googleapis.com/css2?display=swap&family=';
   FP.FONTS = [
     { id: 'classique',  label: 'Classique',  url: GF + 'Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Mulish:wght@400;600;700' },
     { id: 'romantique', label: 'Romantique', url: GF + 'Great+Vibes&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Mulish:wght@400;600;700' },
     { id: 'moderne',    label: 'Moderne',    url: GF + 'DM+Serif+Display:ital@0;1&family=DM+Sans:wght@400;500;700' },
-    { id: 'minimal',    label: 'Minimaliste', url: GF + 'Josefin+Sans:wght@300;400;600&family=Lato:wght@400;700' }
+    { id: 'minimal',    label: 'Minimaliste', url: GF + 'Josefin+Sans:wght@300;400;600&family=Lato:wght@400;700' },
+    { id: 'calligraphie', label: 'Calligraphie', url: GF + 'Pinyon+Script&family=Cormorant+Garamond:ital,wght@0,400;0,500;0,600;1,400&family=Mulish:wght@400;600;700' },
+    { id: 'editorial',  label: 'Éditorial',  url: GF + 'Playfair+Display:ital,wght@0,400;0,500;1,400&family=Mulish:wght@400;600;700' },
+    { id: 'bodoni',     label: 'Haute couture', url: GF + 'Bodoni+Moda:ital,wght@0,400;0,500;1,400&family=Mulish:wght@400;600;700' },
+    { id: 'artdeco',    label: 'Art déco',   url: GF + 'Italiana&family=Jost:wght@300;400;500' }
   ];
   FP.INTROS = [
     { id: 'enveloppe',  label: 'Enveloppe',  hint: 'Vos invités ouvrent une enveloppe' },
@@ -47,12 +59,31 @@
     { id: 'arrondi', label: 'Arrondie' }, { id: 'arche', label: 'Arche' }, { id: 'cercle', label: 'Cercle' }
   ];
   // Ambiances : un clic règle tout le style de façon cohérente.
+  // Ornements dessinés autour des prénoms, et finitions « imprimeur » (dorure à chaud, texture du papier).
+  FP.DECORS = [
+    { id: 'aucun',     label: 'Épuré' },
+    { id: 'feuillage', label: 'Couronne' },
+    { id: 'botanique', label: 'Botanique' },
+    { id: 'cadre',     label: 'Cadre' },
+    { id: 'artdeco',   label: 'Art déco' }
+  ];
+  FP.FOILS = [
+    { id: 'aucune', label: 'Encre',   sw: ['#6B6559', '#3A362E'] },
+    { id: 'or',     label: 'Dorure',  sw: ['#A57E2E', '#F3DF9E', '#8F6B22'] },
+    { id: 'orrose', label: 'Or rose', sw: ['#A9626B', '#F4CDC3', '#94545D'] },
+    { id: 'argent', label: 'Argent',  sw: ['#7E858C', '#F1F3F5', '#6D747B'] }
+  ];
+  // Ambiances : un clic règle tout le style de façon cohérente (comme une collection chez un papetier).
   FP.PRESETS = [
-    { id: 'champetre',   label: 'Champêtre',   theme: 'sauge',      font: 'classique',  intro: 'enveloppe',  photoShape: 'arrondi' },
-    { id: 'romantique',  label: 'Romantique',  theme: 'rose',       font: 'romantique', intro: 'enveloppe',  photoShape: 'arche' },
-    { id: 'elegance',    label: 'Élégance',    theme: 'nuit',       font: 'moderne',    intro: 'monogramme', photoShape: 'arrondi' },
-    { id: 'boheme',      label: 'Bohème',      theme: 'terracotta', font: 'romantique', intro: 'enveloppe',  photoShape: 'arche' },
-    { id: 'minimaliste', label: 'Minimaliste', theme: 'riviera',    font: 'minimal',    intro: 'monogramme', photoShape: 'cercle' }
+    { id: 'champetre',   label: 'Champêtre',   theme: 'sauge',      font: 'classique',    intro: 'enveloppe',  photoShape: 'arrondi', decor: 'feuillage', foil: 'aucune', texture: true },
+    { id: 'romantique',  label: 'Romantique',  theme: 'rose',       font: 'romantique',   intro: 'enveloppe',  photoShape: 'arche',   decor: 'botanique', foil: 'orrose', texture: true },
+    { id: 'chateau',     label: 'Château',     theme: 'ivoire',     font: 'calligraphie', intro: 'enveloppe',  photoShape: 'arche',   decor: 'cadre',     foil: 'or',     texture: true },
+    { id: 'elegance',    label: 'Élégance',    theme: 'nuit',       font: 'bodoni',       intro: 'monogramme', photoShape: 'arrondi', decor: 'cadre',     foil: 'or',     texture: false },
+    { id: 'gatsby',      label: 'Gatsby',      theme: 'noir',       font: 'artdeco',      intro: 'monogramme', photoShape: 'arrondi', decor: 'artdeco',   foil: 'or',     texture: false },
+    { id: 'emeraude',    label: 'Jardin d’hiver', theme: 'emeraude', font: 'editorial',   intro: 'enveloppe',  photoShape: 'arche',   decor: 'feuillage', foil: 'or',     texture: false },
+    { id: 'boheme',      label: 'Bohème',      theme: 'terracotta', font: 'romantique',   intro: 'enveloppe',  photoShape: 'arche',   decor: 'botanique', foil: 'aucune', texture: true },
+    { id: 'porcelaine',  label: 'Porcelaine',  theme: 'porcelaine', font: 'editorial',    intro: 'monogramme', photoShape: 'cercle',  decor: 'cadre',     foil: 'argent', texture: true },
+    { id: 'minimaliste', label: 'Minimaliste', theme: 'riviera',    font: 'minimal',      intro: 'monogramme', photoShape: 'cercle',  decor: 'aucun',     foil: 'aucune', texture: false }
   ];
   FP.SECTIONS = [
     { id: 'story',     label: 'Notre histoire' },
@@ -114,6 +145,7 @@
       message: 'Nous serions très heureux de partager ce jour unique avec vous.',
       photos: [],
       theme: 'sauge', font: 'classique', intro: 'enveloppe', photoShape: 'arrondi', countdown: true,
+      decor: 'feuillage', foil: 'aucune', texture: true,
       tz: '', // fuseau horaire du lieu (celui du créateur au moment de la création)
       sections: {
         story: { on: false, text: '' },
@@ -175,6 +207,10 @@
       intro: pick(c.intro, ids(FP.INTROS), legacy ? 'aucune' : 'enveloppe'),
       photoShape: pick(c.photoShape, ids(FP.SHAPES), 'arrondi'),
       countdown: 'countdown' in c ? c.countdown === true : true,
+      // Les faire-part créés avant l'ajout des ornements et finitions restent tels quels (épuré, encre, sans texture).
+      decor: pick(c.decor, ids(FP.DECORS), 'aucun'),
+      foil: pick(c.foil, ids(FP.FOILS), 'aucune'),
+      texture: c.texture === true,
       tz: /^[A-Za-z]+(\/[A-Za-z0-9_+\-]+){0,2}$/.test(str(c.tz, 64)) ? c.tz : '',
       sections: {}, rsvp: {}
     };
@@ -458,6 +494,51 @@
     root._fpIntro = { open: open, finish: finish };
   }
 
+  var ART = {
+    wreath: { vb: "0 0 240 52", stroke: "M114.0 40.0Q70.0 8.0 16.0 40.0M126.0 40.0Q170.0 8.0 224.0 40.0", fill: "M103.3 33.2C98.1 30.5 95.9 24.5 98.4 19.7C103.4 21.7 105.6 27.8 103.3 33.2ZM94.2 29.0C91.6 34.1 85.8 36.3 81.2 33.9C83.1 29.1 88.9 26.9 94.2 29.0ZM84.8 26.1C79.5 24.9 76.1 19.9 77.3 15.1C82.3 15.7 85.6 20.7 84.8 26.1ZM75.3 24.4C74.3 29.6 69.6 32.9 64.9 31.9C65.4 27.1 70.1 23.8 75.3 24.4ZM65.5 24.0C60.5 24.2 56.3 20.7 56.2 16.1C60.8 15.4 65.0 19.0 65.5 24.0ZM55.6 24.9C55.9 29.7 52.6 33.8 48.2 34.0C47.5 29.7 50.8 25.6 55.6 24.9ZM45.5 27.1C41.0 28.4 36.5 26.1 35.4 22.1C39.3 20.5 43.9 22.8 45.5 27.1ZM35.1 30.6C36.4 34.8 34.2 39.1 30.3 40.1C28.8 36.4 31.0 32.1 35.1 30.6ZM24.6 35.3C20.9 37.2 16.5 36.0 14.8 32.6C18.0 30.5 22.4 31.7 24.6 35.3ZM16.0 40.0C14.7 44.4 10.3 47.0 6.3 45.7C7.1 41.6 11.5 39.0 16.0 40.0ZM136.7 33.2C134.4 27.8 136.6 21.7 141.6 19.7C144.1 24.5 141.9 30.5 136.7 33.2ZM145.8 29.0C151.1 26.9 156.9 29.1 158.8 33.9C154.2 36.3 148.4 34.1 145.8 29.0ZM155.2 26.1C154.4 20.7 157.7 15.7 162.7 15.1C163.9 19.9 160.5 24.9 155.2 26.1ZM164.7 24.4C169.9 23.8 174.6 27.1 175.1 31.9C170.4 32.9 165.7 29.6 164.7 24.4ZM174.5 24.0C175.0 19.0 179.2 15.4 183.8 16.1C183.7 20.7 179.5 24.2 174.5 24.0ZM184.4 24.9C189.2 25.6 192.5 29.7 191.8 34.0C187.4 33.8 184.1 29.7 184.4 24.9ZM194.5 27.1C196.1 22.8 200.7 20.5 204.6 22.1C203.5 26.1 199.0 28.4 194.5 27.1ZM204.9 30.6C209.0 32.1 211.2 36.4 209.7 40.1C205.8 39.1 203.6 34.8 204.9 30.6ZM215.4 35.3C217.6 31.7 222.0 30.5 225.2 32.6C223.5 36.0 219.1 37.2 215.4 35.3ZM224.0 40.0C228.5 39.0 232.9 41.6 233.7 45.7C229.7 47.0 225.3 44.4 224.0 40.0Z", dots: [[120, 40, 2.6]] },
+    corner: { vb: "0 0 130 64", stroke: "M2.0 4.0Q40.0 2.0 118.0 34.0M30.0 4.0Q52.0 18.0 58.0 52.0", fill: "M11.7 4.0C18.5 4.1 23.7 9.2 23.3 15.5C17.0 16.0 11.8 10.9 11.7 4.0ZM18.8 4.6C19.9 -2.0 25.7 -6.2 31.6 -4.7C31.1 1.3 25.4 5.5 18.8 4.6ZM26.4 5.5C32.8 6.2 37.2 11.6 36.1 17.4C30.2 17.3 25.8 12.0 26.4 5.5ZM34.5 7.0C36.1 0.9 41.9 -2.5 47.3 -0.7C46.3 5.0 40.6 8.4 34.5 7.0ZM43.2 8.8C49.1 9.9 52.8 15.3 51.4 20.6C45.9 20.1 42.2 14.8 43.2 8.8ZM52.3 11.1C54.2 5.6 59.8 2.7 64.7 4.8C63.5 10.0 57.9 12.9 52.3 11.1ZM62.0 13.8C67.5 15.2 70.6 20.4 69.0 25.3C63.9 24.5 60.7 19.3 62.0 13.8ZM72.2 17.0C74.2 11.9 79.5 9.6 84.0 11.7C82.6 16.5 77.3 18.9 72.2 17.0ZM82.9 20.6C87.9 22.1 90.6 27.0 88.9 31.5C84.2 30.6 81.4 25.6 82.9 20.6ZM94.1 24.6C96.1 20.0 101.1 18.0 105.2 20.2C103.7 24.6 98.7 26.6 94.1 24.6ZM105.8 29.1C110.4 30.7 112.7 35.3 110.9 39.4C106.6 38.3 104.3 33.7 105.8 29.1ZM118.0 34.0C123.0 32.0 128.3 34.2 129.8 38.8C125.4 41.1 120.1 38.9 118.0 34.0ZM35.0 7.6C38.3 4.0 43.5 3.8 46.5 7.1C43.8 10.7 38.7 10.9 35.0 7.6ZM42.4 15.0C45.5 18.3 45.3 23.1 42.0 25.7C38.9 22.9 39.1 18.1 42.4 15.0ZM48.6 24.0C52.3 22.1 56.5 23.5 57.9 27.1C54.6 29.1 50.4 27.7 48.6 24.0ZM53.4 34.5C54.9 38.0 53.4 41.8 50.1 42.9C48.4 39.8 49.9 36.0 53.4 34.5ZM56.9 46.7C60.3 46.1 63.3 48.2 63.6 51.4C60.5 52.2 57.5 50.1 56.9 46.7ZM58.0 52.0C61.1 54.2 61.8 58.2 59.6 60.9C56.5 59.1 55.8 55.1 58.0 52.0Z", dots: [] },
+    deco: { vb: "0 0 240 68", stroke: "M100.3 58.5L68.8 53.0M101.2 55.2L78.7 47.0M102.7 52.0L75.0 36.0M104.7 49.1L86.3 33.7M107.1 46.7L86.6 22.2M110.0 44.7L98.0 23.9M113.2 43.2L102.2 13.1M116.5 42.3L112.4 18.7M120.0 42.0L120.0 10.0M123.5 42.3L127.6 18.7M126.8 43.2L137.8 13.1M130.0 44.7L142.0 23.9M132.9 46.7L153.4 22.2M135.3 49.1L153.7 33.7M137.3 52.0L165.0 36.0M138.8 55.2L161.3 47.0M139.7 58.5L171.2 53.0M62 62A58 58 0 0 1 178 62M105 62A15 15 0 0 1 135 62M12 62H56M184 62H228", fill: "M8 58.8L11.2 62L8 65.2L4.8 62ZM232 58.8L235.2 62L232 65.2L228.8 62ZM120 -1.4L123.4 2L120 5.4L116.6 2Z", dots: [] },
+    frame: { vb: "0 0 44 44", stroke: "M2 42V14Q2 2 14 2H42M8 42V18Q8 8 18 8H42M14 14m-3 0a3 3 0 1 0 6 0a3 3 0 1 0-6 0", fill: '', dots: [] }
+  };
+  var artUid = 0;
+  // Un ornement en SVG. Avec une dorure, il est peint avec un dégradé métallique (identifiant unique par dessin :
+  // plusieurs miniatures cohabitent dans la même page).
+  function artSvg(name, foil, cls){
+    var a = ART[name], id = 'fpg' + (++artUid), paint = foil !== 'aucune' ? 'url(#' + id + ')' : '';
+    var defs = paint ? '<defs><linearGradient id="' + id + '" x1="0" y1="0" x2="1" y2=".35"><stop offset="0" class="fs1"/><stop offset=".35" class="fs2"/>' +
+      '<stop offset=".55" class="fs3"/><stop offset=".75" class="fs2"/><stop offset="1" class="fs4"/></linearGradient></defs>' : '';
+    var sw = name === 'frame' ? 1.4 : name === 'deco' ? 1.1 : 1.2;
+    return '<svg class="' + cls + '" viewBox="' + a.vb + '" aria-hidden="true" focusable="false">' + defs +
+      '<path class="art-s" fill="none" stroke-width="' + sw + '" stroke-linecap="round"' + (paint ? ' stroke="' + paint + '"' : '') + ' d="' + a.stroke + '"/>' +
+      (a.fill ? '<path class="art-f"' + (paint ? ' fill="' + paint + '"' : '') + ' d="' + a.fill + '"/>' : '') +
+      a.dots.map(function(d){ return '<circle class="art-f" cx="' + d[0] + '" cy="' + d[1] + '" r="' + d[2] + '"' + (paint ? ' fill="' + paint + '"' : '') + '/>'; }).join('') +
+      '</svg>';
+  }
+  // Ornements d'un faire-part : au-dessus des prénoms (couronne, éventail) ou dans les coins (botanique, cadre).
+  function decorParts(cfg){
+    var d = cfg.decor, f = cfg.foil;
+    if(d === 'feuillage') return { top: artSvg('wreath', f, 'dc-top dc-wreath'), corners: '' };
+    if(d === 'artdeco') return { top: artSvg('deco', f, 'dc-top dc-deco'), corners: '', bottom: '<span class="dc-rule" aria-hidden="true"></span>' };
+    if(d === 'botanique') return { top: '', corners: artSvg('corner', f, 'dc-corner dc-tl') + artSvg('corner', f, 'dc-corner dc-br') };
+    if(d === 'cadre') return { top: '', corners: '<span class="dc-frame" aria-hidden="true"></span>' +
+      ['tl', 'tr', 'bl', 'br'].map(function(k){ return artSvg('frame', f, 'dc-fc dc-' + k); }).join('') };
+    return { top: '', corners: '' };
+  }
+  function styleAttrs(el, cfg){
+    el.setAttribute('data-theme', cfg.theme); el.setAttribute('data-font', cfg.font);
+    el.setAttribute('data-decor', cfg.decor); el.setAttribute('data-foil', cfg.foil);
+    el.setAttribute('data-texture', cfg.texture ? 'papier' : 'lisse');
+  }
+  // Miniature d'un faire-part (sélecteur de style) : mêmes palettes, polices, ornements et finitions que le rendu réel.
+  FP.miniHtml = function(cfg, opts){
+    opts = opts || {};
+    var dp = decorParts(cfg), d = FP.formatDate(cfg, false) || '7 août 2027';
+    return '<div class="mini-card">' + dp.corners + '<div class="mini-body">' + dp.top +
+      '<div class="mini-names">' + esc(cfg.partner1 || 'Camille') + ' <span class="amp">&amp;</span> ' + esc(cfg.partner2 || 'Hugo') + '</div>' +
+      '<div class="mini-rule"></div><div class="mini-date">' + esc(d) + '</div></div>' + (dp.bottom || '') + '</div>';
+  };
+  FP.applyStyleAttrs = function(el, cfg){ el.classList.add('fp'); styleAttrs(el, cfg); };
+
   // ------------------------------------------------------------------ Rendu
   FP.renderInvitation = function(root, cfg, opts){
     opts = opts || {};
@@ -469,9 +550,9 @@
 
     var photos = cfg.photos.map(safeImg).filter(Boolean), preview = !!opts.preview, sec = cfg.sections;
     root.className = 'fp' + (photos.length ? '' : ' no-photo');
-    root.setAttribute('data-theme', cfg.theme);
-    root.setAttribute('data-font', cfg.font);
+    styleAttrs(root, cfg);
     root.setAttribute('data-shape', cfg.photoShape);
+    var dp = decorParts(cfg);
 
     var p1 = esc(cfg.partner1 || 'Prénom'), p2 = esc(cfg.partner2 || 'Prénom');
     // Espace normale avant « & » (la ligne peut se couper là si les prénoms sont longs), insécable après.
@@ -482,7 +563,7 @@
 
     // Hero
     if(photos[0]) h += '<div class="hero-photo-wrap"><img class="hero-photo" src="' + photos[0] + '" alt="' + p1 + ' et ' + p2 + '"></div>';
-    h += '<div class="hero-text"><h1 class="names">' + names + '</h1>';
+    h += '<div class="hero-text">' + dp.corners + dp.top + '<h1 class="names">' + names + '</h1>';
     if(cfg.subtitle) h += '<div class="subtitle">' + esc(cfg.subtitle) + '</div>';
     h += '<div class="rule"></div>';
     h += '<div class="date">' + (dateLong ? esc(dateLong) : 'Date à venir') + '</div>';
@@ -494,7 +575,7 @@
         }).join('') + '</div>';
     }
     if(hasDate) h += '<button type="button" class="btn" data-ics>Ajouter à mon agenda</button>';
-    h += '</div>';
+    h += (dp.bottom || '') + '</div>';
 
     // Sections (fond alterné automatiquement)
     var blocks = [];

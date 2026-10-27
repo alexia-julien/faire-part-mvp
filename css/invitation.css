@@ -20,10 +20,20 @@
 .fp[data-theme="riviera"]{--paper:#F3F7F8;--cream:#F8FBFC;--ink:#2E3A3F;--ink-soft:#56666C;--accent:#7FA8B6;--accent-deep:#3B6876;--blush:#D9A88F;--line:#DCE6E9}
 .fp[data-theme="nuit"]{--paper:#1F2433;--paper-2:#283047;--cream:#232A3D;--ink:#F3EEE3;--ink-soft:#B9B6AE;--accent:#C9A86A;--accent-deep:#E2C58A;--blush:#E2C58A;--btn-bg:#C9A86A;--btn-fg:#1F2433;--line:#3A4259;--shadow:rgba(0,0,0,.3)}
 .fp[data-theme="noir"]{--paper:#141414;--paper-2:#1E1E1E;--cream:#191919;--ink:#F4EFE6;--ink-soft:#BDB6A8;--accent:#C9A86A;--accent-deep:#E2C58A;--blush:#E2C58A;--btn-bg:#C9A86A;--btn-fg:#141414;--line:#333333;--shadow:rgba(0,0,0,.4)}
+.fp[data-theme="ivoire"]{--paper:#FBF8F1;--cream:#FFFDF8;--ink:#3A3428;--ink-soft:#6B624F;--accent:#C2A468;--accent-deep:#7E6328;--blush:#B98B6E;--line:#EDE5D3}
+.fp[data-theme="olive"]{--paper:#F5F3EA;--cream:#FAF9F3;--ink:#34352A;--ink-soft:#63645A;--accent:#8E8B57;--accent-deep:#5B5930;--blush:#C59A72;--line:#E5E2D2}
+.fp[data-theme="porcelaine"]{--paper:#F6F8FB;--cream:#FBFCFE;--ink:#26304A;--ink-soft:#56607A;--accent:#6E8BC4;--accent-deep:#2F4C8C;--blush:#C9A0A8;--line:#DDE3EF}
+.fp[data-theme="emeraude"]{--paper:#133A31;--paper-2:#1A473C;--cream:#164036;--ink:#F3EEE2;--ink-soft:#BFC9C1;--accent:#C9A86A;--accent-deep:#E2C58A;--blush:#E2C58A;--btn-bg:#C9A86A;--btn-fg:#133A31;--line:#2C5A4E;--shadow:rgba(0,0,0,.3)}
 /* Polices */
 .fp[data-font="romantique"]{--names:'Great Vibes', 'Cormorant Garamond', cursive;--names-size:1.25}
 .fp[data-font="moderne"]{--display:'DM Serif Display', Georgia, serif;--body:'DM Sans', system-ui, -apple-system, sans-serif}
 .fp[data-font="minimal"]{--display:'Josefin Sans', system-ui, sans-serif;--body:'Lato', system-ui, -apple-system, sans-serif;--names-size:.8;--names-weight:300;--names-case:uppercase;--names-track:.08em}
+.fp[data-font="calligraphie"]{--names:'Pinyon Script', 'Cormorant Garamond', cursive;--names-size:1.12}
+.fp[data-font="editorial"]{--display:'Playfair Display', Georgia, serif;--names-size:.92}
+.fp[data-font="bodoni"]{--display:'Bodoni Moda', 'Didot', Georgia, serif;--names-size:.92}
+.fp[data-font="artdeco"]{--display:'Italiana', Georgia, serif;--body:'Jost', system-ui, -apple-system, sans-serif;--names-size:.74;--names-case:uppercase;--names-track:.14em}
+.fp[data-font="artdeco"] h2{letter-spacing:.1em;text-transform:uppercase;font-size:clamp(1.4rem,4vw,2rem)}
+.fp[data-font="editorial"] .names .amp,.fp[data-font="bodoni"] .names .amp{font-family:var(--display);font-style:italic}
 
 .fp *{box-sizing:border-box}
 .fp h1,.fp h2,.fp h3{font-family:var(--display);font-weight:400;margin:0;line-height:1.08;color:var(--ink);overflow-wrap:break-word}
@@ -36,7 +46,7 @@
 .fp .btn{display:inline-block;text-decoration:none;cursor:pointer;border:0;font-family:var(--body);font-weight:600;font-size:.8rem;letter-spacing:.12em;text-transform:uppercase;padding:.9rem 2.1rem;border-radius:999px;background:var(--btn-bg);color:var(--btn-fg);transition:filter .2s,transform .2s;box-shadow:0 6px 18px var(--shadow)}
 .fp .btn:hover{filter:brightness(.92);transform:translateY(-1px)}
 .fp .btn:disabled{opacity:.6;cursor:default;transform:none}
-.fp[data-theme="nuit"] .form-msg,.fp[data-theme="noir"] .form-msg{color:#F2A08F}
+.fp[data-theme="nuit"] .form-msg,.fp[data-theme="noir"] .form-msg,.fp[data-theme="emeraude"] .form-msg{color:#F2A08F}
 
 /* Hero */
 .fp .hero-photo-wrap{width:calc(100% - 2.2rem);max-width:860px;margin:1.4rem auto 0;border-radius:22px;overflow:hidden;box-shadow:0 12px 34px var(--shadow)}
@@ -173,3 +183,84 @@
 @keyframes fp-thanks-in{from{opacity:0;transform:translateY(8px)}}
 @keyframes fp-thanks-fade{from{opacity:0}}
 @media (prefers-reduced-motion:reduce){.fp .thanks::before,.fp .thanks::after,.fp .thanks h3,.fp .thanks p{animation:none}}
+
+/* ============================================================ Ornements, dorure, papier */
+/* Dorure à chaud : dégradé métallique sur les prénoms, la date et les ornements, avec un reflet qui passe une fois. */
+.fp[data-foil="or"]{--f1:#7A5A1A;--f2:#A07C2E;--f3:#D2B266;--f4:#6A4D14}
+.fp[data-foil="orrose"]{--f1:#7E414B;--f2:#A6636C;--f3:#D9A49C;--f4:#6C3640}
+.fp[data-foil="argent"]{--f1:#4C535A;--f2:#727A82;--f3:#B9C0C6;--f4:#40474E}
+.fp:is([data-theme="nuit"],[data-theme="noir"],[data-theme="emeraude"])[data-foil="or"]{--f1:#B8923F;--f2:#E2C58A;--f3:#FFF1C7;--f4:#A9852F}
+.fp:is([data-theme="nuit"],[data-theme="noir"],[data-theme="emeraude"])[data-foil="orrose"]{--f1:#C98E93;--f2:#E8B7AE;--f3:#FFE3DB;--f4:#B57C83}
+.fp:is([data-theme="nuit"],[data-theme="noir"],[data-theme="emeraude"])[data-foil="argent"]{--f1:#A7AEB5;--f2:#D3D8DC;--f3:#FFFFFF;--f4:#959CA3}
+.fp .fs1{stop-color:var(--f1)}.fp .fs2{stop-color:var(--f2)}.fp .fs3{stop-color:var(--f3)}.fp .fs4{stop-color:var(--f4)}
+.fp:not([data-foil="aucune"]) :is(.names,.mini-names,.date,.mono-letters,.fnames){
+  /* Deux couches : un reflet diagonal (qui balaie une fois) sur un dégradé vertical, comme une feuille d'or sous la lumière */
+  background-image:linear-gradient(110deg,transparent 42%,rgba(255,255,255,.5) 50%,transparent 58%),
+    linear-gradient(172deg,var(--f2) 0%,var(--f3) 34%,var(--f2) 52%,var(--f1) 78%,var(--f4) 100%);
+  background-size:260% 100%,100% 100%;background-repeat:no-repeat;background-position:-30% 0,0 0;
+  -webkit-background-clip:text;background-clip:text;color:transparent;-webkit-text-fill-color:transparent}
+.fp:not([data-foil="aucune"]) :is(.names,.mini-names,.mono-letters,.fnames) .amp{color:transparent;-webkit-text-fill-color:transparent}
+.fp:not([data-foil="aucune"]) .names{animation:fp-foil 3.2s .8s cubic-bezier(.3,.6,.3,1) both}
+.fp:not([data-foil="aucune"]) :is(.rule,.mini-rule,.dc-rule){background:linear-gradient(90deg,var(--f1),var(--f3),var(--f4))}
+.fp:not([data-foil="aucune"]) .dc-frame,.fp:not([data-foil="aucune"]) .dc-frame::after{border-color:var(--f2)}
+@keyframes fp-foil{from{background-position:130% 0,0 0}to{background-position:-30% 0,0 0}}
+
+/* Papier texturé : grain fin et fibres, sur le fond et les sections */
+.fp[data-texture="papier"],.fp[data-texture="papier"] .alt,.fp[data-texture="papier"] footer,.fp[data-texture="papier"] .mini-card,.fp[data-texture="papier"] .fp-intro{
+  background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='220' height='220'%3E%3Cfilter id='p'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='.75' numOctaves='3' stitchTiles='stitch'/%3E%3CfeColorMatrix values='0 0 0 0 .35 0 0 0 0 .3 0 0 0 0 .22 0 0 0 .07 0'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23p)'/%3E%3C/svg%3E")}
+.fp:is([data-theme="nuit"],[data-theme="noir"],[data-theme="emeraude"])[data-texture="papier"],
+.fp:is([data-theme="nuit"],[data-theme="noir"],[data-theme="emeraude"])[data-texture="papier"] :is(.alt,footer,.mini-card){background-blend-mode:screen}
+
+/* Ornements : couleur d'encre de la palette (ou dégradé de dorure, porté par le SVG lui-même) */
+.fp .art-s{stroke:var(--accent-deep)}
+.fp .art-f{fill:var(--accent)}
+.fp .hero-text{position:relative}
+.fp .dc-top{display:block;margin:0 auto .9rem;width:min(62%,260px);height:auto;overflow:visible}
+.fp .dc-deco{width:min(70%,300px);margin-bottom:1.1rem}
+.fp:not(.no-photo) .dc-top{margin-top:.2rem}
+.fp .dc-rule{display:block;width:min(46%,200px);height:5px;margin:1.6rem auto 0;border-top:1px solid var(--accent);border-bottom:1px solid var(--accent)}
+.fp:not([data-foil="aucune"]) .dc-rule{height:1px;border:0;box-shadow:0 4px 0 -0px var(--f2)}
+/* Botanique : deux branches dans les coins du bloc de texte */
+.fp .dc-corner{position:absolute;width:min(34%,190px);height:auto;pointer-events:none;overflow:visible}
+.fp .dc-tl{top:.6rem;left:.4rem}
+.fp .dc-br{bottom:.6rem;right:.4rem;transform:rotate(180deg)}
+.fp[data-decor="botanique"] .hero-text{padding-top:4.6rem;padding-bottom:3.4rem}
+.fp[data-decor="botanique"].no-photo .hero-text{padding-top:5.6rem}
+/* Cadre : double filet et volutes aux coins, comme un carton gravé */
+.fp[data-decor="cadre"] .hero-text{margin:1.2rem auto .6rem;max-width:min(calc(100% - 1.6rem),760px);padding:3.2rem 1.6rem 2.6rem}
+.fp[data-decor="cadre"].no-photo .hero-text{margin-top:2rem;padding-top:4rem}
+.fp .dc-frame{position:absolute;inset:0;border:1px solid var(--accent);pointer-events:none}
+.fp .dc-frame::after{content:"";position:absolute;inset:6px;border:.5px solid var(--accent);opacity:.7}
+.fp .dc-fc{position:absolute;width:38px;height:38px;pointer-events:none}
+.fp .dc-fc.dc-tl{top:-5px;left:-5px}
+.fp .dc-fc.dc-tr{top:-5px;right:-5px;transform:scaleX(-1)}
+.fp .dc-fc.dc-bl{bottom:-5px;left:-5px;transform:scaleY(-1)}
+.fp .dc-fc.dc-br{bottom:-5px;right:-5px;transform:scale(-1)}
+.fp .dc-fc .art-s{stroke:var(--accent-deep)}
+.fp[data-decor="artdeco"] .hero-text{padding-bottom:2rem}
+
+/* ============================================================ Miniatures (sélecteur de style) */
+.fp.fp-mini{container-type:inline-size;background:none;line-height:1.2;overflow:hidden;border-radius:10px}
+.fp .mini-card{position:relative;aspect-ratio:4/5;background-color:var(--paper);display:flex;align-items:center;justify-content:center;text-align:center;padding:12% 8%}
+.fp .mini-body{position:relative;z-index:1;display:flex;flex-direction:column;align-items:center;width:100%}
+.fp .mini-card .dc-top{width:70%;margin:0 auto 8%}
+.fp .mini-card .dc-deco{width:84%}
+.fp .mini-names{font-family:var(--names);font-weight:var(--names-weight);text-transform:var(--names-case);letter-spacing:var(--names-track);
+  font-size:calc(15cqw * var(--names-size));line-height:1.05;color:var(--ink);overflow-wrap:anywhere}
+.fp .mini-names .amp{font-family:var(--display);text-transform:none;font-style:italic;color:var(--blush)}
+.fp .mini-rule{width:18%;height:1px;background:var(--accent);margin:9% auto 7%}
+.fp .mini-date{font-family:var(--body);font-size:5.2cqw;letter-spacing:.16em;text-transform:uppercase;color:var(--accent-deep)}
+.fp .mini-card .dc-corner{width:48%}
+.fp .mini-card .dc-tl{top:3%;left:2%}
+.fp .mini-card .dc-br{bottom:3%;right:2%}
+.fp .mini-card .dc-frame{inset:7%}
+.fp .mini-card .dc-frame::after{inset:4px}
+.fp .mini-card .dc-fc{width:20px;height:20px}
+.fp .mini-card .dc-fc.dc-tl{top:calc(7% - 4px);left:calc(7% - 4px)}
+.fp .mini-card .dc-fc.dc-tr{top:calc(7% - 4px);right:calc(7% - 4px)}
+.fp .mini-card .dc-fc.dc-bl{bottom:calc(7% - 4px);left:calc(7% - 4px)}
+.fp .mini-card .dc-fc.dc-br{bottom:calc(7% - 4px);right:calc(7% - 4px)}
+.fp .mini-card .dc-rule{position:absolute;bottom:10%;left:50%;transform:translateX(-50%);width:44%;margin:0}
+
+@media (prefers-reduced-motion:reduce){.fp .names{animation:none!important}}
+

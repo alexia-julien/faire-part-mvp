@@ -8,7 +8,7 @@ Projet indépendant du site du mariage d'Alexia & Julien (aucun lien avec ce rep
 1. `index.html` : onboarding en 5 étapes avec aperçu en direct. **Seules les étapes 1 et 2 sont obligatoires** (prénoms, date, lieu) : tout le reste a des réglages par défaut, on peut publier en cliquant « Continuer ».
    - **Les mariés** (heure de la cérémonie facultative ; année plafonnée à 2050), **Le lieu**
    - L'aperçu se bascule entre **Mobile** et **Ordinateur** (rendu réel en 1280 px, réduit pour tenir à l'écran).
-   - **Photos et style** : 5 ambiances prêtes en un clic (Champêtre, Romantique, Élégance, Bohème, Minimaliste), puis, repliées sous « Personnaliser le style » : introduction (enveloppe à ouvrir, monogramme, aucune), 8 palettes, 4 polices, forme de la photo (arrondie, arche, cercle), compte à rebours.
+   - **Photos et style** : 9 ambiances prêtes en un clic, chacune montrée en miniature avec les prénoms et la date du couple (Champêtre, Romantique, Château, Élégance, Gatsby, Jardin d'hiver, Bohème, Porcelaine, Minimaliste), puis, sous « Personnaliser le style », 5 onglets : 12 palettes, 8 polices, 5 ornements (épuré, couronne, botanique, cadre, art déco), finitions (encre, dorure, or rose, argent ; papier texturé), introduction, forme de la photo et compte à rebours. Les faire-part créés avant restent inchangés (épuré, encre, sans texture).
    - **Textes et sections** : message d'accueil + sections facultatives pré-remplies (Notre histoire, Programme en frise, Dress code, Hébergement, Infos pratiques, Liste de mariage avec lien).
    - **Réponses** : questions à poser (personnes, enfants, noms des accompagnants, régime, brunch, email, téléphone, adresse, message, question personnalisée) et date limite de réponse.
 2. À la fin (« Terminer ») : un **lien public** pour les invités (`invitation.html?f=<id>`) et un **lien privé** (`admin.html?f=<id>#k=<clé>`) pour suivre les réponses, exporter en CSV et modifier le faire-part.
@@ -67,7 +67,7 @@ Si l'URL du projet Supabase change, mettre à jour **aussi** la CSP (`connect-sr
 Sécurité : voir [SECURITY.md](SECURITY.md) (modèle de menace, protections, limites connues).
 
 ## Tests
-`python3 tests/e2e.py` (prérequis : `pip install playwright pillow`) rejoue 206 vérifications dans un navigateur headless, en mode local : parcours complet, validations, brouillon, photos, ambiances et réglages de style, intros (enveloppe, monogramme, mouvement réduit), sections, RSVP enrichi, suivi (filtres, tri, recherche, régimes, copie des emails, CSV, cartes mobiles), modification, anciens faire-part, agenda (fuseaux horaires), sécurité (XSS, config forgée, clickjacking), espaces testeurs, mobile et contrastes des 8 palettes. Captures dans `tests/out/`.
+`python3 tests/e2e.py` (prérequis : `pip install playwright pillow`) rejoue 222 vérifications dans un navigateur headless, en mode local : parcours complet, validations, brouillon, photos, ambiances et réglages de style, intros (enveloppe, monogramme, mouvement réduit), sections, RSVP enrichi, suivi (filtres, tri, recherche, régimes, copie des emails, CSV, cartes mobiles), modification, anciens faire-part, agenda (fuseaux horaires), sécurité (XSS, config forgée, clickjacking), espaces testeurs, mobile et contrastes des 12 palettes. Captures dans `tests/out/`.
 
 `supabase/tests.sql` teste la base elle-même (66 vérifications, tout est annulé à la fin) : à coller dans le SQL Editor après chaque changement du schéma.
 

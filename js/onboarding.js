@@ -26,10 +26,10 @@
     if(playIntro){
       cancelAnimationFrame(raf); raf = 0;
       FP.renderInvitation($('preview'), state, { preview: true, playIntro: true, introContainer: introContainer() });
-      return;
+      refreshMinis(); return;
     }
     if(raf) return;
-    raf = requestAnimationFrame(function(){ raf = 0; FP.renderInvitation($('preview'), state, { preview: true }); });
+    raf = requestAnimationFrame(function(){ raf = 0; FP.renderInvitation($('preview'), state, { preview: true }); refreshMinis(); });
   }
   function updateReplay(){ $('replay-intro').hidden = state.intro === 'aucune'; }
   $('replay-intro').addEventListener('click', function(){ preview(true); });
@@ -84,24 +84,66 @@
     l.appendChild(i); l.insertAdjacentHTML('beforeend', html);
     return l;
   }
+  var STYLE_FIELDS = ['theme', 'font', 'intro', 'photoShape', 'decor', 'foil', 'texture'];
+  function label(list, id){ var x = list.filter(function(y){ return y.id === id; })[0]; return x ? x.label : ''; }
   FP.PRESETS.forEach(function(p){
-    var intro = FP.INTROS.filter(function(x){ return x.id === p.intro; })[0];
+    var sub = [label(FP.DECORS, p.decor), p.foil !== 'aucune' ? label(FP.FOILS, p.foil).toLowerCase() : ''].filter(Boolean).join(', ');
     $('presets').appendChild(radio('preset', p.id,
-      '<span class="preset-sw pal-' + p.theme + '" aria-hidden="true"></span>' +
-      '<span class="preset-name fs-' + p.font + '">' + FP.esc(p.label) + '</span>' +
-      '<span class="preset-sub">' + FP.esc(intro ? intro.label : '') + '</span>', 'preset'));
+      '<span class="fp fp-mini" data-mini="preset:' + p.id + '" aria-hidden="true"></span>' +
+      '<span class="preset-name">' + FP.esc(p.label) + '</span><span class="preset-sub">' + FP.esc(sub) + '</span>', 'preset'));
   });
   FP.INTROS.forEach(function(x){ $('pick-intro').appendChild(radio('style-intro', x.id, FP.esc(x.label), 'pill')); });
   FP.PALETTES.forEach(function(x){
-    $('pick-theme').appendChild(radio('style-theme', x.id, '<span class="sw pal-' + x.id + '" aria-hidden="true"></span>' + FP.esc(x.label), 'pill swatch'));
+    var l = radio('style-theme', x.id, '<span class="sw3" aria-hidden="true"></span><span class="sw-name">' + FP.esc(x.label) + '</span>', 'swatch-card');
+    // Nuancier en trois teintes (fond, accent, encre) : couleurs posées via le CSSOM, autorisé par la CSP.
+    l.querySelector('.sw3').style.background = 'conic-gradient(from 200deg,' + x.sw[0] + ' 0 50%,' + x.sw[1] + ' 50% 78%,' + x.deep + ' 78% 100%)';
+    $('pick-theme').appendChild(l);
   });
   FP.FONTS.forEach(function(x){
-    $('pick-font').appendChild(radio('style-font', x.id, '<span class="fs-' + x.id + '">Alexia &amp; Julien</span><span class="opt">' + FP.esc(x.label) + '</span>', 'pill font'));
+    $('pick-font').appendChild(radio('style-font', x.id, '<span class="fp font-sample" data-font="' + x.id + '" data-sample aria-hidden="true"></span><span class="font-name">' + FP.esc(x.label) + '</span>', 'font-card'));
+  });
+  FP.DECORS.forEach(function(x){
+    $('pick-decor').appendChild(radio('style-decor', x.id, '<span class="fp fp-mini" data-mini="decor:' + x.id + '" aria-hidden="true"></span><span class="decor-name">' + FP.esc(x.label) + '</span>', 'decor-card'));
+  });
+  FP.FOILS.forEach(function(x){
+    $('pick-foil').appendChild(radio('style-foil', x.id, '<span class="foil-chip foil-' + x.id + '" aria-hidden="true"></span><span class="foil-name">' + FP.esc(x.label) + '</span>', 'foil-card'));
   });
   FP.SHAPES.forEach(function(x){ $('pick-shape').appendChild(radio('style-shape', x.id, '<span class="shape shape-' + x.id + '" aria-hidden="true"></span>' + FP.esc(x.label), 'pill')); });
-  var STYLE_KEYS = { 'style-intro': 'intro', 'style-theme': 'theme', 'style-font': 'font', 'style-shape': 'photoShape' };
+  // Miniatures : chaque ambiance et chaque ornement sont dessinés avec les prénoms et la date du couple.
+  function refreshMinis(){
+    var who = { partner1: state.partner1, partner2: state.partner2, date: state.date, time: state.time };
+    $$('[data-mini]').forEach(function(el){
+      var k = el.getAttribute('data-mini').split(':'), c = {};
+      STYLE_FIELDS.forEach(function(f){ c[f] = state[f]; });
+      if(k[0] === 'preset'){ var p = FP.PRESETS.filter(function(x){ return x.id === k[1]; })[0]; STYLE_FIELDS.forEach(function(f){ c[f] = p[f]; }); }
+      else c.decor = k[1];
+      Object.keys(who).forEach(function(f){ c[f] = who[f]; });
+      c = FP.sanitizeConfig(c);
+      FP.applyStyleAttrs(el, c);
+      el.innerHTML = FP.miniHtml(c);
+    });
+    var names = (state.partner1 || 'Camille') + ' & ' + (state.partner2 || 'Hugo');
+    $$('[data-sample]').forEach(function(el){ el.textContent = names; });
+  }
+  // Onglets de « Personnaliser le style » (flèches gauche/droite au clavier)
+  var tabs = $$('[role=tab]');
+  function selectTab(t, focus){
+    tabs.forEach(function(x){
+      var on = x === t; x.setAttribute('aria-selected', String(on)); x.tabIndex = on ? 0 : -1;
+      $(x.getAttribute('aria-controls')).hidden = !on;
+    });
+    if(focus) t.focus();
+  }
+  tabs.forEach(function(t, i){
+    t.addEventListener('click', function(){ selectTab(t); });
+    t.addEventListener('keydown', function(e){
+      var d = e.key === 'ArrowRight' ? 1 : e.key === 'ArrowLeft' ? -1 : 0;
+      if(d){ e.preventDefault(); selectTab(tabs[(i + d + tabs.length) % tabs.length], true); }
+    });
+  });
+  var STYLE_KEYS = { 'style-intro': 'intro', 'style-theme': 'theme', 'style-font': 'font', 'style-shape': 'photoShape', 'style-decor': 'decor', 'style-foil': 'foil' };
   function matchingPreset(){
-    return FP.PRESETS.filter(function(p){ return p.theme === state.theme && p.font === state.font && p.intro === state.intro && p.photoShape === state.photoShape; })[0];
+    return FP.PRESETS.filter(function(p){ return STYLE_FIELDS.every(function(f){ return p[f] === (f === 'texture' ? !!state.texture : state[f]); }); })[0];
   }
   function syncStyle(){
     var p = matchingPreset();
@@ -113,8 +155,8 @@
     var p = FP.PRESETS.filter(function(x){ return x.id === e.target.value; })[0];
     if(!p) return;
     var introChanged = p.intro !== state.intro;
-    state.theme = p.theme; state.font = p.font; state.intro = p.intro; state.photoShape = p.photoShape;
-    syncStyle(); saveDraft();
+    STYLE_FIELDS.forEach(function(f){ state[f] = p[f]; });
+    syncStyle(); syncInputs(); saveDraft();
     preview(introChanged && p.intro !== 'aucune' && previewVisible());
   });
   Object.keys(STYLE_KEYS).forEach(function(n){
@@ -132,7 +174,7 @@
       el.addEventListener('input', function(){ state[el.getAttribute('data-bind')] = el.value; changed(); });
     });
     $$('[data-bind-bool]').forEach(function(el){
-      el.addEventListener('change', function(){ state[el.getAttribute('data-bind-bool')] = el.checked; changed(); });
+      el.addEventListener('change', function(){ state[el.getAttribute('data-bind-bool')] = el.checked; if(el.getAttribute('data-bind-bool') === 'texture') syncStyle(); changed(); });
     });
     $$('[data-bind-rsvp]').forEach(function(el){
       el.addEventListener('change', function(){ state.rsvp[el.getAttribute('data-bind-rsvp')] = el.checked; rsvpDeps(); changed(); });

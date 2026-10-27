@@ -139,27 +139,45 @@ try:
     check("suppression d'une photo", pg.locator('#thumbs .thumb').count() == 2)
 
     print("\n== Étape 3 : style ==")
-    check("5 ambiances, Champêtre sélectionnée par défaut", pg.locator('.preset').count() == 5 and pg.is_checked('input[name=preset][value=champetre]'))
+    check("9 ambiances, Champêtre sélectionnée par défaut", pg.locator('.preset').count() == 9 and pg.is_checked('input[name=preset][value=champetre]'))
     check("options avancées repliées par défaut", not pg.is_visible('#pick-theme'))
     pg.click('.preset:has(input[value=elegance])'); time.sleep(0.3)
     attrs = pg.evaluate("['data-theme','data-font','data-shape'].map(a=>document.getElementById('preview').getAttribute(a))")
-    check("ambiance Élégance : nuit + moderne + photo arrondie dans l'aperçu", attrs == ['nuit', 'moderne', 'arrondi'], attrs)
+    check("ambiance Élégance : nuit + haute couture + photo arrondie dans l'aperçu", attrs == ['nuit', 'bodoni', 'arrondi'], attrs)
+    check("ambiance Élégance : cadre, dorure, sans texture", pg.evaluate("['data-decor','data-foil','data-texture'].map(a=>document.getElementById('preview').getAttribute(a))") == ['cadre', 'or', 'lisse']
+          and pg.locator('#preview .hero-text .dc-frame').count() == 1 and pg.locator('#preview .dc-fc').count() == 4)
+    check("dorure : prénoms peints en dégradé métallique", 'gradient' in pg.evaluate("getComputedStyle(document.querySelector('#preview .names')).backgroundImage")
+          and pg.evaluate("getComputedStyle(document.querySelector('#preview .names')).webkitTextFillColor") == 'rgba(0, 0, 0, 0)')
+    check("miniatures : chaque ambiance dessinée avec les prénoms du couple", pg.locator('.preset .fp-mini .mini-names').count() == 9
+          and all('alexia' in t.lower() for t in pg.locator('.preset .mini-names').all_inner_texts()))
+    check("miniature Gatsby : palette, police, éventail art déco", pg.evaluate("(()=>{const m=document.querySelector('[data-mini=\"preset:gatsby\"]');return [m.dataset.theme,m.dataset.font,m.dataset.decor,!!m.querySelector('.dc-deco')]})()") == ['noir', 'artdeco', 'artdeco', True])
+    check("dégradés des ornements dorés : identifiants uniques", pg.evaluate("(()=>{const ids=[...document.querySelectorAll('linearGradient')].map(g=>g.id);return ids.length>0&&new Set(ids).size===ids.length})()"))
     check("changer d'intro joue l'intro dans l'aperçu (monogramme)", pg.locator('#preview .fp-intro-monogramme').count() == 1)
     check("contenu de l'aperçu inerte pendant l'intro", pg.evaluate("document.querySelector('#preview .fp-content').inert") is True)
     check("intro du monogramme se ferme seule", wait_until(lambda: pg.locator('#preview .fp-intro').count() == 0, 6))
     check("défilement de l'aperçu rétabli après l'intro", not pg.evaluate("document.getElementById('phone').classList.contains('fp-locked')"))
     pg.click('#style-more summary')
-    check("8 palettes, 4 polices, 3 intros, 3 formes", [pg.locator('[name=%s]' % n).count() for n in ['style-theme', 'style-font', 'style-intro', 'style-shape']] == [8, 4, 3, 3])
-    pg.click('.pill:has(input[name=style-theme][value=bordeaux])'); time.sleep(0.3)
+    check("12 palettes, 8 polices, 5 ornements, 4 finitions, 3 intros, 3 formes", [pg.locator('[name=%s]' % n).count() for n in ['style-theme', 'style-font', 'style-decor', 'style-foil', 'style-intro', 'style-shape']] == [12, 8, 5, 4, 3, 3])
+    check("onglets : « Couleurs » ouvert, les autres masqués", pg.is_visible('#pick-theme') and not pg.is_visible('#pick-font') and pg.get_attribute('#tab-colors', 'aria-selected') == 'true')
+    pg.focus('#tab-colors'); pg.keyboard.press('ArrowRight')
+    check("onglets au clavier (flèche droite)", pg.get_attribute('#tab-font', 'aria-selected') == 'true' and pg.is_visible('#pick-font') and pg.evaluate("document.activeElement.id") == 'tab-font')
+    pg.click('#tab-colors')
+    pg.click('.swatch-card:has(input[name=style-theme][value=bordeaux])'); time.sleep(0.3)
     check("palette Bordeaux appliquée, ambiance devenue personnalisée", pg.get_attribute('#preview', 'data-theme') == 'bordeaux'
           and pg.locator('input[name=preset]:checked').count() == 0)
-    pg.click('.pill:has(input[name=style-shape][value=arche])'); time.sleep(0.3)
+    pg.click('#tab-decor'); pg.click('.decor-card:has(input[name=style-decor][value=botanique])'); time.sleep(0.3)
+    check("ornement botanique : deux branches dans les coins", pg.get_attribute('#preview', 'data-decor') == 'botanique' and pg.locator('#preview .dc-corner').count() == 2)
+    check("miniatures d'ornements aux couleurs choisies", pg.locator('[data-mini^="decor:"][data-theme=bordeaux]').count() == 5)
+    pg.click('#tab-finish'); pg.click('.foil-card:has(input[name=style-foil][value=orrose])'); pg.check('[data-bind-bool=texture]'); time.sleep(0.3)
+    check("finitions : or rose et papier texturé", pg.get_attribute('#preview', 'data-foil') == 'orrose' and pg.get_attribute('#preview', 'data-texture') == 'papier'
+          and 'svg' in pg.evaluate("getComputedStyle(document.getElementById('preview')).backgroundImage"))
+    pg.click('#tab-intro'); pg.click('.pill:has(input[name=style-shape][value=arche])'); time.sleep(0.3)
     check("forme arche appliquée à la photo", pg.get_attribute('#preview', 'data-shape') == 'arche'
           and pg.evaluate("getComputedStyle(document.querySelector('#preview .hero-photo-wrap')).borderTopLeftRadius").startswith('999'))
-    pg.click('.pill:has(input[name=style-font][value=romantique])'); time.sleep(0.3)
+    pg.click('#tab-font'); pg.click('.font-card:has(input[name=style-font][value=romantique])'); time.sleep(0.3)
     check("police romantique : prénoms en Great Vibes", 'Great Vibes' in pg.evaluate("getComputedStyle(document.querySelector('#preview .names')).fontFamily"))
     check("polices chargées depuis Google Fonts uniquement à l'étape Style", pg.evaluate("[...document.querySelectorAll('link[rel=stylesheet]')].filter(l=>l.href.includes('Great+Vibes')).length") >= 1)
-    pg.click('.pill:has(input[name=style-intro][value=enveloppe])'); time.sleep(0.2)
+    pg.click('#tab-intro'); pg.click('.pill:has(input[name=style-intro][value=enveloppe])'); time.sleep(0.2)
     check("choisir l'enveloppe la montre dans l'aperçu", pg.locator('#preview .fp-intro-enveloppe').count() == 1)
     pg.click('#preview .env', force=True)
     check("l'enveloppe s'ouvre au clic puis disparaît", wait_until(lambda: pg.locator('#preview .fp-intro').count() == 0, 5))
@@ -365,13 +383,15 @@ try:
     check("intro « aucune » : faire-part direct", n.locator('.fp-intro').count() == 0)
     l = watch(c.new_page(), "legacy"); l.goto(BASE + "/invitation.html?f=legacy-0001"); l.wait_for_selector('.rsvp-form')
     check("ancien faire-part : pas d'intro imposée, infos pratiques reprises", l.locator('.fp-intro').count() == 0 and 'Parking sur place.' in l.inner_text('.sec-practical'))
+    check("ancien faire-part : rendu inchangé (épuré, encre, sans texture)", l.evaluate("['data-decor','data-foil','data-texture'].map(a=>document.querySelector('.fp').getAttribute(a))") == ['aucun', 'aucune', 'lisse']
+          and l.locator('.dc-top, .dc-corner, .dc-frame').count() == 0)
     rm = watch(newctx(b, reduced_motion="reduce").new_page(), "reduced")
     rm.goto(BASE + "/index.html"); db_put(rm, db_get(pg)); rm.goto(pub); rm.wait_for_selector('.fp-intro')
     rm.click('.env'); check("mouvement réduit : ouverture quasi immédiate", wait_until(lambda: rm.locator('.fp-intro').count() == 0, 1.5))
 
     print("\n== Sécurité : config forgée (nouveaux champs) ==")
     forged = {"partner1": XSS, "partner2": {"x": 1}, "date": "2027-08-07", "venueName": XSS, "intro": "x\"><script>", "font": "../../evil",
-              "theme": "x", "photoShape": "<b>", "countdown": "yes", "tz": "../../etc",
+              "theme": "x", "photoShape": "<b>", "countdown": "yes", "tz": "../../etc", "decor": "<svg onload=alert(1)>", "foil": "url(javascript:x)", "texture": "true",
               "sections": {"story": {"on": True, "text": XSS}, "program": {"on": True, "items": [{"time": "<b>", "label": XSS}] + [{"time": "10:00", "label": "x"}] * 40 + ["str", None]},
                            "lodging": {"on": True, "text": "t", "url": "javascript:alert(1)"}, "gifts": {"on": True, "text": "t", "url": "https://user:pw@evil.com/"},
                            "dress": {"on": "true", "text": "ne doit pas s'afficher"}, "__proto__": {"polluted": 1}},
@@ -381,6 +401,7 @@ try:
     check("forgée : aucun script exécuté, aucune balise injectée", f.evaluate("window.__xss") is None and f.locator('.fp img, .fp script, .fp b').count() == 0)
     check("forgée : intro, police, palette, forme invalides → valeurs sûres (enveloppe par défaut)",
           f.evaluate("[...['data-theme','data-font','data-shape']].map(a=>document.getElementById('root').getAttribute(a))") == ['sauge', 'classique', 'arrondi'] and f.locator('.fp-intro-enveloppe').count() == 1)
+    check("forgée : ornement, dorure, texture invalides → épuré, encre, lisse", f.evaluate("['data-decor','data-foil','data-texture'].map(a=>document.querySelector('.fp').getAttribute(a))") == ['aucun', 'aucune', 'lisse'])
     check("forgée : programme plafonné à 8 étapes, entrées invalides ignorées", f.locator('.timeline li').count() == 8)
     check("forgée : lien javascript: et lien avec identifiants refusés", f.locator('.sec-lodging .maps-btn, .sec-gifts .maps-btn').count() == 0)
     check("forgée : section activée par une chaîne « true » ignorée", f.locator('.sec-dress').count() == 0)
@@ -514,9 +535,9 @@ try:
     check("invité au Brésil : bon instant, date affichée inchangée",
           x.evaluate("FP.eventInstant({date:'2027-08-07',time:'16:00',tz:'Europe/Paris'})") == 1817647200000 and x.evaluate("FP.formatDate({date:'2027-08-07',time:'16:00'})") == '7 août 2027')
 
-    print("\n== Contrastes des 8 palettes ==")
+    print("\n== Contrastes des 12 palettes ==")
     t = c.new_page(); t.goto(BASE + "/index.html")
-    for th in ['sauge', 'rose', 'terracotta', 'lavande', 'bordeaux', 'riviera', 'nuit', 'noir']:
+    for th in ['sauge', 'rose', 'terracotta', 'lavande', 'bordeaux', 'riviera', 'nuit', 'noir', 'ivoire', 'olive', 'porcelaine', 'emeraude']:
         r = t.evaluate("""(th)=>{const el=document.getElementById('preview');
            FP.renderInvitation(el,{partner1:'A',partner2:'B',date:'2027-08-07',venueName:'Lieu',theme:th,intro:'aucune',sections:{program:{on:true,items:[{time:'15:00',label:'x'}]}}},{});
            const q=s=>getComputedStyle(el.querySelector(s)), bg=getComputedStyle(el).backgroundColor, cream=q('section.alt').backgroundColor;
