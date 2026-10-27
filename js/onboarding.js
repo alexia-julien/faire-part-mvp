@@ -331,35 +331,26 @@
     return 'Créé en ' + Math.round(s / 60) + ' minutes.';
   }
   function showDone(slug, key, seconds){
-    var l = links(slug, key);
+    var l = links(slug, key), tester = !!FP.tester.token();
     $('wizard').hidden = true; $('steps').hidden = true; $('draft-note').hidden = true; $('mine-link').hidden = true;
     $('done').hidden = false; $('app').classList.add('done'); $('app').classList.remove('show-preview-on');
-    $('done-title').textContent = editing ? 'Modifications enregistrées !' : 'C’est publié !';
+    $('done-title').textContent = editing ? 'Modifications enregistrées !' : 'C’est prêt !';
     $('public-link').value = l.pub; $('public-open').href = l.pub;
-    $('admin-link').value = l.adm; $('admin-open').href = l.adm;
-    $('mail-admin').href = 'mailto:?subject=' + encodeURIComponent('Mon faire-part : lien privé') + '&body=' +
-      encodeURIComponent('Lien privé (suivi des réponses et modification), à ne pas partager :\n' + l.adm +
-                         '\n\nLien à envoyer aux invités :\n' + l.pub + '\n');
-    $('done-time').textContent = duration(seconds);
-    if(navigator.share){
-      var sb = $('share-btn'); sb.hidden = false;
-      sb.onclick = function(){
-        navigator.share({ title: state.partner1 + ' & ' + state.partner2, text: 'Vous êtes invités à notre mariage !', url: l.pub }).catch(function(){});
-      };
+    var ed = new URL('index.html', location.href); ed.search = '?f=' + slug; ed.hash = 'k=' + key;
+    $('edit-again').href = ed.href;
+    $('admin-link').value = l.adm;
+    $('done-time').textContent = editing ? '' : duration(seconds);
+    // Testeur : le faire-part rejoint son espace, qui suffit pour le retrouver. Sinon, le lien privé reste affiché.
+    $('admin-card').hidden = tester;
+    $('go-mine').textContent = tester ? 'Retour à mon espace' : 'Voir mes faire-part';
+    if(!tester){
+      $('mail-admin').href = 'mailto:?subject=' + encodeURIComponent('Mon faire-part : lien privé') + '&body=' +
+        encodeURIComponent('Lien privé (suivi des réponses et modification), à ne pas partager :\n' + l.adm +
+                           '\n\nLien à envoyer aux invités :\n' + l.pub + '\n');
+    } else {
+      FP.tester.attach(slug, key).then(function(ok){ if(!ok) $('admin-card').hidden = false; }); // échec : on garde le lien privé
     }
     FP.mine.add(slug, key); // retrouvable ensuite dans « Mes faire-part »
-    // Testeur (lien personnel ouvert dans ce navigateur) : le faire-part rejoint son espace, le lien privé n'est plus
-    // le seul moyen de le retrouver. Si le rattachement échoue, on garde l'avertissement habituel.
-    if(FP.tester.token()){
-      FP.tester.attach(slug, key).then(function(ok){
-        if(!ok) return;
-        $('admin-card').classList.remove('warn');
-        $('admin-card-title').textContent = '2. Retrouvez-le dans votre espace';
-        $('admin-card-text').textContent = 'Ce faire-part est enregistré dans votre espace : ouvrez votre lien personnel, sur n’importe quel appareil, pour voir les réponses et le modifier. Le lien ci-dessous ne donne accès qu’à ce faire-part (à transmettre aux mariés s’ils veulent suivre leurs réponses).';
-        var so = $('space-open'); so.href = FP.tester.link(); so.hidden = false;
-        $('mail-admin').hidden = true;
-      });
-    }
     published = true; clearTimeout(draftTimer); storeDel(DRAFT_KEY);
     window.scrollTo({ top: 0 }); $('done-title').focus({ preventScroll: true });
   }
@@ -420,7 +411,6 @@
       state = FP.sanitizeConfig(res[1]);
       editing = { slug: p.slug, key: p.key };
       FP.mine.add(p.slug, p.key); FP.tester.attach(p.slug, p.key);
-      $('publish').textContent = 'Enregistrer les modifications';
       wizard.hidden = false; $('steps').hidden = false;
       syncInputs(); show(1); preview();
     }).catch(function(e){

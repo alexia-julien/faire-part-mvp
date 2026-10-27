@@ -11,7 +11,7 @@ Projet indépendant du site du mariage d'Alexia & Julien (aucun lien avec ce rep
    - **Photos et style** : 5 ambiances prêtes en un clic (Champêtre, Romantique, Élégance, Bohème, Minimaliste), puis, repliées sous « Personnaliser le style » : introduction (enveloppe à ouvrir, monogramme, aucune), 8 palettes, 4 polices, forme de la photo (arrondie, arche, cercle), compte à rebours.
    - **Textes et sections** : message d'accueil + sections facultatives pré-remplies (Notre histoire, Programme en frise, Dress code, Hébergement, Infos pratiques, Liste de mariage avec lien).
    - **Réponses** : questions à poser (personnes, enfants, noms des accompagnants, régime, brunch, email, téléphone, adresse, message, question personnalisée) et date limite de réponse.
-2. À la publication : un **lien public** pour les invités (`invitation.html?f=<id>`) et un **lien privé** (`admin.html?f=<id>#k=<clé>`) pour suivre les réponses, exporter en CSV et modifier le faire-part.
+2. À la fin (« Terminer ») : un **lien public** pour les invités (`invitation.html?f=<id>`) et un **lien privé** (`admin.html?f=<id>#k=<clé>`) pour suivre les réponses, exporter en CSV et modifier le faire-part.
 3. Les invités ouvrent l'enveloppe (ou voient le monogramme), puis répondent via le formulaire intégré, limité aux questions activées par le couple.
 4. Le back-office (`admin.html`) ouvre sur **« Mes faire-part »** : la liste des faire-part créés ou ouverts depuis ce navigateur (prénoms, date, nombre de réponses) ; sur un autre appareil, ouvrir une fois le lien privé ajoute le faire-part à la liste. Chaque carte mène à la vue des réponses : totaux (adultes, enfants, absents, brunch), liste des régimes pour le traiteur, recherche, filtres présents/absents, tri, colonnes selon les questions posées, copie des emails (champ Cci), export CSV, suppression, affichage en cartes sur mobile.
 
@@ -20,7 +20,7 @@ La clé privée est dans le fragment d'URL (`#k=…`), donc jamais envoyée au s
 ## Espaces testeurs (wedding planners)
 Chaque testeur reçoit un **lien personnel** (`admin.html#t=<jeton>`) qui retrouve **tous** ses faire-part, sur n'importe quel appareil, sans compte :
 - à la première ouverture, le lien est mémorisé dans le navigateur ; tout faire-part **créé** ou **ouvert via son lien privé** ensuite est rattaché automatiquement à l'espace (ceux déjà présents dans « Mes faire-part » aussi) ;
-- à la publication, la carte « Votre lien privé (à garder précieusement) » devient **« Retrouvez-le dans votre espace »** (le lien privé reste affiché, pour le transmettre aux mariés) ;
+- à la fin (bouton « Terminer »), l'écran ne propose que : copier le lien des invités, ouvrir le faire-part, le modifier, revenir à l'espace. Sans espace testeur, le lien privé et son avertissement restent affichés (c'est alors le seul moyen de revenir) ;
 - tant que l'espace est vide, la page d'accueil n'affiche qu'une action : « Créer mon premier faire-part » (ni encart du lien, ni liste) ;
 - « Retirer de la liste » retire aussi le faire-part de l'espace (sans le supprimer) ; « Quitter l'espace sur cet appareil » oublie le lien sur un ordinateur partagé.
 
@@ -67,7 +67,7 @@ Si l'URL du projet Supabase change, mettre à jour **aussi** la CSP (`connect-sr
 Sécurité : voir [SECURITY.md](SECURITY.md) (modèle de menace, protections, limites connues).
 
 ## Tests
-`python3 tests/e2e.py` (prérequis : `pip install playwright pillow`) rejoue 204 vérifications dans un navigateur headless, en mode local : parcours complet, validations, brouillon, photos, ambiances et réglages de style, intros (enveloppe, monogramme, mouvement réduit), sections, RSVP enrichi, suivi (filtres, tri, recherche, régimes, copie des emails, CSV, cartes mobiles), modification, anciens faire-part, agenda (fuseaux horaires), sécurité (XSS, config forgée, clickjacking), espaces testeurs, mobile et contrastes des 8 palettes. Captures dans `tests/out/`.
+`python3 tests/e2e.py` (prérequis : `pip install playwright pillow`) rejoue 207 vérifications dans un navigateur headless, en mode local : parcours complet, validations, brouillon, photos, ambiances et réglages de style, intros (enveloppe, monogramme, mouvement réduit), sections, RSVP enrichi, suivi (filtres, tri, recherche, régimes, copie des emails, CSV, cartes mobiles), modification, anciens faire-part, agenda (fuseaux horaires), sécurité (XSS, config forgée, clickjacking), espaces testeurs, mobile et contrastes des 8 palettes. Captures dans `tests/out/`.
 
 `supabase/tests.sql` teste la base elle-même (62 vérifications, tout est annulé à la fin) : à coller dans le SQL Editor après chaque changement du schéma.
 

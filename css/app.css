@@ -122,6 +122,12 @@ details.more .chk{margin-bottom:0}
 .btn-ghost:hover{border-color:var(--sage)}
 .btn-ghost:disabled{opacity:.5;cursor:default}
 
+.app.done .hello{display:none}
+#done-title{font-size:clamp(2rem,6vw,2.6rem);margin:.4rem 0 .2rem}
+#done-title:focus{outline:none}
+.done-actions{display:flex;gap:.6rem;flex-wrap:wrap;margin:0 0 1.6rem}
+.done-actions .btn-ghost{flex:1;min-width:12rem;text-align:center}
+.btn-main.done-back{display:block;text-align:center;margin-top:.4rem}
 .link-card{background:var(--white);border:1px solid var(--line);border-radius:16px;padding:1.2rem;margin:1rem 0}
 .link-card.warn{border-color:#E0B9A6;background:#FFF9F5}
 .link-card h3{font-size:1.4rem}

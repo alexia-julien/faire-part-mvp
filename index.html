@@ -161,25 +161,29 @@
         <button type="button" class="btn-ghost preview-btn" id="show-preview">Aperçu</button>
         <button type="button" class="btn-ghost" id="back" hidden>Retour</button>
         <button type="button" class="btn-main" id="next">Continuer</button>
-        <button type="button" class="btn-main" id="publish" hidden>Publier mon faire-part</button>
+        <button type="button" class="btn-main" id="publish" hidden>Terminer</button>
       </div>
     </form>
 
     <section id="done" hidden>
-      <h2 id="done-title" tabindex="-1">C’est publié !</h2>
+      <h2 id="done-title" tabindex="-1">C’est prêt !</h2>
       <p class="muted" id="done-time"></p>
       <div class="link-card">
-        <h3>1. Le lien à envoyer à vos invités</h3>
+        <h3>Le lien à envoyer à vos invités</h3>
         <div class="link-row"><input type="text" id="public-link" readonly aria-label="Lien du faire-part"><button type="button" class="btn-ghost" data-copy="public-link">Copier</button></div>
-        <p class="link-actions"><a id="public-open" target="_blank" rel="noopener">Ouvrir le faire-part</a><button type="button" class="link-btn" id="share-btn" hidden>Partager…</button></p>
       </div>
-      <div class="link-card warn" id="admin-card">
-        <h3 id="admin-card-title">2. Votre lien privé (à garder précieusement)</h3>
-        <p id="admin-card-text">C’est le seul moyen de voir les réponses et de modifier votre faire-part. Il n’y a pas de compte : si vous le perdez, nous ne pouvons pas le retrouver. Ne le partagez pas.</p>
+      <div class="done-actions">
+        <a class="btn-ghost" id="public-open" target="_blank" rel="noopener">Ouvrir le faire-part</a>
+        <a class="btn-ghost" id="edit-again">Modifier le faire-part</a>
+      </div>
+      <!-- Sans espace testeur, le lien privé reste le seul moyen de revenir : on le garde, avec l'avertissement. -->
+      <div class="link-card warn" id="admin-card" hidden>
+        <h3>Votre lien privé (à garder précieusement)</h3>
+        <p>C’est le seul moyen de voir les réponses et de modifier votre faire-part. Il n’y a pas de compte : si vous le perdez, nous ne pouvons pas le retrouver. Ne le partagez pas.</p>
         <div class="link-row"><input type="text" id="admin-link" readonly aria-label="Lien privé de suivi"><button type="button" class="btn-ghost" data-copy="admin-link">Copier</button></div>
-        <p class="link-actions"><a id="admin-open">Ouvrir le suivi des réponses</a><a id="space-open" hidden>Ouvrir mon espace</a><a id="mail-admin">M’envoyer ce lien par email</a></p>
+        <p class="link-actions"><a id="mail-admin">M’envoyer ce lien par email</a></p>
       </div>
-      <p class="link-actions"><a href="admin.html" id="go-mine">Voir tous mes faire-part</a><a href="index.html" id="new-one">Créer un autre faire-part</a></p>
+      <a class="btn-main done-back" id="go-mine" href="admin.html">Retour à mon espace</a>
     </section>
   </main>
 
