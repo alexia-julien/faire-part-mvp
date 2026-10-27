@@ -384,7 +384,7 @@
   $$('[data-copy]').forEach(function(b){
     b.addEventListener('click', function(){
       var input = $(b.getAttribute('data-copy')), label = b.textContent;
-      var ok = function(){ b.textContent = 'Copié ✓'; setTimeout(function(){ b.textContent = label; }, 1500); };
+      var ok = function(){ b.textContent = 'Copié ✓'; b.classList.add('copied'); setTimeout(function(){ b.textContent = label; b.classList.remove('copied'); }, 1600); };
       var fallback = function(){ input.focus(); input.select(); try{ if(document.execCommand('copy')) ok(); }catch(e){} };
       if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(input.value).then(ok, fallback);
       else fallback();
