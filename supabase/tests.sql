@@ -1,4 +1,4 @@
--- Tests de la base (62 vérifications), à exécuter dans Supabase > SQL Editor (ou via le connecteur) après chaque changement de schema.sql.
+-- Tests de la base (66 vérifications), à exécuter dans Supabase > SQL Editor (ou via le connecteur) après chaque changement de schema.sql.
 -- Tout s'exécute dans une transaction qui est TOUJOURS annulée à la fin : aucune donnée de test ne reste.
 -- Le résultat s'affiche dans un message d'erreur volontaire « RESULTATS » : une ligne PASS ou FAIL par vérification.
 -- Les tests se placent dans la peau du rôle « anon » (le navigateur d'un visiteur), pas du propriétaire de la base.
@@ -112,6 +112,20 @@ begin
   r := r || case when ok and jsonb_array_length(v->'items') = 0 and public.get_invitation(v_slug) is not null
     then E'PASS retrait de l''espace (le faire-part, lui, existe toujours)\n' else E'FAIL retrait de l''espace\n' end;
   perform public.tester_attach(v_tok, v_slug, v_key);
+
+  -- Suppression définitive d'un faire-part (réponses et espaces suivent)
+  perform public.create_invitation(v_slug || '-del', v_key, '{"partner1":"D"}'::jsonb);
+  perform public.submit_rsvp(v_slug || '-del', '{"name":"X","attendance":"yes"}'::jsonb);
+  perform public.tester_attach(v_tok, v_slug || '-del', v_key);
+  r := r || case when not public.delete_invitation(v_slug || '-del', v_bad) and public.get_invitation(v_slug || '-del') is not null
+    then E'PASS suppression du faire-part refusée avec une mauvaise clé\n' else E'FAIL suppression avec mauvaise clé\n' end;
+  r := r || case when not public.delete_invitation('inexistant-0000', v_key) then E'PASS suppression d''un faire-part inconnu = false\n' else E'FAIL suppression inconnu\n' end;
+  ok := public.delete_invitation(v_slug || '-del', v_key);
+  r := r || case when ok and public.get_invitation(v_slug || '-del') is null and public.list_rsvps(v_slug || '-del', v_key) is null
+    then E'PASS suppression du faire-part avec la bonne clé (réponses comprises)\n' else E'FAIL suppression du faire-part\n' end;
+  v := public.tester_workspace(v_tok);
+  r := r || case when not exists (select 1 from jsonb_array_elements(v->'items') e where e->>'slug' = v_slug || '-del')
+    then E'PASS faire-part supprimé retiré de l''espace testeur\n' else E'FAIL faire-part supprimé encore dans l''espace\n' end;
 
   -- Limitation de débit : 10 créations par heure et par IP
   perform set_config('request.headers', '{"cf-connecting-ip":"203.0.113.7"}', true);

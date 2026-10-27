@@ -81,6 +81,14 @@
       }));
     },
     // Espaces testeurs : en local, db.testers = { <jeton>: { name, disabled, items: { <slug>: <clé> } } } (créés à la main / par les tests).
+    deleteInvitation: function(slug, key){
+      var db = load(), i = db.inv[slug];
+      if(!i || i.key !== key){ var e = new Error('forbidden'); e.forbidden = true; return Promise.reject(e); }
+      delete db.inv[slug]; delete db.rsvps[slug];
+      Object.keys(db.testers || {}).forEach(function(t){ if(db.testers[t].items) delete db.testers[t].items[slug]; });
+      try{ save(db); }catch(e){ return Promise.reject(e); }
+      return Promise.resolve();
+    },
     testerWorkspace: function(token){
       var t = (load().testers || {})[token];
       if(!t || t.disabled) return Promise.resolve(null);
@@ -148,6 +156,12 @@
           return e && e.forbidden ? { slug: it.slug, invalid: true } : { slug: it.slug, responses: null };
         });
       }));
+    },
+    // Suppression définitive (réponses comprises). Le serveur renvoie false si la clé est mauvaise.
+    deleteInvitation: function(slug, key){
+      return rpc('delete_invitation', { p_slug: slug, p_key: key }).then(function(ok){
+        if(!ok){ var e = new Error('forbidden'); e.forbidden = true; throw e; }
+      });
     },
     // Espaces testeurs. Le serveur renvoie null / false (et non une erreur) quand le jeton ou la clé est mauvais.
     testerWorkspace: function(token){ return rpc('tester_workspace', { p_token: token }); },

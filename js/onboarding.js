@@ -343,6 +343,9 @@
     // Testeur : le faire-part rejoint son espace, qui suffit pour le retrouver. Sinon, le lien privé reste affiché.
     $('admin-card').hidden = tester;
     $('go-mine').textContent = tester ? 'Retour à mon espace' : 'Voir mes faire-part';
+    $('done-note').textContent = tester
+      ? 'Pas besoin de le noter : ce faire-part et son lien restent disponibles dans votre espace, avec les réponses de vos invités.'
+      : 'Vous le retrouverez aussi dans « Mes faire-part », sur cet appareil.';
     if(!tester){
       $('mail-admin').href = 'mailto:?subject=' + encodeURIComponent('Mon faire-part : lien privé') + '&body=' +
         encodeURIComponent('Lien privé (suivi des réponses et modification), à ne pas partager :\n' + l.adm +

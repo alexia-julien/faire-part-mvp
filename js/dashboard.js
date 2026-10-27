@@ -50,6 +50,26 @@
     return b;
   }
 
+  // Suppression DÉFINITIVE du faire-part et de ses réponses, en deux temps (pas de boîte de dialogue).
+  function deleteBtn(item){
+    var b = el('button', 'link-btn danger-link', 'Supprimer'); b.type = 'button';
+    b.addEventListener('click', function(){
+      if(!b.classList.contains('confirm')){
+        b.classList.add('confirm'); b.textContent = 'Supprimer définitivement ?';
+        b.title = 'Le faire-part et toutes ses réponses seront effacés. Le lien envoyé aux invités ne fonctionnera plus.';
+        setTimeout(function(){ if(b.isConnected){ b.classList.remove('confirm'); b.textContent = 'Supprimer'; b.title = ''; } }, 4000);
+        return;
+      }
+      b.disabled = true; b.textContent = 'Suppression…';
+      FP.api.deleteInvitation(item.slug, item.key).then(function(){ FP.mine.remove(item.slug); render(); }, function(e){
+        if(e && e.forbidden){ FP.mine.remove(item.slug); render(); return; } // déjà supprimé ailleurs
+        b.disabled = false; b.classList.remove('confirm'); b.textContent = 'Supprimer';
+        $('dash-state').textContent = FP.userError(e);
+      });
+    });
+    return b;
+  }
+
   function card(item, s){
     var c = el('article', 'fp-card');
     if(!s || s.invalid){
@@ -77,20 +97,13 @@
     var main = el('a', 'btn-main', 'Voir les réponses'); main.href = link('admin.html', item.slug, item.key);
     var pub = el('a', null, 'Voir le faire-part'); pub.href = link('invitation.html', item.slug); pub.target = '_blank'; pub.rel = 'noopener';
     var edit = el('a', null, 'Modifier'); edit.href = link('index.html', item.slug, item.key);
-    acts.appendChild(main); acts.appendChild(pub); acts.appendChild(edit); acts.appendChild(removeBtn(item));
+    acts.appendChild(main); acts.appendChild(pub); acts.appendChild(edit); acts.appendChild(deleteBtn(item));
     c.appendChild(acts);
     return c;
   }
 
   // ---------- Espace testeur ----------
   var tester = FP.tester.token(), spaceMsg = '';
-  function showSpace(name){
-    $('space-box').hidden = false;
-    $('space-link').value = FP.tester.link();
-    $('dash-title').textContent = 'Mes faire-part';
-    $('dash-sub').textContent = 'Espace de ' + String(name || '').slice(0, 80) + ' · choisissez un faire-part pour voir ses réponses.';
-    $('dash-hint').textContent = 'Vos faire-part sont enregistrés dans votre espace : votre lien personnel les retrouve sur n’importe quel appareil.';
-  }
   // Fusionne l'espace (serveur) et la liste de ce navigateur, dans les deux sens : un faire-part créé ici avant
   // d'ouvrir le lien personnel rejoint aussi l'espace. En cas d'échec réseau, on affiche la liste locale.
   function syncSpace(){
@@ -101,7 +114,6 @@
         spaceMsg = 'Ce lien personnel n’est plus valide : demandez-en un nouveau.';
         return;
       }
-      showSpace(ws.name);
       var remote = {};
       (Array.isArray(ws.items) ? ws.items : []).forEach(function(it){
         if(it && typeof it.slug === 'string' && typeof it.key === 'string' && FP.mine.add(it.slug, it.key) !== false) remote[it.slug] = true;
@@ -110,25 +122,6 @@
         .map(function(x){ return FP.tester.attach(x.slug, x.key); }));
     }).catch(function(){});
   }
-  $('copy-space').addEventListener('click', function(){
-    var b = this, input = $('space-link');
-    var ok = function(){ b.textContent = 'Copié ✓'; setTimeout(function(){ b.textContent = 'Copier'; }, 1500); };
-    if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(input.value).then(ok, function(){ input.focus(); input.select(); });
-    else { input.focus(); input.select(); }
-  });
-  $('space-link').addEventListener('focus', function(){ this.select(); });
-  // Ordinateur partagé : on oublie le lien ET la liste sur cet appareil (tout reste dans l'espace, côté serveur).
-  $('leave-space').addEventListener('click', function(){
-    var b = this;
-    if(!b.classList.contains('confirm')){
-      b.classList.add('confirm'); b.textContent = 'Confirmer : oublier l’espace sur cet appareil ?';
-      setTimeout(function(){ if(b.isConnected){ b.classList.remove('confirm'); b.textContent = 'Quitter l’espace sur cet appareil'; } }, 4000);
-      return;
-    }
-    FP.tester.forget(); FP.mine.list().forEach(function(x){ FP.mine.remove(x.slug); });
-    location.replace('admin.html');
-  });
-
   function load(){
     if(tester){ $('dash-state').textContent = 'Chargement…'; $('dash-empty').hidden = true; $('dash-head').hidden = true; }
     syncSpace().then(render);
@@ -139,8 +132,8 @@
     // Testeur sans faire-part : page d'accueil avec une seule action (créer le premier), sans encart ni liste.
     var welcome = !!tester && !items.length;
     $('welcome').hidden = !welcome;
-    $('dash-head').hidden = $('dash-hint').hidden = welcome;
-    if(tester) $('space-box').hidden = welcome;
+    $('dash-head').hidden = welcome;
+    $('dash-hint').hidden = welcome || !!tester; // la note « ce navigateur uniquement » ne concerne pas les testeurs
     $('dash-empty').hidden = welcome || items.length > 0;
     if(!items.length){ st.textContent = welcome ? '' : spaceMsg; return; }
     st.textContent = 'Chargement…';

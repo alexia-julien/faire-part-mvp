@@ -22,7 +22,7 @@ Chaque testeur reçoit un **lien personnel** (`admin.html#t=<jeton>`) qui retrou
 - à la première ouverture, le lien est mémorisé dans le navigateur ; tout faire-part **créé** ou **ouvert via son lien privé** ensuite est rattaché automatiquement à l'espace (ceux déjà présents dans « Mes faire-part » aussi) ;
 - à la fin (bouton « Terminer »), l'écran ne propose que : copier le lien des invités, ouvrir le faire-part, le modifier, revenir à l'espace. Sans espace testeur, le lien privé et son avertissement restent affichés (c'est alors le seul moyen de revenir) ;
 - tant que l'espace est vide, la page d'accueil n'affiche qu'une action : « Créer mon premier faire-part » (ni encart du lien, ni liste) ;
-- « Retirer de la liste » retire aussi le faire-part de l'espace (sans le supprimer) ; « Quitter l'espace sur cet appareil » oublie le lien sur un ordinateur partagé.
+- l'espace ne sert qu'à gérer les faire-part : voir les réponses, voir, modifier, **supprimer** (définitif, réponses comprises, en deux clics) et créer un nouveau faire-part. Le lien personnel n'y est pas réaffiché : c'est celui que le testeur a reçu.
 
 Créer un lien testeur (SQL Editor de Supabase) :
 
@@ -67,9 +67,9 @@ Si l'URL du projet Supabase change, mettre à jour **aussi** la CSP (`connect-sr
 Sécurité : voir [SECURITY.md](SECURITY.md) (modèle de menace, protections, limites connues).
 
 ## Tests
-`python3 tests/e2e.py` (prérequis : `pip install playwright pillow`) rejoue 207 vérifications dans un navigateur headless, en mode local : parcours complet, validations, brouillon, photos, ambiances et réglages de style, intros (enveloppe, monogramme, mouvement réduit), sections, RSVP enrichi, suivi (filtres, tri, recherche, régimes, copie des emails, CSV, cartes mobiles), modification, anciens faire-part, agenda (fuseaux horaires), sécurité (XSS, config forgée, clickjacking), espaces testeurs, mobile et contrastes des 8 palettes. Captures dans `tests/out/`.
+`python3 tests/e2e.py` (prérequis : `pip install playwright pillow`) rejoue 206 vérifications dans un navigateur headless, en mode local : parcours complet, validations, brouillon, photos, ambiances et réglages de style, intros (enveloppe, monogramme, mouvement réduit), sections, RSVP enrichi, suivi (filtres, tri, recherche, régimes, copie des emails, CSV, cartes mobiles), modification, anciens faire-part, agenda (fuseaux horaires), sécurité (XSS, config forgée, clickjacking), espaces testeurs, mobile et contrastes des 8 palettes. Captures dans `tests/out/`.
 
-`supabase/tests.sql` teste la base elle-même (62 vérifications, tout est annulé à la fin) : à coller dans le SQL Editor après chaque changement du schéma.
+`supabase/tests.sql` teste la base elle-même (66 vérifications, tout est annulé à la fin) : à coller dans le SQL Editor après chaque changement du schéma.
 
 ## Comportements à connaître
 - **Brouillon** : la saisie est sauvegardée dans le navigateur ; un rechargement ne fait rien perdre.

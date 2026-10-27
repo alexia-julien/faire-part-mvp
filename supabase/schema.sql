@@ -330,7 +330,19 @@ grant execute on function public.tester_workspace(text) to anon;
 grant execute on function public.tester_attach(text, text, text) to anon;
 grant execute on function public.tester_detach(text, text) to anon;
 
--- Seules ces 10 fonctions sont appelables depuis le navigateur (les 7 ci-dessous + les 3 des espaces testeurs).
+-- Suppression définitive d'un faire-part (clé privée requise) : ses réponses et son rattachement aux espaces testeurs
+-- partent avec lui (on delete cascade). Renvoie false si la clé est mauvaise. 120 appels / heure / IP.
+create or replace function public.delete_invitation(p_slug text, p_key text)
+returns boolean language plpgsql security definer set search_path = public, extensions as $$
+begin
+  perform private.rate_limit('delete', 120);
+  delete from invitations where slug = p_slug and key_hash = crypt(coalesce(p_key, ''), key_hash);
+  return found;
+end $$;
+revoke execute on function public.delete_invitation(text, text) from public, authenticated;
+grant execute on function public.delete_invitation(text, text) to anon;
+
+-- Seules ces 11 fonctions sont appelables depuis le navigateur (les 7 ci-dessous + delete_invitation + les 3 des espaces testeurs).
 revoke execute on function public.summarize_invitations(jsonb) from public;
 grant execute on function public.summarize_invitations(jsonb) to anon;
 revoke execute on function public.summarize_invitations(jsonb) from authenticated;
