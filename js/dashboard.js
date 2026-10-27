@@ -133,7 +133,6 @@
     var welcome = !!tester && !items.length;
     $('welcome').hidden = !welcome;
     $('dash-head').hidden = welcome;
-    $('dash-hint').hidden = welcome || !!tester; // la note « ce navigateur uniquement » ne concerne pas les testeurs
     $('dash-empty').hidden = welcome || items.length > 0;
     if(!items.length){ st.textContent = welcome ? '' : spaceMsg; return; }
     st.textContent = 'Chargement…';

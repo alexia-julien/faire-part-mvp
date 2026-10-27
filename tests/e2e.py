@@ -454,7 +454,7 @@ try:
     check("espace vide : page d'accueil avec une seule action, créer le premier faire-part",
           t1.evaluate("[...document.querySelectorAll('#dashboard a, #dashboard button')].filter(e=>e.offsetParent).map(e=>e.textContent)") == ['Créer mon premier faire-part'])
     check("espace vide : ni encart du lien personnel, ni liste, ni note", not t1.is_visible('#dash-empty')
-          and not t1.is_visible('#dash-head') and not t1.is_visible('#dash-hint'))
+          and not t1.is_visible('#dash-head'))
     t1.screenshot(path=OUT + "/tester-welcome.png", full_page=True)
     t1.goto(BASE + "/index.html")
     check("onboarding d'un testeur : lien « Mon espace »", t1.is_visible('#mine-link') and t1.inner_text('#mine-link') == 'Mon espace')
@@ -476,7 +476,7 @@ try:
     check("ouvrir un lien privé dans l'espace : faire-part rattaché", db_get(t1)['testers'][TOK]['items'].get(slug) == key)
     t1.goto(BASE + "/admin.html"); t1.wait_for_selector('.fp-card')
     check("espace avec faire-part : liste et bouton « Créer un faire-part », plus de page d'accueil", t1.is_visible('#dash-head') and not t1.is_visible('#welcome'))
-    check("espace : plus de bloc « Votre lien personnel » ni de note", t1.locator('#space-box, #space-link, #leave-space').count() == 0 and not t1.is_visible('#dash-hint'))
+    check("espace : plus de bloc « Votre lien personnel » ni de note", t1.locator('#space-box, #space-link, #leave-space, #dash-hint').count() == 0)
     # Autre appareil : rien en local, seulement le lien personnel. (En local, la « base » est copiée pour simuler le serveur.)
     t2 = watch(newctx(b, viewport={"width": 1280, "height": 900}).new_page(), "tester-2")
     t2.goto(BASE + "/index.html"); db_put(t2, db_get(t1))
