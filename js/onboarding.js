@@ -338,21 +338,12 @@
     $('public-link').value = l.pub; $('public-open').href = l.pub;
     var ed = new URL('index.html', location.href); ed.search = '?f=' + slug; ed.hash = 'k=' + key;
     $('edit-again').href = ed.href;
-    $('admin-link').value = l.adm;
     $('done-time').textContent = editing ? '' : duration(seconds);
-    // Testeur : le faire-part rejoint son espace, qui suffit pour le retrouver. Sinon, le lien privé reste affiché.
-    $('admin-card').hidden = tester;
     $('go-mine').textContent = tester ? 'Retour à mon espace' : 'Voir mes faire-part';
     $('done-note').textContent = tester
       ? 'Pas besoin de le noter : ce faire-part et son lien restent disponibles dans votre espace, avec les réponses de vos invités.'
       : 'Vous le retrouverez aussi dans « Mes faire-part », sur cet appareil.';
-    if(!tester){
-      $('mail-admin').href = 'mailto:?subject=' + encodeURIComponent('Mon faire-part : lien privé') + '&body=' +
-        encodeURIComponent('Lien privé (suivi des réponses et modification), à ne pas partager :\n' + l.adm +
-                           '\n\nLien à envoyer aux invités :\n' + l.pub + '\n');
-    } else {
-      FP.tester.attach(slug, key).then(function(ok){ if(!ok) $('admin-card').hidden = false; }); // échec : on garde le lien privé
-    }
+    if(tester) FP.tester.attach(slug, key); // le faire-part rejoint l'espace du testeur
     FP.mine.add(slug, key); // retrouvable ensuite dans « Mes faire-part »
     published = true; clearTimeout(draftTimer); storeDel(DRAFT_KEY);
     window.scrollTo({ top: 0 }); $('done-title').focus({ preventScroll: true });
@@ -399,7 +390,7 @@
       else fallback();
     });
   });
-  ['public-link', 'admin-link'].forEach(function(id){ $(id).addEventListener('focus', function(){ this.select(); }); });
+  ['public-link'].forEach(function(id){ $(id).addEventListener('focus', function(){ this.select(); }); });
 
   // ---------- Démarrage : modification via lien privé, brouillon, ou nouveau faire-part ----------
   bindInputs();

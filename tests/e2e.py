@@ -224,11 +224,11 @@ try:
     check("mention de confidentialité adaptée aux coordonnées", 'coordonnées' in pg.inner_text('#preview .privacy'))
     check("bouton final : « Terminer »", pg.inner_text('#publish') == 'Terminer')
     pg.click('#publish'); pg.wait_for_selector('#done:not([hidden])')
-    pub, adm = pg.input_value('#public-link'), pg.input_value('#admin-link')
-    check("fin sans espace testeur : lien privé conservé, avec l'avertissement", pg.is_visible('#admin-card') and 'si vous le perdez' in pg.inner_text('#admin-card')
+    pub = pg.input_value('#public-link')
+    check("fin sans espace testeur : plus de carte « lien privé », retour vers « Mes faire-part »", pg.locator('#admin-card, #admin-link, #mail-admin').count() == 0
           and pg.inner_text('#go-mine') == 'Voir mes faire-part' and pg.locator('#share-btn').count() == 0)
     pg.screenshot(path=OUT + "/done.png", full_page=True)
-    slug = pub.split('f=')[1]; key = adm.split('#k=')[1]
+    slug = pub.split('f=')[1]; key = pg.get_attribute('#edit-again', 'href').split('#k=')[1]; adm = BASE + '/admin.html?f=' + slug + '#k=' + key
     check("publication : lien public et lien privé", re.fullmatch(r'alexia-julien-[a-z0-9]{8}', slug) and re.fullmatch(r'[a-z0-9]{24}', key))
     stored = db_get(pg)['inv'][slug]['config']
     check("config publiée : style, sections, RSVP, fuseau", stored['theme'] == 'rose' and stored['font'] == 'romantique' and stored['intro'] == 'enveloppe'
@@ -459,12 +459,12 @@ try:
     t1.goto(BASE + "/index.html")
     check("onboarding d'un testeur : lien « Mon espace »", t1.is_visible('#mine-link') and t1.inner_text('#mine-link') == 'Mon espace')
     fill_basics(t1, 'Inès', 'Hugo', '2027-06-12', 'Château Test'); t1.click('#next'); t1.click('#next'); t1.click('#publish'); t1.wait_for_selector('#done:not([hidden])')
-    tslug = t1.input_value('#public-link').split('f=')[1]; tkey = t1.input_value('#admin-link').split('#k=')[1]
+    tslug = t1.input_value('#public-link').split('f=')[1]; tkey = t1.get_attribute('#edit-again', 'href').split('#k=')[1]
     time.sleep(0.3)
     vis = t1.evaluate("[...document.querySelectorAll('#done a, #done button')].filter(e=>e.offsetParent).map(e=>e.textContent)")
     check("fin testeur : seulement copier, ouvrir, modifier et retour à l'espace", vis == ['Copier', 'Ouvrir le faire-part', 'Modifier le faire-part', 'Retour à mon espace'], vis)
     check("fin testeur : le lien se retrouvera dans l'espace", 'disponibles dans votre espace' in t1.inner_text('#done-note'))
-    check("fin testeur : plus de lien privé, de « Partager… » ni d'en-tête", not t1.is_visible('#admin-card') and not t1.is_visible('.hello') and t1.locator('#share-btn').count() == 0)
+    check("fin testeur : plus de lien privé, de « Partager… » ni d'en-tête", t1.locator('#admin-card').count() == 0 and not t1.is_visible('.hello') and t1.locator('#share-btn').count() == 0)
     check("fin testeur : « Modifier » rouvre ce faire-part, « Retour » mène à l'espace",
           t1.get_attribute('#edit-again', 'href').endswith('index.html?f=' + tslug + '#k=' + tkey) and t1.get_attribute('#go-mine', 'href') == 'admin.html')
     wait_until(lambda: tslug in db_get(t1)['testers'][TOK]['items'])

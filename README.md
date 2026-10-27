@@ -20,7 +20,7 @@ La clé privée est dans le fragment d'URL (`#k=…`), donc jamais envoyée au s
 ## Espaces testeurs (wedding planners)
 Chaque testeur reçoit un **lien personnel** (`admin.html#t=<jeton>`) qui retrouve **tous** ses faire-part, sur n'importe quel appareil, sans compte :
 - à la première ouverture, le lien est mémorisé dans le navigateur ; tout faire-part **créé** ou **ouvert via son lien privé** ensuite est rattaché automatiquement à l'espace (ceux déjà présents dans « Mes faire-part » aussi) ;
-- à la fin (bouton « Terminer »), l'écran ne propose que : copier le lien des invités, ouvrir le faire-part, le modifier, revenir à l'espace. Sans espace testeur, le lien privé et son avertissement restent affichés (c'est alors le seul moyen de revenir) ;
+- à la fin (bouton « Terminer »), l'écran ne propose que : copier le lien des invités, ouvrir le faire-part, le modifier, revenir à l'espace. Le lien privé n'est plus affiché ;
 - tant que l'espace est vide, la page d'accueil n'affiche qu'une action : « Créer mon premier faire-part » (ni encart du lien, ni liste) ;
 - l'espace ne sert qu'à gérer les faire-part : voir les réponses, voir, modifier, **supprimer** (définitif, réponses comprises, en deux clics) et créer un nouveau faire-part. Le lien personnel n'y est pas réaffiché : c'est celui que le testeur a reçu.
 
