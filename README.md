@@ -21,6 +21,7 @@ La clé privée est dans le fragment d'URL (`#k=…`), donc jamais envoyée au s
 Chaque testeur reçoit un **lien personnel** (`admin.html#t=<jeton>`) qui retrouve **tous** ses faire-part, sur n'importe quel appareil, sans compte :
 - à la première ouverture, le lien est mémorisé dans le navigateur ; tout faire-part **créé** ou **ouvert via son lien privé** ensuite est rattaché automatiquement à l'espace (ceux déjà présents dans « Mes faire-part » aussi) ;
 - à la publication, la carte « Votre lien privé (à garder précieusement) » devient **« Retrouvez-le dans votre espace »** (le lien privé reste affiché, pour le transmettre aux mariés) ;
+- tant que l'espace est vide, la page d'accueil n'affiche qu'une action : « Créer mon premier faire-part » (ni encart du lien, ni liste) ;
 - « Retirer de la liste » retire aussi le faire-part de l'espace (sans le supprimer) ; « Quitter l'espace sur cet appareil » oublie le lien sur un ordinateur partagé.
 
 Créer un lien testeur (SQL Editor de Supabase) :
@@ -66,7 +67,7 @@ Si l'URL du projet Supabase change, mettre à jour **aussi** la CSP (`connect-sr
 Sécurité : voir [SECURITY.md](SECURITY.md) (modèle de menace, protections, limites connues).
 
 ## Tests
-`python3 tests/e2e.py` (prérequis : `pip install playwright pillow`) rejoue 202 vérifications dans un navigateur headless, en mode local : parcours complet, validations, brouillon, photos, ambiances et réglages de style, intros (enveloppe, monogramme, mouvement réduit), sections, RSVP enrichi, suivi (filtres, tri, recherche, régimes, copie des emails, CSV, cartes mobiles), modification, anciens faire-part, agenda (fuseaux horaires), sécurité (XSS, config forgée, clickjacking), espaces testeurs, mobile et contrastes des 8 palettes. Captures dans `tests/out/`.
+`python3 tests/e2e.py` (prérequis : `pip install playwright pillow`) rejoue 204 vérifications dans un navigateur headless, en mode local : parcours complet, validations, brouillon, photos, ambiances et réglages de style, intros (enveloppe, monogramme, mouvement réduit), sections, RSVP enrichi, suivi (filtres, tri, recherche, régimes, copie des emails, CSV, cartes mobiles), modification, anciens faire-part, agenda (fuseaux horaires), sécurité (XSS, config forgée, clickjacking), espaces testeurs, mobile et contrastes des 8 palettes. Captures dans `tests/out/`.
 
 `supabase/tests.sql` teste la base elle-même (62 vérifications, tout est annulé à la fin) : à coller dans le SQL Editor après chaque changement du schéma.
 

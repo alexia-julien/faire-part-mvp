@@ -130,14 +130,19 @@
   });
 
   function load(){
-    if(tester){ $('dash-state').textContent = 'Chargement…'; $('dash-empty').hidden = true; }
+    if(tester){ $('dash-state').textContent = 'Chargement…'; $('dash-empty').hidden = true; $('dash-head').hidden = true; }
     syncSpace().then(render);
   }
   function render(){
     var items = FP.mine.list(), box = $('fp-cards'), st = $('dash-state');
     box.innerHTML = '';
-    $('dash-empty').hidden = items.length > 0;
-    if(!items.length){ st.textContent = spaceMsg; return; }
+    // Testeur sans faire-part : page d'accueil avec une seule action (créer le premier), sans encart ni liste.
+    var welcome = !!tester && !items.length;
+    $('welcome').hidden = !welcome;
+    $('dash-head').hidden = $('dash-hint').hidden = welcome;
+    if(tester) $('space-box').hidden = welcome;
+    $('dash-empty').hidden = welcome || items.length > 0;
+    if(!items.length){ st.textContent = welcome ? '' : spaceMsg; return; }
     st.textContent = 'Chargement…';
     FP.api.summarize(items.map(function(x){ return { slug: x.slug, key: x.key }; })).then(function(list){
       var by = {};

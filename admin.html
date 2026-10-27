@@ -18,7 +18,7 @@
 
   <!-- Écran 1 : la liste des faire-part -->
   <section id="dashboard" hidden aria-labelledby="dash-title">
-    <div class="dash-head">
+    <div class="dash-head" id="dash-head">
       <div>
         <h1 id="dash-title">Mes faire-part</h1>
         <p class="muted admin-sub" id="dash-sub">Choisissez un faire-part pour voir ses réponses.</p>
@@ -33,6 +33,29 @@
     </div>
     <p id="dash-state" class="muted" role="status"></p>
     <div class="fp-cards" id="fp-cards"></div>
+    <!-- Testeur sans faire-part : une seule action, créer le premier -->
+    <div class="welcome" id="welcome" hidden>
+      <svg class="welcome-art" viewBox="0 0 240 170" aria-hidden="true" focusable="false">
+        <rect x="58" y="14" width="124" height="104" rx="6" fill="#FFFFFF" stroke="#E7E0D2"/>
+        <text x="120" y="56" text-anchor="middle" font-family="Cormorant Garamond, Georgia, serif" font-size="22" fill="#3A362E">A <tspan fill="#CE968C">&amp;</tspan> J</text>
+        <line x1="104" y1="68" x2="136" y2="68" stroke="#8C9B7C"/>
+        <text x="120" y="86" text-anchor="middle" font-family="Mulish, sans-serif" font-size="8" letter-spacing="2" fill="#6B6559">7 · 08 · 2027</text>
+        <path d="M30 70 L120 128 L210 70 L210 156 Q210 160 206 160 L34 160 Q30 160 30 156 Z" fill="#EFE8DA" stroke="#E0D6C3"/>
+        <path d="M30 156 L104 112 M210 156 L136 112" stroke="#E0D6C3" fill="none"/>
+        <path d="M30 70 L120 128 L210 70" fill="none" stroke="#E0D6C3"/>
+        <circle cx="120" cy="128" r="13" fill="#5F6E4E"/>
+        <path d="M120 134 C114 130 112 126 114.5 123.5 C116.5 121.5 119 122.5 120 124.5 C121 122.5 123.5 121.5 125.5 123.5 C128 126 126 130 120 134 Z" fill="#F6F2EA"/>
+      </svg>
+      <h1 id="welcome-title">Votre premier <span class="nowrap">faire-part,</span> <span class="nowrap">en 3 minutes</span></h1>
+      <p class="welcome-lead">Les prénoms, la date et le lieu suffisent : tout le reste est déjà prêt. Les réponses des invités arrivent ensuite ici, au même endroit.</p>
+      <ul class="welcome-points">
+        <li>Modifiable à tout moment</li>
+        <li>Réponses des invités intégrées</li>
+        <li>Aucun compte à créer</li>
+      </ul>
+      <a class="btn-main btn-xl" href="index.html">Créer mon premier faire-part</a>
+    </div>
+
     <div class="empty-box" id="dash-empty" hidden>
       <h2>Aucun faire-part pour l’instant</h2>
       <p class="muted">Créez votre premier faire-part en quelques minutes : il apparaîtra ici automatiquement.</p>
