@@ -1,4 +1,4 @@
--- Tests de la base (47 vérifications), à exécuter dans Supabase > SQL Editor (ou via le connecteur) après chaque changement de schema.sql.
+-- Tests de la base (62 vérifications), à exécuter dans Supabase > SQL Editor (ou via le connecteur) après chaque changement de schema.sql.
 -- Tout s'exécute dans une transaction qui est TOUJOURS annulée à la fin : aucune donnée de test ne reste.
 -- Le résultat s'affiche dans un message d'erreur volontaire « RESULTATS » : une ligne PASS ou FAIL par vérification.
 -- Les tests se placent dans la peau du rôle « anon » (le navigateur d'un visiteur), pas du propriétaire de la base.
@@ -11,8 +11,12 @@ declare
   v_key  text := 'abcdefghijklmnopqrstuvwx';
   v_bad  text := 'zzzzzzzzzzzzzzzzzzzzzzzz';
   v_id bigint;
+  v_tok text; v_tok2 text;
 begin
   perform set_config('request.headers', '{}', true);
+  v_tok := private.create_tester('QA testeur');  -- comme le propriétaire, depuis le SQL Editor
+  v_tok2 := private.create_tester('QA testeur désactivé');
+  update private.testers set disabled = true where token_hash = encode(extensions.digest(v_tok2, 'sha256'), 'hex');
   set local role anon;
 
   -- Accès direct interdit
@@ -85,6 +89,30 @@ begin
   v := public.list_rsvps(v_slug, v_key);
   r := r || case when ok and jsonb_array_length(v) = 2 then E'PASS suppression avec la bonne clé\n' else E'FAIL suppression avec la bonne clé\n' end;
 
+  -- Espaces testeurs (lien personnel d'un wedding planner)
+  begin perform 1 from private.testers limit 1; r := r || E'FAIL lecture directe des testeurs autorisée\n';
+  exception when insufficient_privilege then r := r || E'PASS lecture directe des testeurs refusée\n'; end;
+  begin perform private.create_tester('pirate'); r := r || E'FAIL création de testeur possible depuis le navigateur\n';
+  exception when insufficient_privilege then r := r || E'PASS création de testeur impossible depuis le navigateur\n'; end;
+  r := r || case when public.tester_workspace('mauvaisjeton') is null and public.tester_workspace(repeat('a', 32)) is null and public.tester_workspace(null) is null
+    then E'PASS espace : jeton mal formé ou inconnu → null\n' else E'FAIL espace : jeton invalide accepté\n' end;
+  r := r || case when public.tester_workspace(v_tok2) is null then E'PASS espace : testeur désactivé → null\n' else E'FAIL espace : testeur désactivé accepté\n' end;
+  v := public.tester_workspace(v_tok);
+  r := r || case when v->>'name' = 'QA testeur' and jsonb_array_length(v->'items') = 0 then E'PASS espace : bon jeton → nom, aucun faire-part\n' else 'FAIL espace vide : ' || coalesce(v::text, 'null') || E'\n' end;
+  r := r || case when not public.tester_attach(v_tok, v_slug, v_bad) then E'PASS rattachement refusé avec une mauvaise clé de faire-part\n' else E'FAIL rattachement avec mauvaise clé\n' end;
+  r := r || case when not public.tester_attach(repeat('b', 32), v_slug, v_key) then E'PASS rattachement refusé avec un mauvais jeton\n' else E'FAIL rattachement avec mauvais jeton\n' end;
+  r := r || case when not public.tester_attach(v_tok2, v_slug, v_key) then E'PASS rattachement refusé pour un testeur désactivé\n' else E'FAIL rattachement testeur désactivé\n' end;
+  r := r || case when public.tester_attach(v_tok, v_slug, v_key) and public.tester_attach(v_tok, v_slug, v_key) then E'PASS rattachement accepté (et idempotent)\n' else E'FAIL rattachement\n' end;
+  v := public.tester_workspace(v_tok);
+  r := r || case when jsonb_array_length(v->'items') = 1 and v->'items'->0->>'slug' = v_slug and v->'items'->0->>'key' = v_key
+    then E'PASS espace : le faire-part et sa clé sont retrouvés\n' else 'FAIL espace après rattachement : ' || coalesce(v::text, 'null') || E'\n' end;
+  r := r || case when (public.list_rsvps(v->'items'->0->>'slug', v->'items'->0->>'key')) is not null then E'PASS la clé retrouvée ouvre bien les réponses\n' else E'FAIL clé retrouvée inutilisable\n' end;
+  r := r || case when not public.tester_detach(v_bad || 'zzzzzzzz', v_slug) then E'PASS retrait refusé avec un mauvais jeton\n' else E'FAIL retrait avec mauvais jeton\n' end;
+  ok := public.tester_detach(v_tok, v_slug); v := public.tester_workspace(v_tok);
+  r := r || case when ok and jsonb_array_length(v->'items') = 0 and public.get_invitation(v_slug) is not null
+    then E'PASS retrait de l''espace (le faire-part, lui, existe toujours)\n' else E'FAIL retrait de l''espace\n' end;
+  perform public.tester_attach(v_tok, v_slug, v_key);
+
   -- Limitation de débit : 10 créations par heure et par IP
   perform set_config('request.headers', '{"cf-connecting-ip":"203.0.113.7"}', true);
   for i in 1..12 loop
@@ -133,6 +161,9 @@ begin
   exception when others then r := r || case when sqlerrm = 'invalid data' then E'PASS résumé : paramètre non tableau refusé\n' else 'FAIL résumé objet : ' || sqlerrm || E'\n' end; end;
 
   reset role;
+  r := r || case when exists (select 1 from private.tester_invitations where position(convert_to(v_key, 'UTF8') in key_enc) > 0)
+    then E'FAIL clé de faire-part stockée en clair dans l''espace\n' else E'PASS clés des faire-part chiffrées dans l''espace (jamais en clair)\n' end;
+  r := r || case when not exists (select 1 from private.testers where token_hash in (v_tok, v_tok2)) then E'PASS jeton testeur stocké uniquement sous forme de hash\n' else E'FAIL jeton stocké en clair\n' end;
   r := r || case when exists (select 1 from private.rate_limits where ip_hash = '203.0.113.7') then E'FAIL IP stockée en clair\n' else E'PASS IP stockée uniquement sous forme de hash\n' end;
 
   raise exception E'RESULTATS\n%', r;

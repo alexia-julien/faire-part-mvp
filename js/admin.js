@@ -1,7 +1,7 @@
 // Suivi des réponses : accessible uniquement avec le lien privé (la clé est dans le #fragment, jamais envoyée au serveur).
 (function(){
   'use strict';
-  var FP = window.FP, p = FP.params(), rows = [], cfg = null;
+  var FP = window.FP, p = FP.params(), rows = [], cfg = null, attached = false;
   var view = { filter: 'all', q: '', sort: 'date', dir: -1 };
   var $ = function(id){ return document.getElementById(id); };
   // Anti-clickjacking (GitHub Pages ne permet pas d'envoyer X-Frame-Options / frame-ancestors).
@@ -226,6 +226,7 @@
     Promise.all([FP.api.listRsvps(p.slug, p.key), FP.api.getInvitation(p.slug).catch(function(){ return null; })]).then(function(res){
       rows = (Array.isArray(res[0]) ? res[0] : []).filter(function(r){ return r && r.data && typeof r.data === 'object'; });
       FP.mine.add(p.slug, p.key); // clé valide : le faire-part rejoint « Mes faire-part » sur cet appareil
+      if(!attached){ attached = true; FP.tester.attach(p.slug, p.key); } // ... et l'espace du testeur s'il en a un
       if(res[1]){
         cfg = FP.sanitizeConfig(res[1]);
         $('admin-title').textContent = 'Réponses — ' + cfg.partner1 + ' & ' + cfg.partner2;
