@@ -20,8 +20,11 @@
 
   // ---------- Aperçu ----------
   var raf = 0, wide = window.matchMedia('(min-width: 980px)');
-  function previewVisible(){ return wide.matches || $('app').classList.contains('show-preview-on'); }
-  function introContainer(){ return wide.matches ? $('phone') : $('preview-pane'); }
+  // Sur téléphone, l'aperçu est un bandeau fixé en haut de l'écran (toujours visible) ; « Plein écran » l'agrandit.
+  function fullScreen(){ return $('app').classList.contains('show-preview-on'); }
+  function isBand(){ return !wide.matches && !fullScreen(); }
+  function previewVisible(){ return !$('app').classList.contains('done'); }
+  function introContainer(){ return !wide.matches && fullScreen() ? $('preview-pane') : $('phone'); }
   function preview(playIntro){
     if(playIntro){
       cancelAnimationFrame(raf); raf = 0;
@@ -39,10 +42,10 @@
   try{ if(localStorage.getItem('fp:device') === 'desktop') device = 'desktop'; }catch(e){}
   function fitPreview(){
     var pv = $('preview');
-    pv.style.zoom = device === 'desktop' ? String($('phone').clientWidth / DESKTOP_W) : '';
+    pv.style.zoom = device === 'desktop' && !isBand() ? String($('phone').clientWidth / DESKTOP_W) : '';
   }
   function applyDevice(){
-    var desk = device === 'desktop';
+    var desk = device === 'desktop' && !isBand(); // le bandeau montre toujours le rendu téléphone
     $('phone').classList.toggle('desktop', desk); $('app').classList.toggle('preview-desktop', desk);
     $$('[data-device]').forEach(function(b){ b.setAttribute('aria-pressed', String(b.getAttribute('data-device') === device)); });
     fitPreview();
@@ -55,6 +58,7 @@
     });
   });
   if(window.ResizeObserver) new ResizeObserver(fitPreview).observe($('phone'));
+  if(wide.addEventListener) wide.addEventListener('change', function(){ applyDevice(); preview(); });
   applyDevice();
 
   // ---------- Brouillon : sauvegardé automatiquement, restauré si la page est rechargée ----------
@@ -92,7 +96,10 @@
       '<span class="fp fp-mini" data-mini="preset:' + p.id + '" aria-hidden="true"></span>' +
       '<span class="preset-name">' + FP.esc(p.label) + '</span><span class="preset-sub">' + FP.esc(sub) + '</span>', 'preset'));
   });
-  FP.INTROS.forEach(function(x){ $('pick-intro').appendChild(radio('style-intro', x.id, FP.esc(x.label), 'pill')); });
+  FP.INTROS.forEach(function(x){
+    $('pick-intro').appendChild(radio('style-intro', x.id, '<span class="fp intro-demo" data-intro-demo="' + x.id + '" aria-hidden="true"></span>' +
+      '<span class="intro-name">' + FP.esc(x.label) + '</span><span class="intro-desc">' + FP.esc(x.hint) + '</span>', 'intro-card'));
+  });
   FP.PALETTES.forEach(function(x){
     var l = radio('style-theme', x.id, '<span class="sw3" aria-hidden="true"></span><span class="sw-name">' + FP.esc(x.label) + '</span>', 'swatch-card');
     // Nuancier en trois teintes (fond, accent, encre) : couleurs posées via le CSSOM, autorisé par la CSP.
@@ -108,7 +115,17 @@
   FP.FOILS.forEach(function(x){
     $('pick-foil').appendChild(radio('style-foil', x.id, '<span class="foil-chip foil-' + x.id + '" aria-hidden="true"></span><span class="foil-name">' + FP.esc(x.label) + '</span>', 'foil-card'));
   });
-  FP.SHAPES.forEach(function(x){ $('pick-shape').appendChild(radio('style-shape', x.id, '<span class="shape shape-' + x.id + '" aria-hidden="true"></span>' + FP.esc(x.label), 'pill')); });
+  FP.SHAPES.forEach(function(x){
+    $('pick-shape').appendChild(radio('style-shape', x.id, '<span class="shape-demo shape-' + x.id + '" aria-hidden="true"><img alt=""></span><span class="shape-name">' + FP.esc(x.label) + '</span>', 'shape-card'));
+  });
+  // Démonstration de chaque introduction, aux couleurs et dans la police du faire-part
+  function introDemo(id, c){
+    var ini = FP.esc((c.partner1 || 'C').charAt(0).toUpperCase()) + '<span class="amp">&amp;</span>' + FP.esc((c.partner2 || 'H').charAt(0).toUpperCase());
+    if(id === 'enveloppe') return '<span class="id-stage"><span class="id-env"><span class="id-back"></span><span class="id-card"><span class="id-card-names">' +
+      FP.esc(c.partner1 || 'Camille') + ' <span class="amp">&amp;</span> ' + FP.esc(c.partner2 || 'Hugo') + '</span></span><span class="id-front"></span><span class="id-flap"></span><span class="id-seal">' + ini + '</span></span></span>';
+    if(id === 'monogramme') return '<span class="id-stage"><span class="id-mono"><span class="mono-letters">' + ini + '</span><span class="id-mono-date">' + FP.esc(FP.formatDate(c, false) || '7 août 2027') + '</span></span></span>';
+    return FP.miniHtml(c);
+  }
   // Miniatures : chaque ambiance et chaque ornement sont dessinés avec les prénoms et la date du couple.
   function refreshMinis(){
     var who = { partner1: state.partner1, partner2: state.partner2, date: state.date, time: state.time };
@@ -122,6 +139,8 @@
       FP.applyStyleAttrs(el, c);
       el.innerHTML = FP.miniHtml(c);
     });
+    var cur = FP.sanitizeConfig(state);
+    $$('[data-intro-demo]').forEach(function(el){ FP.applyStyleAttrs(el, cur); el.innerHTML = introDemo(el.getAttribute('data-intro-demo'), cur); });
     var names = (state.partner1 || 'Camille') + ' & ' + (state.partner2 || 'Hugo');
     $$('[data-sample]').forEach(function(el){ el.textContent = names; });
   }
@@ -266,6 +285,9 @@
       box.appendChild(d);
     });
     $('add-photo').hidden = state.photos.length + pendingPhotos >= MAX_PHOTOS;
+    // La forme ne s'applique qu'à la photo principale : le choix apparaît dès qu'il y a une photo, illustré avec elle.
+    $('shape-field').hidden = !state.photos.length;
+    $$('.shape-demo img').forEach(function(img){ if(state.photos[0]) img.src = state.photos[0]; else img.removeAttribute('src'); });
   }
   $('photo-input').addEventListener('change', function(e){
     var files = Array.prototype.slice.call(e.target.files).slice(0, Math.max(0, MAX_PHOTOS - state.photos.length - pendingPhotos));
@@ -355,8 +377,8 @@
   });
 
   // ---------- Aperçu mobile ----------
-  $('show-preview').addEventListener('click', function(){ $('app').classList.add('show-preview-on'); $('close-preview').focus(); });
-  $('close-preview').addEventListener('click', function(){ $('app').classList.remove('show-preview-on'); preview(); $('show-preview').focus(); });
+  $('show-preview').addEventListener('click', function(){ $('app').classList.add('show-preview-on'); applyDevice(); preview(); $('close-preview').focus(); });
+  $('close-preview').addEventListener('click', function(){ $('app').classList.remove('show-preview-on'); applyDevice(); preview(); $('show-preview').focus(); });
   document.addEventListener('keydown', function(e){
     if(e.key === 'Escape' && $('app').classList.contains('show-preview-on') && !document.querySelector('#preview .fp-intro')) $('close-preview').click();
   });

@@ -138,7 +138,7 @@ details.more .chk{margin-bottom:0}
 
 /* Aperçu : plein écran sur mobile (bouton « Aperçu » dans la barre d'actions), colonne fixe sur ordinateur */
 .preview{display:none}
-.preview-btn{margin-right:auto}
+.expand-preview{display:none}
 .preview-bar{display:flex;gap:.5rem}
 .app.show-preview-on .preview{display:block;position:fixed;inset:0;z-index:30;background:var(--paper);overflow:auto}
 .app.show-preview-on .preview-bar{position:sticky;top:0;z-index:120;background:var(--sage-deep)}
@@ -169,7 +169,7 @@ body:has(.app.show-preview-on){overflow:hidden}
   .phone.desktop{flex:0 1 auto;aspect-ratio:16/10;border-width:1px;border-top-width:26px;border-radius:12px}
   .replay{color:var(--sage-deep);padding:.3rem .2rem;font-size:.85rem}
   .phone{flex:1;min-height:0;border:10px solid #2B2B2B;border-radius:34px;overflow:auto;background:#fff;box-shadow:0 20px 50px rgba(0,0,0,.18)}
-  .preview-btn,.close-preview{display:none!important}
+  .expand-preview,.close-preview{display:none!important}
   body:has(.app.show-preview-on){overflow:auto}
   .app.show-preview-on .preview{position:sticky;inset:auto;background:transparent;z-index:auto;display:flex}
   .app.show-preview-on .preview-bar{position:static;background:none}
@@ -474,3 +474,85 @@ details.more[open]{padding-bottom:1.1rem}
   .preset{flex:0 0 42%;scroll-snap-align:start}
   .style-tabs{-webkit-mask-image:linear-gradient(90deg,#000 82%,transparent);mask-image:linear-gradient(90deg,#000 82%,transparent)}
 }
+
+/* ============================================================ Aperçu toujours visible sur téléphone
+   Le panneau d'aperçu devient un bandeau fixé en haut : un petit téléphone avec le vrai rendu (375 px réduit),
+   qu'on peut faire défiler du doigt ; « Plein écran » l'agrandit (mode plein écran existant). */
+@media (max-width:979px){
+  .app:not(.show-preview-on) .preview{display:block;order:-1;position:sticky;top:0;z-index:25;height:clamp(220px,36svh,340px);
+    background:#E8E0CF;border-bottom:1px solid #DDD3BF;box-shadow:0 14px 26px -22px rgba(58,54,46,.6);overflow:hidden}
+  .app.done .preview{display:none!important}
+  .app:not(.show-preview-on) .phone{height:100%;overflow-y:auto;overflow-x:hidden;padding:14px 0 22px;scrollbar-width:none;overscroll-behavior:contain}
+  .app:not(.show-preview-on) .phone::-webkit-scrollbar{display:none}
+  .app:not(.show-preview-on) #preview{width:375px;zoom:.56;margin:0 auto;border-radius:34px;overflow:hidden;
+    box-shadow:0 0 0 12px #2B2B2B,0 30px 50px -20px rgba(58,54,46,.6)}
+  .app:not(.show-preview-on) .preview-bar{position:absolute;top:10px;left:10px;right:10px;z-index:3;display:flex;justify-content:space-between;align-items:flex-start;pointer-events:none}
+  .app:not(.show-preview-on) .preview-bar > *{pointer-events:auto}
+  .app:not(.show-preview-on) .preview-bar .replay[hidden] + .expand-preview{margin-left:auto}
+  .app:not(.show-preview-on) .preview-bar .seg.device,.app:not(.show-preview-on) .close-preview{display:none}
+  .app:not(.show-preview-on) .expand-preview,.app:not(.show-preview-on) .replay{display:inline-flex;align-items:center;gap:.35rem;border:1px solid rgba(58,54,46,.12);
+    background:rgba(255,255,255,.88);-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px);color:var(--ink);font:inherit;font-size:.7rem;font-weight:700;line-height:1.2;
+    padding:.4rem .6rem;max-width:84px;text-align:center;justify-content:center;white-space:normal;border-radius:999px;text-decoration:none;cursor:pointer;box-shadow:0 4px 12px -6px rgba(58,54,46,.45)}
+  .app:not(.show-preview-on) .replay[hidden]{display:none}
+  .app.show-preview-on .expand-preview{display:none}
+  /* Le formulaire défile sous le bandeau : les ancres et le focus ne se cachent pas derrière */
+  .panel{scroll-margin-top:clamp(220px,36svh,340px)}
+  .panel .f,.panel fieldset,.panel legend{scroll-margin-top:calc(clamp(220px,36svh,340px) + 12px)}
+}
+
+/* ============================================================ Introduction : démonstrations animées */
+.panel-hint{font-size:.82rem;color:var(--soft);margin:0 0 .7rem}
+.intro-cards{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem}
+.intro-card{position:relative;cursor:pointer;display:flex;flex-direction:column;gap:.3rem;background:var(--white);border:1px solid var(--line);border-radius:14px;padding:.4rem .4rem .65rem;
+  transition:border-color .15s,box-shadow .2s,background-color .2s,transform .12s var(--ease)}
+.intro-card input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.intro-card:hover{border-color:var(--sage)}
+.intro-card:active{transform:scale(.975)}
+.intro-card:has(input:checked){border-color:var(--sage-deep);background:#FCFDF9;box-shadow:0 0 0 3px rgba(95,110,78,.14)}
+.intro-card:has(input:focus-visible){outline:2px solid var(--sage-deep);outline-offset:2px}
+.intro-name{font-size:.8rem;font-weight:700;padding:0 .3rem}
+.intro-desc{font-size:.7rem;color:var(--soft);line-height:1.3;padding:0 .3rem}
+.fp.intro-demo{display:block;border-radius:9px;overflow:hidden;line-height:1.2;container-type:inline-size;box-shadow:0 6px 12px -10px rgba(58,54,46,.5)}
+.fp .id-stage{position:relative;display:flex;align-items:center;justify-content:center;aspect-ratio:4/5;background-color:var(--paper)}
+/* Enveloppe miniature (mêmes teintes que l'enveloppe du faire-part) */
+.fp .id-env{position:relative;display:block;width:78%;aspect-ratio:3/2;margin-top:18%}
+.fp .id-env > span{position:absolute;display:block}
+.fp .id-back{inset:0;border-radius:4px;background:color-mix(in srgb,var(--accent-deep) 70%,var(--accent))}
+.fp .id-card{left:7%;right:7%;top:6%;bottom:8%;z-index:2;border-radius:2px;background:var(--paper-2);display:flex!important;align-items:flex-start;justify-content:center;padding-top:9%}
+.fp .id-card-names{font-family:var(--names);font-size:calc(7.5cqw * var(--names-size));color:var(--ink);text-transform:var(--names-case);letter-spacing:var(--names-track);white-space:nowrap}
+.fp .id-card-names .amp{font-family:var(--display)}
+.fp .id-front{inset:0;z-index:3;border-radius:4px;background:color-mix(in srgb,var(--accent) 88%,#fff);clip-path:polygon(0 0,50% 54%,100% 0,100% 100%,0 100%)}
+.fp .id-flap{left:0;right:0;top:0;height:60%;z-index:4;background:color-mix(in srgb,var(--accent) 70%,#fff);clip-path:polygon(0 0,100% 0,50% 100%);transform-origin:top center}
+.fp .id-seal{left:50%;top:60%;z-index:5;width:28%;aspect-ratio:1;transform:translate(-50%,-50%);border-radius:50%;background:var(--btn-bg);color:var(--btn-fg);
+  display:flex!important;align-items:center;justify-content:center;font-family:var(--display);font-size:6cqw;box-shadow:0 2px 4px rgba(0,0,0,.25),inset 0 0 0 2px rgba(255,255,255,.18)}
+.fp .id-seal .amp{color:inherit;font-size:.8em;opacity:.85}
+/* Monogramme miniature */
+.fp .id-mono{display:flex;flex-direction:column;align-items:center;gap:6%}
+.fp .id-mono .mono-letters{font-size:24cqw;animation:none}
+.fp .id-mono-date{font-size:5cqw;letter-spacing:.2em;text-transform:uppercase;color:var(--accent-deep)}
+/* La démonstration se joue en boucle sur l'introduction choisie (et au survol) */
+.intro-card:has(input:checked) .id-flap,.intro-card:hover .id-flap{animation:id-flap 3.6s ease-in-out infinite}
+.intro-card:has(input:checked) .id-card,.intro-card:hover .id-card{animation:id-card 3.6s cubic-bezier(.2,.8,.2,1) infinite}
+.intro-card:has(input:checked) .id-seal,.intro-card:hover .id-seal{animation:id-seal 3.6s ease infinite}
+.intro-card:has(input:checked) .id-mono,.intro-card:hover .id-mono{animation:id-mono 3.6s ease infinite}
+@keyframes id-seal{0%,12%{opacity:1;transform:translate(-50%,-50%) scale(1)}22%,88%{opacity:0;transform:translate(-50%,-50%) scale(.6)}100%{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+@keyframes id-flap{0%,18%{transform:rotateX(0);z-index:4}34%,84%{transform:rotateX(180deg);z-index:1}100%{transform:rotateX(0);z-index:4}}
+@keyframes id-card{0%,30%{transform:none}52%,80%{transform:translateY(-58%)}96%,100%{transform:none}}
+@keyframes id-mono{0%{opacity:0;transform:scale(.92)}18%,70%{opacity:1;transform:none}88%,100%{opacity:0;transform:scale(1.05)}}
+
+/* Forme de la photo : la photo principale découpée dans chaque forme */
+.shapes{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:.5rem;max-width:420px}
+.shape-card{position:relative;cursor:pointer;display:flex;flex-direction:column;align-items:center;gap:.45rem;background:var(--white);border:1px solid var(--line);border-radius:14px;
+  padding:.7rem .5rem .55rem;font-size:.78rem;font-weight:700;transition:border-color .15s,box-shadow .2s,background-color .2s,transform .12s var(--ease)}
+.shape-card input{position:absolute;opacity:0;width:1px;height:1px;pointer-events:none}
+.shape-card:hover{border-color:var(--sage)}
+.shape-card:active{transform:scale(.975)}
+.shape-card:has(input:checked){border-color:var(--sage-deep);background:#FCFDF9;box-shadow:0 0 0 3px rgba(95,110,78,.14)}
+.shape-card:has(input:focus-visible){outline:2px solid var(--sage-deep);outline-offset:2px}
+.shape-demo{display:block;overflow:hidden;background:var(--sage);height:64px;box-shadow:0 6px 12px -8px rgba(58,54,46,.5)}
+.shape-demo img{display:block;width:100%;height:100%;object-fit:cover;object-position:50% 35%}
+.shape-demo.shape-arrondi{width:92px;border-radius:9px}
+.shape-demo.shape-arche{width:52px;border-radius:999px 999px 6px 6px}
+.shape-demo.shape-cercle{width:64px;border-radius:50%}
+
+@media (prefers-reduced-motion:reduce){.intro-card .id-flap,.intro-card .id-card,.intro-card .id-seal,.intro-card .id-mono{animation:none!important}}
