@@ -104,8 +104,9 @@
 
   // ---------- Espace testeur ----------
   var tester = FP.tester.token(), spaceMsg = '';
-  // Fusionne l'espace (serveur) et la liste de ce navigateur, dans les deux sens : un faire-part créé ici avant
-  // d'ouvrir le lien personnel rejoint aussi l'espace. En cas d'échec réseau, on affiche la liste locale.
+  // Fusionne l'espace (serveur) et la liste de ce navigateur : un faire-part créé ici HORS de tout espace, avant d'ouvrir
+  // le lien personnel, rejoint l'espace. Ceux d'un autre espace ouvert dans ce navigateur n'y entrent jamais.
+  // En cas d'échec réseau, on affiche la liste locale de cet espace.
   function syncSpace(){
     if(!tester) return Promise.resolve();
     return FP.api.testerWorkspace(tester).then(function(ws){
@@ -116,9 +117,9 @@
       }
       var remote = {};
       (Array.isArray(ws.items) ? ws.items : []).forEach(function(it){
-        if(it && typeof it.slug === 'string' && typeof it.key === 'string' && FP.mine.add(it.slug, it.key) !== false) remote[it.slug] = true;
+        if(it && typeof it.slug === 'string' && typeof it.key === 'string' && FP.mine.add(it.slug, it.key, tester, true) !== false) remote[it.slug] = true;
       });
-      return Promise.all(FP.mine.list().filter(function(x){ return !remote[x.slug]; })
+      return Promise.all(FP.mine.list().filter(function(x){ return !remote[x.slug] && (x.t === '' || x.t === tester); })
         .map(function(x){ return FP.tester.attach(x.slug, x.key); }));
     }).catch(function(){});
   }

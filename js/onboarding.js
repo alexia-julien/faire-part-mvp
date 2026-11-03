@@ -407,8 +407,8 @@
     $('done-note').textContent = tester
       ? 'Pas besoin de le noter : ce faire-part et son lien restent disponibles dans votre espace, avec les réponses de vos invités.'
       : 'Vous le retrouverez aussi dans « Mes faire-part », sur cet appareil.';
+    FP.mine.add(slug, key); // retrouvable ensuite dans « Mes faire-part » (rattaché à l'espace actif)
     if(tester) FP.tester.attach(slug, key); // le faire-part rejoint l'espace du testeur
-    FP.mine.add(slug, key); // retrouvable ensuite dans « Mes faire-part »
     published = true; clearTimeout(draftTimer); storeDel(DRAFT_KEY);
     window.scrollTo({ top: 0 }); $('done-title').focus({ preventScroll: true });
   }

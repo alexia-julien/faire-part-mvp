@@ -180,6 +180,9 @@
   FP.api = remote ? supa : local;
 
   // ---------- « Mes faire-part » : la liste des faire-part gérés depuis CE navigateur (pas de compte) ----------
+  // Chaque entrée retient l'espace testeur auquel elle appartient (champ t : jeton, '' = créé hors de tout espace).
+  // Un même navigateur peut ouvrir plusieurs liens personnels (ex. : Julien qui vérifie les liens envoyés) : un faire-part
+  // d'un espace ne doit JAMAIS être versé dans un autre. Les entrées anciennes (sans t) ne sont plus rattachées d'office.
   var MINE_KEY = 'fp:mine', SLUG_RE = /^[a-z0-9][a-z0-9-]{2,62}$/, KEY_RE = /^[a-z0-9]{16,64}$/;
   function mineRead(){
     var list = [];
@@ -196,13 +199,25 @@
     return list;
   }
   function mineWrite(list){ try{ localStorage.setItem(MINE_KEY, JSON.stringify(list)); return true; }catch(e){ return false; } }
+  function mineFind(slug){ var l = mineRead(); for(var i = 0; i < l.length; i++) if(l[i].slug === slug) return l[i]; return null; }
   FP.mine = {
-    list: mineRead,
-    add: function(slug, key){
+    // Avec un espace testeur actif : seulement ses faire-part (et ceux créés ici hors de tout espace, qui vont le rejoindre).
+    list: function(){
+      var t = FP.tester ? FP.tester.token() : '', l = mineRead();
+      return t ? l.filter(function(x){ return x.t === t || x.t === ''; }) : l;
+    },
+    all: mineRead,
+    find: mineFind,
+    // owner : jeton de l'espace (par défaut l'espace actif). Une entrée déjà rattachée à un AUTRE espace garde son propriétaire,
+    // sauf si owner est imposé (force = true : le serveur confirme que le faire-part est dans cet espace).
+    add: function(slug, key, owner, force){
       if(!SLUG_RE.test(slug) || !KEY_RE.test(key)) return false;
-      var list = mineRead().filter(function(x){ return x.slug !== slug; });
-      list.unshift({ slug: slug, key: key, addedAt: new Date().toISOString() });
-      return mineWrite(list.slice(0, 100));
+      var cur = FP.tester ? FP.tester.token() : '', l = mineRead(), prev = null;
+      l = l.filter(function(x){ if(x.slug === slug){ prev = x; return false; } return true; });
+      var t = typeof owner === 'string' ? owner : cur;
+      if(!force && prev && typeof prev.t === 'string' && prev.t !== '' && prev.t !== t) t = prev.t;
+      l.unshift({ slug: slug, key: key, t: t, addedAt: new Date().toISOString() });
+      return mineWrite(l.slice(0, 100));
     },
     remove: function(slug){
       mineWrite(mineRead().filter(function(x){ return x.slug !== slug; }));
@@ -225,10 +240,13 @@
       var u = new URL('admin.html', location.href); u.search = ''; u.hash = 't=' + t; return u.href;
     },
     // Rattache un faire-part à l'espace (silencieux : renvoie une promesse qui ne rejette jamais ; true si rattaché).
+    // Refusé si ce navigateur sait que le faire-part appartient à un AUTRE espace, ou s'il date d'avant ce suivi (sans t).
     attach: function(slug, key){
       var t = FP.tester.token();
       if(!t || !SLUG_RE.test(slug) || !KEY_RE.test(key)) return Promise.resolve(false);
-      return FP.api.testerAttach(t, slug, key).then(function(){ return true; }, function(){ return false; });
+      var e = mineFind(slug);
+      if(e && (typeof e.t !== 'string' || (e.t !== '' && e.t !== t))) return Promise.resolve(false);
+      return FP.api.testerAttach(t, slug, key).then(function(){ FP.mine.add(slug, key, t, true); return true; }, function(){ return false; });
     },
     forget: function(){ try{ localStorage.removeItem(TESTER_KEY); }catch(e){} }
   };

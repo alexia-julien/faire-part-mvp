@@ -532,6 +532,20 @@ try:
           tw.evaluate("document.documentElement.scrollWidth <= innerWidth") and tw.evaluate("document.querySelector('.btn-xl').getBoundingClientRect().bottom <= innerHeight"))
     tw.screenshot(path=OUT + "/tester-welcome-mobile.png")
     t1.goto(BASE + "/admin.html"); t1.wait_for_selector('.fp-card'); t1.screenshot(path=OUT + "/tester-space.png", full_page=True)
+    # Régression du 03/11/2026 : un même navigateur ouvre le lien d'un AUTRE testeur (ex. vérification des mails envoyés).
+    # Les faire-part du 1er espace ne doivent ni s'afficher ni être rattachés au 2e.
+    TOK2 = 'bcdefghijkmnpqrstuvwxyz234567892'
+    db = db_get(t1); db['testers'][TOK2] = {"name": "Agence 2", "items": {}}; db_put(t1, db)
+    t1.goto(BASE + "/index.html"); t1.goto(BASE + "/admin.html#t=" + TOK2); t1.wait_for_selector('#welcome:not([hidden])'); time.sleep(0.5)
+    check("2e lien personnel dans le même navigateur : espace vide, rien de rattaché",
+          db_get(t1)['testers'][TOK2]['items'] == {} and t1.locator('.fp-card').count() == 0)
+    t1.goto(BASE + "/index.html"); t1.goto(BASE + "/admin.html#t=" + TOK); t1.wait_for_selector('.fp-card')
+    check("retour au 1er lien : ses faire-part sont toujours là", t1.locator('.fp-card').count() >= 1 and db_get(t1)['testers'][TOK2]['items'] == {})
+    t4 = watch(newctx(b).new_page(), "tester-legacy"); t4.goto(BASE + "/index.html")
+    db = db_get(t1); db['testers'][TOK2] = {"name": "Agence 2", "items": {}}; db_put(t4, db)
+    t4.evaluate("(m)=>localStorage.setItem('fp:mine', JSON.stringify([m]))", {"slug": tslug, "key": tkey})
+    t4.goto(BASE + "/admin.html#t=" + TOK2); t4.wait_for_selector('#welcome:not([hidden])'); time.sleep(0.5)
+    check("ancienne entrée locale (sans espace connu) : pas rattachée d'office", db_get(t4)['testers'][TOK2]['items'] == {})
 
     print("\n== Agenda et fuseaux ==")
     with g.expect_download() as dl: g.click('[data-ics]')
