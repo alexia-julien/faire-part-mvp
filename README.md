@@ -13,6 +13,7 @@ Cette branche remplace les liens privés et les espaces testeurs par des **compt
 - **Base** : `supabase/comptes.sql` (étape 1, n'enlève rien : colonne `owner`, fonctions `account_*` réservées aux connectés), `supabase/tests-comptes.sql` (30 vérifications, annulées à la fin), puis `supabase/bascule.sql` (étape 2, **destructive** : supprime les faire-part sans compte, les fonctions à clé et les espaces testeurs). `schema.sql` et `tests.sql` décrivent l'état d'avant la bascule.
 - **À configurer dans Supabase avant la mise en ligne** : service d'envoi d'emails (SMTP), code `{{ .Token }}` dans les modèles « Magic Link » et « Confirm signup », Site URL et redirections autorisées (`https://maison-meli.com/**`), fournisseur Google.
 - **Ordre de bascule** : 1) `comptes.sql`, 2) configuration et essai de connexion, 3) fusion de `comptes` dans `dev` et `bascule.sql` au même moment.
+- **État au 12/11/2026** : étape 1 (`comptes.sql`) appliquée en production (migration `comptes_etape1`), `tests-comptes.sql` passé (30/30). Le Security Advisor signale les fonctions `account_*` appelables par les connectés : c'est voulu, chacune n'agit que sur le faire-part du compte. Les alertes « anon » sur les anciennes fonctions disparaissent avec `bascule.sql`.
 
 Autres pages : `index.html` (page d'accueil : conversion, SEO, GEO ; prénoms et ambiance transmis à l'éditeur dans le fragment d'URL), `confidentialite.html`, `404.html`, `robots.txt`, `sitemap.xml`, `llms.txt`, `img/og.png`.
 
