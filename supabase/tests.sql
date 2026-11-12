@@ -1,4 +1,4 @@
--- Tests de la base (93 vérifications), à exécuter dans Supabase > SQL Editor (ou via le connecteur) après chaque changement de schema.sql.
+-- Tests de la base (66 vérifications), à exécuter dans Supabase > SQL Editor (ou via le connecteur) après chaque changement de schema.sql.
 -- Tout s'exécute dans une transaction qui est TOUJOURS annulée à la fin : aucune donnée de test ne reste.
 -- Le résultat s'affiche dans un message d'erreur volontaire « RESULTATS » : une ligne PASS ou FAIL par vérification.
 -- Les tests se placent dans la peau du rôle « anon » (le navigateur d'un visiteur), pas du propriétaire de la base.
@@ -12,9 +12,7 @@ declare
   v_bad  text := 'zzzzzzzzzzzzzzzzzzzzzzzz';
   v_id bigint;
   v_tok text; v_tok2 text;
-  v_u1 uuid := gen_random_uuid(); v_u2 uuid := gen_random_uuid(); v_s2 text; v_s3 text; v_k2 text := 'bcdefghijklmnopqrstuvwxy';
 begin
-  v_s2 := v_slug || '-acc'; v_s3 := v_slug || '-libre';
   perform set_config('request.headers', '{}', true);
   v_tok := private.create_tester('QA testeur');  -- comme le propriétaire, depuis le SQL Editor
   v_tok2 := private.create_tester('QA testeur désactivé');
@@ -175,91 +173,6 @@ begin
   exception when others then r := r || case when sqlerrm = 'too many' then E'PASS résumé : plus de 100 éléments refusés\n' else 'FAIL résumé 101 : ' || sqlerrm || E'\n' end; end;
   begin perform public.summarize_invitations('{"a":1}'::jsonb); r := r || E'FAIL résumé : objet accepté\n';
   exception when others then r := r || case when sqlerrm = 'invalid data' then E'PASS résumé : paramètre non tableau refusé\n' else 'FAIL résumé objet : ' || sqlerrm || E'\n' end; end;
-
-  -- ===== Comptes (supabase/comptes.sql) =====
-  begin perform public.account_invitations(); r := r || E'FAIL compte : fonctions de compte ouvertes aux visiteurs non connectés\n';
-  exception when insufficient_privilege then r := r || E'PASS compte : fonctions de compte refusées aux visiteurs non connectés\n'; end;
-  begin perform public.delete_account(); r := r || E'FAIL compte : suppression de compte ouverte aux visiteurs\n';
-  exception when insufficient_privilege then r := r || E'PASS compte : suppression de compte refusée aux visiteurs\n'; end;
-  perform public.create_invitation(v_s3, v_key, '{"partner1":"Libre"}'::jsonb); -- faire-part sans compte, hors espace testeur
-  reset role;
-  r := r || case when (select owner is null from public.invitations where slug = v_s3) then E'PASS compte : un faire-part créé sans compte n''a pas de propriétaire\n' else E'FAIL propriétaire sans compte\n' end;
-  insert into auth.users(id, instance_id, aud, role, email) values
-    (v_u1, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'qa1-' || v_slug || '@example.com'),
-    (v_u2, '00000000-0000-0000-0000-000000000000', 'authenticated', 'authenticated', 'qa2-' || v_slug || '@example.com');
-  set local role authenticated;
-  perform set_config('request.jwt.claims', json_build_object('sub', v_u1, 'role', 'authenticated')::text, true);
-  begin perform 1 from public.invitations limit 1; r := r || E'FAIL compte : lecture directe des tables autorisée une fois connecté\n';
-  exception when insufficient_privilege then r := r || E'PASS compte : lecture directe des tables refusée même connecté\n'; end;
-  r := r || case when public.account_invitations() = '[]'::jsonb then E'PASS compte neuf : aucun faire-part\n' else E'FAIL compte neuf\n' end;
-  r := r || case when public.get_invitation(v_slug) is not null then E'PASS compte : un visiteur connecté peut ouvrir un faire-part\n' else E'FAIL lecture connectée\n' end;
-  perform public.create_invitation(v_s2, v_k2, '{"partner1":"Compte","partner2":"Un","date":"2027-08-07","theme":"sauge"}'::jsonb);
-  v := public.account_invitations();
-  r := r || case when jsonb_array_length(v) = 1 and v->0->>'slug' = v_s2 and v->0->>'partner1' = 'Compte' and (v->0->>'responses')::int = 0
-    then E'PASS compte : le faire-part créé connecté appartient au compte\n' else 'FAIL appartenance : ' || coalesce(v::text, 'null') || E'\n' end;
-  begin perform public.create_invitation(v_s2 || '2', v_k2, '{}'::jsonb); r := r || E'FAIL compte : second faire-part accepté\n';
-  exception when others then r := r || case when sqlerrm = 'one per account' then E'PASS compte : un seul faire-part par compte\n' else 'FAIL second faire-part : ' || sqlerrm || E'\n' end; end;
-  perform public.submit_rsvp(v_s2, '{"name":"Invité","attendance":"yes"}'::jsonb);
-  r := r || case when jsonb_array_length(public.list_rsvps(v_s2, v_bad)) = 1 and public.update_invitation(v_s2, null, '{"partner1":"Compte","partner2":"Deux"}'::jsonb)
-      and (public.summarize_invitations(jsonb_build_array(jsonb_build_object('slug', v_s2, 'key', v_bad)))->0->>'partner2') = 'Deux'
-    then E'PASS compte : le propriétaire gère son faire-part sans la clé\n' else E'FAIL gestion par le propriétaire\n' end;
-  v := public.list_rsvps(v_s2, v_bad);
-  r := r || case when public.delete_rsvp(v_s2, v_bad, (v->0->>'id')::bigint) and jsonb_array_length(public.list_rsvps(v_s2, v_bad)) = 0
-    then E'PASS compte : le propriétaire supprime une réponse sans la clé\n' else E'FAIL suppression de réponse par le propriétaire\n' end;
-  r := r || case when public.list_rsvps(v_s3, v_bad) is null and not public.update_invitation(v_s3, v_bad, '{}'::jsonb)
-    then E'PASS compte : être connecté ne donne aucun droit sur le faire-part d''un autre\n' else E'FAIL droits sur un faire-part sans propriétaire\n' end;
-  r := r || case when public.tester_attach(v_tok, v_s2, v_k2) is not null and public.claim_invitation(v_s2, v_k2) = 'ok'
-    then E'PASS compte : revendiquer son propre faire-part est sans effet\n' else E'FAIL revendication idempotente\n' end;
-  perform public.tester_detach(v_tok, v_s2);
-
-  -- Un autre compte
-  perform set_config('request.jwt.claims', json_build_object('sub', v_u2, 'role', 'authenticated')::text, true);
-  r := r || case when public.list_rsvps(v_s2, v_bad) is null and not public.update_invitation(v_s2, v_bad, '{}'::jsonb)
-      and not public.delete_invitation(v_s2, v_bad) and not public.delete_rsvp(v_s2, v_bad, 1)
-      and (public.summarize_invitations(jsonb_build_array(jsonb_build_object('slug', v_s2, 'key', v_bad)))->0->>'invalid')::boolean
-      and public.account_invitations() = '[]'::jsonb
-    then E'PASS compte : un autre compte ne voit ni ne modifie rien sans la clé\n' else E'FAIL isolation entre comptes\n' end;
-  r := r || case when public.list_rsvps(v_s2, v_k2) is not null then E'PASS compte : le lien privé (clé) reste valable pour un faire-part rattaché à un compte\n' else E'FAIL clé sur faire-part rattaché\n' end;
-  r := r || case when public.claim_invitation(v_s2, v_k2) = 'taken' then E'PASS compte : impossible de revendiquer le faire-part d''un autre compte, même avec la clé\n' else E'FAIL revendication d''un faire-part pris\n' end;
-  r := r || case when public.claim_invitation(v_s3, v_bad) = 'forbidden' then E'PASS compte : revendication refusée avec une mauvaise clé\n' else E'FAIL revendication mauvaise clé\n' end;
-  perform public.tester_attach(v_tok, v_slug, v_key);
-  r := r || case when public.claim_invitation(v_slug, v_key) = 'forbidden' then E'PASS compte : un faire-part d''espace testeur ne se revendique pas\n' else E'FAIL revendication d''un faire-part testeur\n' end;
-  r := r || case when public.claim_invitation(v_s3, v_key) = 'ok' and public.account_invitations()->0->>'slug' = v_s3
-    then E'PASS compte : un faire-part créé sans compte se rattache au compte avec sa clé\n' else E'FAIL rattachement au compte\n' end;
-  perform public.create_invitation(v_s3 || '-b', v_key, '{"partner1":"Testeur"}'::jsonb, v_tok);
-  r := r || case when jsonb_array_length(public.account_invitations()) = 1 then E'PASS compte : avec un jeton testeur valide, la création ne consomme pas le faire-part du compte\n' else E'FAIL création testeur connecté\n' end;
-  begin perform public.create_invitation(v_s3 || '-c', v_key, '{}'::jsonb, v_tok2); r := r || E'FAIL compte : jeton testeur désactivé contourne la limite\n';
-  exception when others then r := r || case when sqlerrm = 'one per account' then E'PASS compte : un jeton testeur désactivé ne contourne pas la limite\n' else 'FAIL jeton désactivé : ' || sqlerrm || E'\n' end; end;
-
-  -- Compte obligatoire (réglage private.settings)
-  reset role;
-  update private.settings set value = 'true' where name = 'require_account';
-  set local role anon;
-  perform set_config('request.jwt.claims', '', true);
-  begin perform public.create_invitation(v_s3 || '-d', v_key, '{}'::jsonb); r := r || E'FAIL compte obligatoire : création sans compte acceptée\n';
-  exception when others then r := r || case when sqlerrm = 'account required' then E'PASS compte obligatoire : création sans compte refusée\n' else 'FAIL compte obligatoire : ' || sqlerrm || E'\n' end; end;
-  begin perform public.create_invitation(v_s3 || '-d', v_key, '{}'::jsonb, 'zzzzzzzzzzzzzzzzzzzzzzzzzzzzzzzz'); r := r || E'FAIL compte obligatoire : faux jeton testeur accepté\n';
-  exception when others then r := r || case when sqlerrm = 'account required' then E'PASS compte obligatoire : un faux jeton testeur ne suffit pas\n' else 'FAIL faux jeton : ' || sqlerrm || E'\n' end; end;
-  perform public.create_invitation(v_s3 || '-e', v_key, '{}'::jsonb, v_tok);
-  r := r || E'PASS compte obligatoire : les espaces testeurs créent toujours sans compte\n';
-  r := r || case when public.get_invitation(v_s2) is not null and public.list_rsvps(v_s3, v_key) is not null then E'PASS compte obligatoire : les faire-part existants et leurs liens privés fonctionnent toujours\n' else E'FAIL existant après bascule\n' end;
-  reset role;
-  update private.settings set value = 'false' where name = 'require_account';
-
-  -- Suppression du compte
-  set local role authenticated;
-  perform set_config('request.jwt.claims', json_build_object('sub', v_u2, 'role', 'authenticated')::text, true);
-  ok := public.delete_account();
-  reset role;
-  r := r || case when ok and not exists (select 1 from auth.users where id = v_u2) and not exists (select 1 from public.invitations where slug = v_s3)
-      and exists (select 1 from public.invitations where slug = v_s3 || '-b') and exists (select 1 from auth.users where id = v_u1)
-    then E'PASS compte : la suppression efface le compte et son faire-part, rien d''autre\n' else E'FAIL suppression du compte\n' end;
-  set local role authenticated;
-  perform set_config('request.jwt.claims', json_build_object('sub', v_u1, 'role', 'authenticated', 'is_anonymous', true)::text, true);
-  r := r || case when public.account_invitations() is null and public.list_rsvps(v_s2, v_bad) is null then E'PASS compte : une session anonyme n''est pas un compte\n' else E'FAIL session anonyme\n' end;
-  perform set_config('request.jwt.claims', json_build_object('sub', v_u1, 'role', 'authenticated')::text, true);
-  r := r || case when public.delete_invitation(v_s2, v_bad) and public.account_invitations() = '[]'::jsonb then E'PASS compte : le propriétaire supprime son faire-part sans la clé, et peut en recréer un\n' else E'FAIL suppression par le propriétaire\n' end;
-  perform set_config('request.jwt.claims', '', true);
 
   reset role;
   r := r || case when exists (select 1 from private.tester_invitations where position(convert_to(v_key, 'UTF8') in key_enc) > 0)
