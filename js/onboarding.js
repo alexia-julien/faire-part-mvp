@@ -400,13 +400,23 @@
     $('done').hidden = false; $('app').classList.add('done'); $('app').classList.remove('show-preview-on');
     $('done-title').textContent = editing ? 'Modifications enregistrées !' : 'C’est prêt !';
     $('public-link').value = l.pub; $('public-open').href = l.pub;
-    var ed = new URL('index.html', location.href); ed.search = '?f=' + slug; ed.hash = 'k=' + key;
+    var ed = new URL('creer.html', location.href); ed.search = '?f=' + slug; ed.hash = 'k=' + key;
     $('edit-again').href = ed.href;
     $('done-time').textContent = editing ? '' : duration(seconds);
-    $('go-mine').textContent = tester ? 'Retour à mon espace' : 'Voir mes faire-part';
+    $('go-mine').textContent = tester ? 'Retour à mon espace' : 'Voir les réponses de mes invités';
     $('done-note').textContent = tester
       ? 'Pas besoin de le noter : ce faire-part et son lien restent disponibles dans votre espace, avec les réponses de vos invités.'
-      : 'Vous le retrouverez aussi dans « Mes faire-part », sur cet appareil.';
+      : 'Collez-le dans un message, un email ou un groupe WhatsApp : vos invités répondent directement dessus.';
+    // Hors espace testeur, pas de compte : le lien de gestion est la seule clé, on l'affiche pour qu'il soit conservé.
+    $('private-card').hidden = tester;
+    if(!tester){
+      $('private-link').value = l.adm;
+      var who = [state.partner1, state.partner2].filter(Boolean).join(' & ');
+      $('mail-link').href = 'mailto:?subject=' + encodeURIComponent('Notre faire-part' + (who ? ' ' + who : '') + ' : lien de gestion (à conserver)') +
+        '&body=' + encodeURIComponent('Lien de gestion (privé, pour modifier le faire-part et voir les réponses) :\n' + l.adm +
+        '\n\nLien à envoyer aux invités :\n' + l.pub + '\n');
+      $('go-mine').href = l.adm;
+    }
     FP.mine.add(slug, key); // retrouvable ensuite dans « Mes faire-part » (rattaché à l'espace actif)
     if(tester) FP.tester.attach(slug, key); // le faire-part rejoint l'espace du testeur
     published = true; clearTimeout(draftTimer); storeDel(DRAFT_KEY);
@@ -454,7 +464,7 @@
       else fallback();
     });
   });
-  ['public-link'].forEach(function(id){ $(id).addEventListener('focus', function(){ this.select(); }); });
+  ['public-link', 'private-link'].forEach(function(id){ $(id).addEventListener('focus', function(){ this.select(); }); });
 
   // ---------- Démarrage : modification via lien privé, brouillon, ou nouveau faire-part ----------
   bindInputs();
@@ -476,6 +486,34 @@
         : 'Impossible de charger ce faire-part. Vérifiez votre lien et votre connexion.';
     });
   } else {
+    // Un seul faire-part par personne hors espace testeur (limite côté navigateur : il n'y a pas de compte).
+    var existing = FP.tester.token() ? [] : FP.mine.list();
+    if(!existing.length) startNew();
+    else {
+      wizard.hidden = true; $('steps').hidden = true; $('app').classList.add('gated'); $('gate-wait').hidden = false;
+      FP.api.summarize(existing.map(function(x){ return { slug: x.slug, key: x.key }; })).then(function(list){
+        var by = {};
+        (Array.isArray(list) ? list : []).forEach(function(x){ if(x && typeof x.slug === 'string') by[x.slug] = x; });
+        var valid = existing.filter(function(x){ return by[x.slug] && !by[x.slug].invalid; });
+        if(!valid.length){ ungate(); startNew(); return; } // faire-part supprimés ou liens invalides : rien ne bloque
+        showGate(valid[0], by[valid[0].slug], valid.length);
+      }).catch(function(){ showGate(existing[0], null, existing.length); });
+    }
+  }
+  function ungate(){ wizard.hidden = false; $('steps').hidden = false; $('app').classList.remove('gated'); $('gate-wait').hidden = true; }
+  function showGate(item, sum, count){
+    var l = links(item.slug, item.key);
+    var ed = new URL('creer.html', location.href); ed.search = '?f=' + item.slug; ed.hash = 'k=' + item.key;
+    var names = sum ? [sum.partner1, sum.partner2].map(function(x){ return typeof x === 'string' ? x.slice(0, 40) : ''; }).filter(Boolean).join(' & ') : '';
+    $('gate-wait').hidden = true; $('gate').hidden = false;
+    $('title').textContent = 'Votre faire-part vous attend';
+    $('subtitle').hidden = true;
+    $('gate-names').textContent = names; $('gate-names').hidden = !names;
+    $('gate-edit').href = ed.href; $('gate-open').href = l.pub;
+    if(count > 1){ $('gate-rsvps').href = 'admin.html'; $('gate-rsvps').textContent = 'Voir mes faire-part'; $('gate-open').hidden = true; $('gate-title').textContent = 'Vous avez déjà des faire-part'; }
+    else $('gate-rsvps').href = l.adm;
+  }
+  function startNew(){
     var draft = storeGet(DRAFT_KEY);
     if(draft && draft.state && typeof draft.state === 'object'){
       var meta = draft.state.meta;
@@ -485,12 +523,22 @@
       if(hasContent) $('draft-note').hidden = false;
       step = Math.min(Math.max(parseInt(draft.step, 10) || 1, 1), TOTAL);
     }
-    $('reset-draft').addEventListener('click', function(){ storeDel(DRAFT_KEY); location.replace('index.html'); });
+    $('reset-draft').addEventListener('click', function(){ storeDel(DRAFT_KEY); location.replace('creer.html'); });
     var mine = FP.mine.list().length;
     if(mine || FP.tester.token()){ var a = $('mine-link'); a.hidden = false; a.textContent = FP.tester.token() ? 'Mon espace' + (mine ? ' (' + mine + ')' : '') : 'Mes faire-part (' + mine + ')'; }
     // Pas de date passée ni au-delà de 2050 dans le calendrier du navigateur
     var t0 = today(), iso = t0.getFullYear() + '-' + ('0' + (t0.getMonth() + 1)).slice(-2) + '-' + ('0' + t0.getDate()).slice(-2);
     $('date-input').min = iso; $('deadline-input').min = iso;
+    // Arrivée depuis la page d'accueil : prénoms et ambiance choisis là-bas (dans le fragment, jamais envoyés au serveur).
+    var h = new URLSearchParams(location.hash.slice(1)), touched = false;
+    ['partner1', 'partner2'].forEach(function(f, i){
+      var v = (h.get('p' + (i + 1)) || '').trim().slice(0, 40);
+      if(v && !state[f]){ state[f] = v; touched = true; }
+    });
+    var hp = FP.PRESETS.filter(function(x){ return x.id === h.get('s'); })[0];
+    if(hp){ STYLE_FIELDS.forEach(function(f){ state[f] = hp[f]; }); touched = true; }
+    if(touched){ $('draft-note').hidden = true; try{ history.replaceState(null, '', location.pathname + location.search); }catch(e){} }
     syncInputs(); show(step); preview();
+    if(touched) saveDraft();
   }
 })();

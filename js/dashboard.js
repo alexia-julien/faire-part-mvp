@@ -96,7 +96,7 @@
     var acts = el('div', 'card-actions');
     var main = el('a', 'btn-main', 'Voir les réponses'); main.href = link('admin.html', item.slug, item.key);
     var pub = el('a', null, 'Voir le faire-part'); pub.href = link('invitation.html', item.slug); pub.target = '_blank'; pub.rel = 'noopener';
-    var edit = el('a', null, 'Modifier'); edit.href = link('index.html', item.slug, item.key);
+    var edit = el('a', null, 'Modifier'); edit.href = link('creer.html', item.slug, item.key);
     acts.appendChild(main); acts.appendChild(pub); acts.appendChild(edit); acts.appendChild(deleteBtn(item));
     c.appendChild(acts);
     return c;

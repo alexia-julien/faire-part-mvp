@@ -27,6 +27,13 @@ Le repo est public et la clé Supabase `anon` est visible par tous : c'est voulu
 | Fuite d'un lien testeur | Jeton dans le fragment (`#t=`), jamais dans l'URL envoyée au serveur ; désactivable en SQL (`disabled = true`) ; création de testeurs impossible depuis le navigateur |
 | Exfiltration de données | CSP `connect-src` limité à l'URL exacte du projet Supabase |
 
+## Page d'accueil et parcours grand public
+- `index.html` n'appelle jamais la base (`connect-src 'none'`) ; les pages de texte n'exécutent aucun script.
+- Prénoms et ambiance passent de l'accueil à l'éditeur dans le fragment d'URL : rien n'est envoyé au serveur, les valeurs sont tronquées (40 caractères), l'ambiance doit exister dans le catalogue, et tout est échappé à l'affichage (testé avec une charge XSS).
+- La redirection des anciens liens (`index.html?f=…`) ne vise que `creer.html` sur le même site, et seulement si l'identifiant a le bon format : pas de redirection ouverte.
+- La limite « un faire-part par personne » est une règle d'usage côté navigateur, **pas** un contrôle de sécurité : elle se contourne en navigation privée. La vraie protection contre l'abus reste la limitation par IP côté base.
+- Le lien de gestion est affiché à l'écran et peut partir dans un email que l'utilisateur s'envoie : quiconque le lit peut modifier le faire-part et voir les réponses.
+
 ## Alertes du « Security Advisor » de Supabase : lesquelles sont normales
 - **« RLS Enabled No Policy »** (info, 3 tables) : voulu. Aucune policy = aucun accès direct ; tout passe par les fonctions.
 - **« Public Can Execute SECURITY DEFINER Function »** (11 fonctions) : voulu. Ces fonctions sont l'API publique de l'app ; chacune valide ses entrées et exige la clé privée quand c'est nécessaire (testé dans `supabase/tests.sql`).

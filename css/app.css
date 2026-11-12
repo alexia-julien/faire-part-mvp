@@ -556,3 +556,22 @@ details.more[open]{padding-bottom:1.1rem}
 .shape-demo.shape-cercle{width:64px;border-radius:50%}
 
 @media (prefers-reduced-motion:reduce){.intro-card .id-flap,.intro-card .id-card,.intro-card .id-seal,.intro-card .id-mono{animation:none!important}}
+
+/* ============================================================ Parcours grand public
+   Marque en tête de l'éditeur, écran « vous avez déjà un faire-part », lien de gestion à conserver. */
+.brand{margin:0 0 1.1rem;font-family:var(--display);font-size:1.25rem;font-weight:600;letter-spacing:.01em}
+.brand a{color:var(--ink);text-decoration:none}
+.brand a:hover{color:var(--sage-deep)}
+.app.gated{grid-template-columns:minmax(0,1fr)!important}
+.app.gated .preview{display:none!important}
+.app.gated .panel{margin:0 auto}
+.gate{background:var(--white);border:1px solid #E4DCCB;border-radius:16px;padding:1.5rem 1.4rem;margin:1.2rem 0;box-shadow:var(--lift,none)}
+.gate h2{font-size:1.7rem}
+.gate h2:focus{outline:none}
+.gate-names{font-family:var(--display);font-size:1.45rem;color:var(--sage-deep);margin:.1rem 0 .6rem}
+.gate-actions{display:flex;flex-wrap:wrap;gap:.6rem;margin:1.2rem 0 1rem}
+.gate-foot{font-size:.85rem;margin:0}
+.card-text{font-size:.88rem;color:var(--soft);margin:.2rem 0 .9rem}
+.card-more{margin:.9rem 0 0}
+.legal-note{font-size:.78rem;color:var(--soft);margin:0 0 .9rem}
+@media (max-width:480px){.gate-actions a{flex:1 1 100%;text-align:center}}

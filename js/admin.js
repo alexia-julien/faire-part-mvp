@@ -243,7 +243,7 @@
 
   var pub = new URL('invitation.html', location.href); pub.search = '?f=' + encodeURIComponent(p.slug);
   $('open-public').href = pub.href;
-  var ed = new URL('index.html', location.href); ed.search = '?f=' + encodeURIComponent(p.slug); ed.hash = 'k=' + encodeURIComponent(p.key);
+  var ed = new URL('creer.html', location.href); ed.search = '?f=' + encodeURIComponent(p.slug); ed.hash = 'k=' + encodeURIComponent(p.key);
   $('edit-link').href = ed.href;
   $('csv').addEventListener('click', exportCsv);
   $('copy-emails').addEventListener('click', copyEmails);

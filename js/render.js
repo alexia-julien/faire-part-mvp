@@ -563,7 +563,9 @@
 
     // Hero
     if(photos[0]) h += '<div class="hero-photo-wrap"><img class="hero-photo" src="' + photos[0] + '" alt="' + p1 + ' et ' + p2 + '"></div>';
-    h += '<div class="hero-text">' + dp.corners + dp.top + '<h1 class="names">' + names + '</h1>';
+    // Sur la page d'accueil, l'exemple ne doit pas ajouter un second titre principal à la page (opts.namesTag = 'p').
+    var nt = opts.namesTag === 'p' ? 'p' : 'h1';
+    h += '<div class="hero-text">' + dp.corners + dp.top + '<' + nt + ' class="names">' + names + '</' + nt + '>';
     if(cfg.subtitle) h += '<div class="subtitle">' + esc(cfg.subtitle) + '</div>';
     h += '<div class="rule"></div>';
     h += '<div class="date">' + (dateLong ? esc(dateLong) : 'Date à venir') + '</div>';

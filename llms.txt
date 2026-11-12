@@ -1,0 +1,24 @@
+# Maison Meli
+
+> Maison Meli est un créateur de faire-part de mariage digital, en français. Un couple crée son faire-part en ligne en 3 minutes environ, le partage par lien, et suit les réponses de ses invités (RSVP) au même endroit. Le service est gratuit et fonctionne sans création de compte.
+
+## L'essentiel
+
+- Site : https://maison-meli.com/
+- Créer un faire-part : https://maison-meli.com/creer.html
+- Prix : gratuit, aucune carte bancaire demandée.
+- Compte : aucun. À la publication, le couple reçoit un lien public (pour les invités) et un lien de gestion privé (pour modifier le faire-part et voir les réponses).
+- Informations obligatoires : prénoms, date, lieu. Tout le reste est pré-rempli et modifiable.
+- Style : 9 ambiances prêtes (Champêtre, Romantique, Château, Élégance, Gatsby, Jardin d'hiver, Bohème, Porcelaine, Minimaliste), 12 palettes de couleurs, 8 typographies, 5 ornements, finitions dorure, or rose ou argent, jusqu'à 3 photos.
+- Ouverture : animation d'enveloppe à ouvrir ou monogramme, au choix.
+- Sections facultatives : notre histoire, programme de la journée, dress code, hébergement, infos pratiques, liste de mariage, compte à rebours, ajout à l'agenda, lien vers le plan d'accès.
+- RSVP : présence, nombre de personnes, enfants, noms des accompagnants, régime alimentaire et allergies, brunch du lendemain, email, téléphone, adresse postale, message libre, une question personnalisée, date limite de réponse.
+- Suivi : totaux adultes, enfants et absents, liste des régimes pour le traiteur, recherche, filtres, copie des emails, export CSV.
+- Le faire-part reste modifiable après l'envoi ; le lien ne change pas.
+- Limites actuelles : un faire-part par personne, 3 photos, 1 000 réponses par faire-part. Le partage se fait par lien (WhatsApp, SMS, email) ; le service n'envoie pas de messages et n'imprime pas de faire-part papier.
+- Les invités n'ont rien à installer et aucun compte à créer.
+
+## Pages
+
+- [Accueil et questions fréquentes](https://maison-meli.com/)
+- [Confidentialité](https://maison-meli.com/confidentialite.html)

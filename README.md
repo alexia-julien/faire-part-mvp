@@ -1,17 +1,26 @@
-# Faire-part digital — MVP
+# Maison Meli — faire-part digital
 
 Générateur de faire-part digital avec RSVP intégré. Objectif : un couple publie un faire-part de qualité en moins de 3 minutes, **sans créer de compte**.
+
+Depuis le 12/11/2026, le site s'adresse directement aux particuliers (B2C), gratuitement :
+- `index.html` : **page d'accueil** (conversion, SEO, GEO). Exemple vivant dans un téléphone, 9 ambiances, FAQ. Les prénoms et l'ambiance choisis sont transmis à l'éditeur dans le fragment d'URL (`creer.html#p1=…&p2=…&s=…`), jamais au serveur.
+- `creer.html` : **l'éditeur** (ex-`index.html`). Les anciens liens `index.html?f=…#k=…` sont redirigés.
+- **Un seul faire-part par personne** hors espace testeur : si ce navigateur en gère déjà un, l'éditeur propose de le modifier au lieu d'en créer un autre. C'est une limite côté navigateur (il n'y a pas de compte) : une navigation privée ou un autre appareil la contourne. Côté serveur, seule la limitation par IP (10 créations/h) s'applique.
+- À la publication, le **lien de gestion** (privé) est affiché avec un bouton « Me l'envoyer par email » (`mailto:`, rien n'est envoyé par le site) : sans compte, c'est la seule clé du couple.
+- `confidentialite.html`, `404.html`, `robots.txt`, `sitemap.xml`, `llms.txt`, `img/og.png` (image de partage).
+
+La page d'accueil est **générée** : modifier les textes, la FAQ ou les étapes dans `tools/build_landing.py`, puis `python3 tools/build_landing.py index.html` (la FAQ visible et les données structurées JSON-LD viennent de la même liste, un test le vérifie).
 
 Projet indépendant du site du mariage d'Alexia & Julien (aucun lien avec ce repo ni ses branches `main` / `test`).
 
 ## Parcours
-1. `index.html` : onboarding en 5 étapes avec aperçu en direct. **Seules les étapes 1 et 2 sont obligatoires** (prénoms, date, lieu) : tout le reste a des réglages par défaut, on peut publier en cliquant « Continuer ».
+1. `creer.html` : onboarding en 5 étapes avec aperçu en direct. **Seules les étapes 1 et 2 sont obligatoires** (prénoms, date, lieu) : tout le reste a des réglages par défaut, on peut publier en cliquant « Continuer ».
    - **Les mariés** (heure de la cérémonie facultative ; année plafonnée à 2050), **Le lieu**
    - L'aperçu se bascule entre **Mobile** et **Ordinateur** (rendu réel en 1280 px, réduit pour tenir à l'écran). Sur téléphone, il reste toujours visible dans un bandeau fixé en haut de l'écran (« Plein écran » pour l'agrandir).
    - **Photos et style** : 9 ambiances prêtes en un clic, chacune montrée en miniature avec les prénoms et la date du couple (Champêtre, Romantique, Château, Élégance, Gatsby, Jardin d'hiver, Bohème, Porcelaine, Minimaliste), puis, sous « Personnaliser le style », 5 onglets : 12 palettes, 8 polices, 5 ornements (épuré, couronne, botanique, cadre, art déco), finitions (encre, dorure, or rose, argent ; papier texturé), introduction (chaque choix montré par une petite animation). La forme de la photo se choisit sous les photos ; le compte à rebours s'active dans les sections. Les faire-part créés avant restent inchangés (épuré, encre, sans texture).
    - **Textes et sections** : message d'accueil + sections facultatives pré-remplies (Notre histoire, Programme en frise, Dress code, Hébergement, Infos pratiques, Liste de mariage avec lien).
    - **Réponses** : questions à poser (personnes, enfants, noms des accompagnants, régime, brunch, email, téléphone, adresse, message, question personnalisée) et date limite de réponse.
-2. À la fin (« Terminer ») : un **lien public** pour les invités (`invitation.html?f=<id>`) et un **lien privé** (`admin.html?f=<id>#k=<clé>`) pour suivre les réponses, exporter en CSV et modifier le faire-part.
+2. À la fin (« Terminer ») : un **lien public** pour les invités (`invitation.html?f=<id>`) et un **lien de gestion privé** (`admin.html?f=<id>#k=<clé>`), affiché et à conserver, pour suivre les réponses, exporter en CSV et modifier le faire-part.
 3. Les invités ouvrent l'enveloppe (ou voient le monogramme), puis répondent via le formulaire intégré, limité aux questions activées par le couple.
 4. Le back-office (`admin.html`) ouvre sur **« Mes faire-part »** : la liste des faire-part créés ou ouverts depuis ce navigateur (prénoms, date, nombre de réponses) ; sur un autre appareil, ouvrir une fois le lien privé ajoute le faire-part à la liste. Chaque carte mène à la vue des réponses : totaux (adultes, enfants, absents, brunch), liste des régimes pour le traiteur, recherche, filtres présents/absents, tri, colonnes selon les questions posées, copie des emails (champ Cci), export CSV, suppression, affichage en cartes sur mobile.
 
@@ -62,12 +71,12 @@ Sans configuration, l'app tourne en **mode local** (données dans le `localStora
 
 La liste « Mes faire-part » utilise `summarize_invitations` (un seul appel, chaque clé vérifiée côté serveur), indispensable pour un espace testeur qui contient beaucoup de faire-part. Si la fonction n'est pas déployée, le site se rabat sur `get_invitation` + `list_rsvps` faire-part par faire-part.
 
-Si l'URL du projet Supabase change, mettre à jour **aussi** la CSP (`connect-src`) dans `index.html`, `invitation.html` et `admin.html`.
+Si l'URL du projet Supabase change, mettre à jour **aussi** la CSP (`connect-src`) dans `creer.html`, `invitation.html` et `admin.html`.
 
 Sécurité : voir [SECURITY.md](SECURITY.md) (modèle de menace, protections, limites connues).
 
 ## Tests
-`python3 tests/e2e.py` (prérequis : `pip install playwright pillow`) rejoue 230 vérifications dans un navigateur headless, en mode local : parcours complet, validations, brouillon, photos, ambiances et réglages de style, intros (enveloppe, monogramme, mouvement réduit), sections, RSVP enrichi, suivi (filtres, tri, recherche, régimes, copie des emails, CSV, cartes mobiles), modification, anciens faire-part, agenda (fuseaux horaires), sécurité (XSS, config forgée, clickjacking), espaces testeurs, mobile et contrastes des 12 palettes. Captures dans `tests/out/`.
+`python3 tests/e2e.py` (prérequis : `pip install playwright pillow`) rejoue 264 vérifications dans un navigateur headless, en mode local : parcours complet, validations, brouillon, photos, ambiances et réglages de style, intros (enveloppe, monogramme, mouvement réduit), sections, RSVP enrichi, suivi (filtres, tri, recherche, régimes, copie des emails, CSV, cartes mobiles), modification, anciens faire-part, agenda (fuseaux horaires), sécurité (XSS, config forgée, clickjacking), espaces testeurs, page d'accueil et parcours grand public (un seul faire-part, lien de gestion, redirection des anciens liens), mobile et contrastes des 12 palettes. Captures dans `tests/out/`.
 
 `supabase/tests.sql` teste la base elle-même (66 vérifications, tout est annulé à la fin) : à coller dans le SQL Editor après chaque changement du schéma.
 
@@ -80,7 +89,9 @@ Sécurité : voir [SECURITY.md](SECURITY.md) (modèle de menace, protections, li
 ## Limites connues du MVP
 - Photos stockées en base (JPEG 1600 px, ~150–300 Ko chacune, 3 max). À migrer vers Supabase Storage si le volume grandit.
 - Pas d'aperçu riche (Open Graph) quand le lien est partagé sur WhatsApp : nécessite un rendu côté serveur.
-- Pas d'envoi d'email : hors espace testeur, le couple doit conserver son lien privé (bouton « M'envoyer ce lien par email » à la publication).
+- Pas d'envoi d'email par le site : hors espace testeur, le couple doit conserver son lien de gestion (bouton « Me l'envoyer par email » à la publication, qui ouvre sa messagerie).
+- Pas de mesure d'audience sur la page d'accueil : le taux de conversion visite → création n'est pas mesuré.
+- `confidentialite.html` ne contient ni identité de l'éditeur ni adresse de contact : à compléter (mentions légales).
 - Polices Google chargées depuis les serveurs de Google (seule la police choisie sur la page publique).
 - Protection anti-spam minimale (champ piège + plafond de 1000 réponses par faire-part).
 - RGPD : le formulaire peut collecter email, téléphone et adresse. Une mention courte est affichée, mais avant d'ouvrir à des inconnus il faut une vraie politique de confidentialité et une durée de conservation (suppression automatique après le mariage).
