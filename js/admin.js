@@ -1,17 +1,21 @@
-// Suivi des réponses : accessible uniquement avec le lien privé (la clé est dans le #fragment, jamais envoyée au serveur).
+// « Mon faire-part » : le faire-part du compte connecté et les réponses de ses invités. Sans session : connexion.
 (function(){
   'use strict';
-  var FP = window.FP, p = FP.params(), rows = [], cfg = null, attached = false;
+  var FP = window.FP, slug = '', rows = [], cfg = null;
   var view = { filter: 'all', q: '', sort: 'date', dir: -1 };
   var $ = function(id){ return document.getElementById(id); };
   // Anti-clickjacking (GitHub Pages ne permet pas d'envoyer X-Frame-Options / frame-ancestors).
   if(window.top !== window.self){ document.body.textContent = ''; return; }
-
-  // Sans faire-part dans l'adresse, c'est la liste « Mes faire-part » (js/dashboard.js) qui s'affiche.
-  if(!new URLSearchParams(location.search).get('f')) return;
-  $('detail').hidden = false;
   function state(msg){ $('state').textContent = msg; $('state').hidden = !msg; }
-  if(!p.slug || !p.key){ state('Lien privé incomplet. Utilisez le lien de suivi complet que vous avez reçu à la publication.'); return; }
+  function showSignin(){
+    $('detail').hidden = true; $('signin').hidden = false;
+    FP.authPanel($('auth-box'), {
+      title: 'Mon faire-part',
+      text: 'Connectez-vous pour retrouver votre faire-part et les réponses de vos invités.',
+      returnTo: location.href.split('#')[0].split('?')[0],
+      onSignedIn: function(){ $('signin').hidden = true; start(); }
+    });
+  }
 
   // Les réponses viennent d'inconnus : on ne fait jamais confiance à leur forme, même si le serveur les filtre aussi.
   function txt(v){ return typeof v === 'string' ? v : (v == null ? '' : String(v)); }
@@ -180,7 +184,7 @@
       return;
     }
     btn.disabled = true;
-    FP.api.deleteRsvp(p.slug, p.key, r.id).then(function(){
+    FP.api.deleteRsvp(r.id).then(function(){
       rows = rows.filter(function(x){ return x.id !== r.id; });
       $('action-msg').textContent = ''; render();
     }).catch(function(e){ btn.disabled = false; $('action-msg').textContent = FP.userError(e); });
@@ -199,7 +203,7 @@
       return cols.map(function(c){ return c.get(r); }).concat([r.superseded ? 'Oui' : '']).map(csvCell).join(';');
     }));
     var url = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
-    var a = document.createElement('a'); a.href = url; a.download = 'reponses-' + p.slug + '.csv';
+    var a = document.createElement('a'); a.href = url; a.download = 'reponses-' + slug + '.csv';
     document.body.appendChild(a); a.click(); document.body.removeChild(a);
     setTimeout(function(){ URL.revokeObjectURL(url); }, 1000);
   }
@@ -221,30 +225,65 @@
     if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(text).then(ok, fallback); else fallback();
   }
 
+  function gone(e){ if(e && e.signedOut){ showSignin(); return true; } return false; }
   function load(){
-    state('Chargement…'); $('action-msg').textContent = '';
-    Promise.all([FP.api.listRsvps(p.slug, p.key), FP.api.getInvitation(p.slug).catch(function(){ return null; })]).then(function(res){
-      rows = (Array.isArray(res[0]) ? res[0] : []).filter(function(r){ return r && r.data && typeof r.data === 'object'; });
-      FP.mine.add(p.slug, p.key); // clé valide : le faire-part rejoint « Mes faire-part » sur cet appareil
-      if(!attached){ attached = true; FP.tester.attach(p.slug, p.key); } // ... et l'espace du testeur s'il en a un
-      if(res[1]){
-        cfg = FP.sanitizeConfig(res[1]);
-        $('admin-title').textContent = 'Réponses — ' + cfg.partner1 + ' & ' + cfg.partner2;
-        document.title = 'Suivi des réponses — ' + cfg.partner1 + ' & ' + cfg.partner2;
-        var dl = FP.parseDate(cfg.rsvp.deadline), wd = FP.formatDate(cfg, false);
-        $('admin-sub').textContent = [wd ? 'Mariage le ' + wd : '', dl ? 'réponses attendues avant le ' + FP.longDate(dl) : ''].filter(Boolean).join(' · ');
-      }
+    state('Chargement…'); $('action-msg').textContent = ''; $('none').hidden = true;
+    Promise.all([FP.api.myInvitation(), FP.api.listRsvps()]).then(function(res){
+      var inv = res[0];
+      if(!inv){ state(''); $('content').hidden = true; $('danger').hidden = false; $('delete-invitation').parentNode.hidden = true; $('none').hidden = false;
+        $('admin-title').textContent = 'Mon faire-part'; $('admin-sub').textContent = ''; return; }
+      slug = inv.slug;
+      rows = (Array.isArray(res[1]) ? res[1] : []).filter(function(r){ return r && r.data && typeof r.data === 'object'; });
+      cfg = FP.sanitizeConfig(inv.config);
+      $('admin-title').textContent = 'Réponses — ' + cfg.partner1 + ' & ' + cfg.partner2;
+      document.title = 'Suivi des réponses — ' + cfg.partner1 + ' & ' + cfg.partner2;
+      var dl = FP.parseDate(cfg.rsvp.deadline), wd = FP.formatDate(cfg, false);
+      $('admin-sub').textContent = [wd ? 'Mariage le ' + wd : '', dl ? 'réponses attendues avant le ' + FP.longDate(dl) : ''].filter(Boolean).join(' · ');
+      $('public-link').value = FP.publicLink(slug); $('open-public').href = FP.publicLink(slug);
+      $('delete-invitation').parentNode.hidden = false; $('danger').hidden = false;
       state(''); $('content').hidden = false; render();
     }).catch(function(e){
-      $('content').hidden = true;
-      state(e && e.forbidden ? 'Accès refusé : le lien privé est incorrect.' : FP.userError(e));
+      if(gone(e)) return;
+      $('content').hidden = true; state(FP.userError(e));
     });
   }
+  function start(){
+    var u = FP.auth.user();
+    if(!u){ showSignin(); return; }
+    $('detail').hidden = false; $('account-email').textContent = u.email ? 'Connecté : ' + u.email : 'Connecté';
+    load();
+  }
 
-  var pub = new URL('invitation.html', location.href); pub.search = '?f=' + encodeURIComponent(p.slug);
-  $('open-public').href = pub.href;
-  var ed = new URL('creer.html', location.href); ed.search = '?f=' + encodeURIComponent(p.slug); ed.hash = 'k=' + encodeURIComponent(p.key);
-  $('edit-link').href = ed.href;
+  // Suppressions définitives, en deux temps (pas de boîte de dialogue) : 1er clic = confirmation, 2e clic = suppression.
+  function twoStep(btn, confirmText, run){
+    var label = btn.textContent;
+    btn.addEventListener('click', function(){
+      if(!btn.classList.contains('confirm')){
+        btn.classList.add('confirm'); btn.textContent = confirmText;
+        setTimeout(function(){ if(btn.classList.contains('confirm') && !btn.disabled){ btn.classList.remove('confirm'); btn.textContent = label; } }, 5000);
+        return;
+      }
+      btn.disabled = true; $('danger-msg').textContent = '';
+      run().then(function(){ btn.disabled = false; btn.classList.remove('confirm'); btn.textContent = label; }, function(e){
+        btn.disabled = false; btn.classList.remove('confirm'); btn.textContent = label;
+        if(!gone(e)) $('danger-msg').textContent = FP.userError(e);
+      });
+    });
+  }
+  twoStep($('delete-invitation'), 'Confirmer : le lien envoyé aux invités ne fonctionnera plus', function(){
+    return FP.api.deleteInvitation().then(function(){ rows = []; cfg = null; slug = ''; load(); });
+  });
+  twoStep($('delete-account'), 'Confirmer : compte, faire-part et réponses seront effacés', function(){
+    return FP.api.deleteAccount().then(function(){ location.replace('./'); });
+  });
+  $('signout').addEventListener('click', function(){ FP.auth.signOut().then(function(){ location.replace('./'); }); });
+  $('copy-link').addEventListener('click', function(){
+    var b = this, input = $('public-link'), label = 'Copier';
+    var ok = function(){ b.textContent = 'Copié ✓'; setTimeout(function(){ b.textContent = label; }, 1600); };
+    var fallback = function(){ input.focus(); input.select(); try{ if(document.execCommand('copy')) ok(); }catch(e){} };
+    if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(input.value).then(ok, fallback); else fallback();
+  });
+  $('public-link').addEventListener('focus', function(){ this.select(); });
   $('csv').addEventListener('click', exportCsv);
   $('copy-emails').addEventListener('click', copyEmails);
   $('refresh').addEventListener('click', load);
@@ -256,5 +295,5 @@
       render();
     });
   });
-  load();
+  start();
 })();

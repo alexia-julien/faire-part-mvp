@@ -3,12 +3,12 @@ import json, html, sys
 OUT = sys.argv[1]
 SITE = "https://maison-meli.com/"
 TITLE = "Faire-part de mariage digital gratuit avec RSVP | Maison Meli"
-DESC = "Créez votre faire-part de mariage en ligne en 3 minutes : 9 ambiances, lien à partager, réponses des invités suivies au même endroit. Gratuit, sans compte."
+DESC = "Créez votre faire-part de mariage en ligne en 3 minutes : 9 ambiances, un lien à partager et les réponses de vos invités suivies au même endroit. Gratuit."
 FAQ = [
  ("Est-ce vraiment gratuit ?",
   "Oui. Créer le faire-part, le personnaliser, obtenir le lien à partager et suivre les réponses ne coûte rien, et aucune carte bancaire n’est demandée."),
  ("Faut-il créer un compte ?",
-  "Non. À la publication, vous recevez deux liens : un lien public à envoyer à vos invités, et un lien de gestion privé pour modifier le faire-part et voir les réponses. Gardez ce lien de gestion : c’est lui qui remplace le mot de passe."),
+  "Oui, mais seulement au moment de publier : vous personnalisez d’abord votre faire-part librement. Le compte se crée avec votre adresse email (vous recevez un code à 6 chiffres, sans mot de passe à retenir) ou avec votre compte Google. Il sert à retrouver votre faire-part et les réponses depuis n’importe quel appareil."),
  ("Combien de temps faut-il pour créer un faire-part ?",
   "Environ 3 minutes. Seuls les prénoms, la date et le lieu sont obligatoires ; le style, les textes et les questions posées aux invités sont déjà pré-remplis et restent modifiables."),
  ("Comment mes invités répondent-ils ?",
@@ -18,13 +18,13 @@ FAQ = [
  ("Quelles informations puis-je demander à mes invités ?",
   "La présence et le nom sont toujours demandés. Vous pouvez ajouter le nombre de personnes, les enfants, les noms des accompagnants, le régime alimentaire et les allergies, la présence au brunch du lendemain, l’email, le téléphone, l’adresse postale, un message libre et une question personnalisée, avec une date limite de réponse."),
  ("Comment suivre les réponses ?",
-  "Votre page de suivi affiche le total des adultes, des enfants et des absents, la liste des régimes alimentaires pour le traiteur, une recherche, des filtres présents ou absents et un export CSV à ouvrir dans Excel ou Google Sheets."),
+  "Une fois connecté, votre page de suivi affiche le total des adultes, des enfants et des absents, la liste des régimes alimentaires pour le traiteur, une recherche, des filtres présents ou absents et un export CSV à ouvrir dans Excel ou Google Sheets."),
  ("Combien de faire-part puis-je créer ?",
-  "Un faire-part par personne pour l’instant. Il peut contenir jusqu’à 3 photos et recevoir jusqu’à 1 000 réponses."),
+  "Un faire-part par compte pour l’instant. Il peut contenir jusqu’à 3 photos et recevoir jusqu’à 1 000 réponses."),
  ("Comment envoyer le faire-part ?",
   "Copiez le lien et collez-le où vous voulez : WhatsApp, SMS, email ou réseaux sociaux. Maison Meli n’envoie pas de message à votre place et ne demande pas les coordonnées de vos invités."),
  ("Puis-je supprimer mon faire-part et les réponses ?",
-  "Oui, à tout moment depuis votre page « Mes faire-part ». La suppression est définitive et efface aussi les réponses reçues."),
+  "Oui, à tout moment depuis votre page « Mon faire-part ». La suppression est définitive et efface aussi les réponses reçues. Vous pouvez aussi supprimer votre compte."),
 ]
 STEPS = [
  ("Indiquez les prénoms, la date et le lieu", "Ce sont les seules informations obligatoires. L’aperçu se met à jour pendant que vous écrivez."),
@@ -36,9 +36,9 @@ ld = [
  {"@context":"https://schema.org","@type":"WebSite","name":"Maison Meli","url":SITE,"inLanguage":"fr-FR","description":DESC},
  {"@context":"https://schema.org","@type":"WebApplication","name":"Maison Meli","url":SITE,"applicationCategory":"LifestyleApplication",
   "operatingSystem":"Web","browserRequirements":"Navigateur récent, sur téléphone ou ordinateur","inLanguage":"fr-FR",
-  "description":"Créateur de faire-part de mariage digital avec formulaire de réponse (RSVP) intégré et suivi des réponses, sans création de compte.",
+  "description":"Créateur de faire-part de mariage digital avec formulaire de réponse (RSVP) intégré et suivi des réponses.",
   "offers":{"@type":"Offer","price":"0","priceCurrency":"EUR"},
-  "featureList":["Faire-part de mariage en ligne à partager par lien","9 ambiances, 12 palettes de couleurs, 8 typographies","Formulaire de réponse (RSVP) intégré","Suivi des réponses et export CSV","Liste des régimes alimentaires pour le traiteur","Modifiable après l’envoi","Sans création de compte"]},
+  "featureList":["Faire-part de mariage en ligne à partager par lien","9 ambiances, 12 palettes de couleurs, 8 typographies","Formulaire de réponse (RSVP) intégré","Suivi des réponses et export CSV","Liste des régimes alimentaires pour le traiteur","Modifiable après l’envoi","Connexion par code email ou Google, sans mot de passe"]},
  {"@context":"https://schema.org","@type":"HowTo","name":"Créer un faire-part de mariage digital avec Maison Meli","totalTime":"PT3M",
   "step":[{"@type":"HowToStep","position":i+1,"name":n,"text":t} for i,(n,t) in enumerate(STEPS)]},
  {"@context":"https://schema.org","@type":"FAQPage",
@@ -89,7 +89,7 @@ page = f'''<!doctype html>
   <nav aria-label="Navigation principale">
     <a href="#ambiances">Ambiances</a>
     <a href="#questions">Questions</a>
-    <a href="admin.html" id="nav-mine" hidden>Mon faire-part</a>
+    <a href="admin.html" id="nav-mine">Se connecter</a>
     <a class="btn btn-small" href="creer.html" data-create>Créer mon faire-part</a>
   </nav>
 </header>
@@ -98,14 +98,14 @@ page = f'''<!doctype html>
   <section class="hero" aria-labelledby="h-hero">
     <div class="hero-text">
       <h1 id="h-hero">Le faire-part de mariage digital, gratuit, avec les réponses de vos invités</h1>
-      <p class="lead">Écrivez vos prénoms, choisissez une ambiance, partagez un lien. Vos invités ouvrent l’enveloppe sur leur téléphone et répondent sur place. Prêt en 3 minutes, sans compte à créer.</p>
+      <p class="lead">Écrivez vos prénoms, choisissez une ambiance, partagez un lien. Vos invités ouvrent l’enveloppe sur leur téléphone et répondent sur place. Prêt en 3 minutes.</p>
       <div class="start" id="start" role="group" aria-label="Commencer mon faire-part">
         <label>Premier prénom<input type="text" id="p1" maxlength="40" autocomplete="off" autocapitalize="words" placeholder="Camille"></label>
         <span class="start-amp" aria-hidden="true">&amp;</span>
         <label>Second prénom<input type="text" id="p2" maxlength="40" autocomplete="off" autocapitalize="words" placeholder="Hugo"></label>
         <a class="btn btn-big" href="creer.html" data-create id="cta-hero">Créer mon faire-part</a>
       </div>
-      <p class="reassure">Gratuit. Aucune carte bancaire, aucun compte. Modifiable après l’envoi.</p>
+      <p class="reassure">Gratuit, sans carte bancaire. Le compte se crée en dernier, au moment de publier.</p>
       <p class="back-home" id="back-home" hidden><a href="admin.html" id="back-link">Retrouver mon faire-part et les réponses</a></p>
     </div>
     <div class="hero-demo">
@@ -159,10 +159,10 @@ page = f'''<!doctype html>
   </section>
 
   <section class="nokey" aria-labelledby="h-nokey">
-    <h2 id="h-nokey">Pas de compte, deux liens</h2>
+    <h2 id="h-nokey">Un compte, sans mot de passe</h2>
     <div class="two">
-      <p>À la publication, vous recevez un <strong>lien public</strong> à envoyer à vos invités et un <strong>lien de gestion</strong> que vous gardez pour vous. Le second ouvre vos réponses et permet de modifier le faire-part depuis n’importe quel appareil.</p>
-      <p>Ni mot de passe à retenir, ni email à confirmer. En contrepartie, ce lien de gestion est votre seule clé : à la fin, vous pouvez vous l’envoyer par email en un clic pour ne pas le perdre.</p>
+      <p>Vous personnalisez votre faire-part sans rien créer. Au moment de publier, vous indiquez votre <strong>adresse email</strong> et recevez un code à 6 chiffres, ou vous continuez avec <strong>Google</strong>. C’est tout.</p>
+      <p>Ce compte garde votre faire-part et les réponses de vos invités : vous les retrouvez depuis votre téléphone ou votre ordinateur, sans lien à conserver. Vos invités, eux, n’ont aucun compte à créer.</p>
     </div>
   </section>
 
@@ -184,7 +184,7 @@ page = f'''<!doctype html>
   <p class="logo">Maison Meli</p>
   <nav aria-label="Pied de page">
     <a href="creer.html" data-create>Créer mon faire-part</a>
-    <a href="admin.html">Mes faire-part</a>
+    <a href="admin.html">Mon faire-part</a>
     <a href="confidentialite.html">Confidentialité</a>
   </nav>
 </footer>

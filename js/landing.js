@@ -2,10 +2,6 @@
 // avec les prénoms et l'ambiance choisis (dans le fragment d'URL : jamais envoyés au serveur).
 (function(){
   'use strict';
-  // Anciens liens de modification (index.html?f=<id>#k=<clé>) : l'éditeur a déménagé sur creer.html.
-  if(/^[a-z0-9][a-z0-9-]{2,62}$/.test(new URLSearchParams(location.search).get('f') || '')){
-    location.replace('creer.html' + location.search + location.hash); return;
-  }
   var FP = window.FP;
   var $ = function(id){ return document.getElementById(id); };
   var $$ = function(sel){ return Array.prototype.slice.call(document.querySelectorAll(sel)); };
@@ -89,14 +85,12 @@
     $(id).addEventListener('keydown', function(e){ if(e.key === 'Enter'){ e.preventDefault(); location.href = target(picked ? preset.id : ''); } });
   });
 
-  // ---------- Visiteur qui a déjà un faire-part dans ce navigateur ----------
+  // ---------- Visiteur déjà connecté dans ce navigateur ----------
   (function(){
-    var mine = [], tester = '';
-    try{ mine = JSON.parse(localStorage.getItem('fp:mine') || '[]'); tester = localStorage.getItem('fp:tester') || ''; }catch(e){}
-    var space = /^[a-z0-9]{32}$/.test(tester), has = Array.isArray(mine) && mine.length > 0;
-    if(!space && !has) return;
-    $('nav-mine').hidden = false; $('back-home').hidden = false;
-    if(space){ $('nav-mine').textContent = 'Mon espace'; $('back-link').textContent = 'Retrouver mon espace et mes faire-part'; }
+    var s = null;
+    try{ s = JSON.parse(localStorage.getItem('fp:session') || 'null'); }catch(e){}
+    if(!s || !s.user || typeof s.user.id !== 'string') return;
+    $('nav-mine').textContent = 'Mon faire-part'; $('back-home').hidden = false;
   })();
 
   renderDemo(true); minis(); hrefs();

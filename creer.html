@@ -23,24 +23,18 @@
     <p class="brand"><a href="./">Maison Meli</a></p>
     <header class="hello">
       <h1 id="title">Votre faire-part, prêt en 3 minutes</h1>
-      <p class="muted" id="subtitle">Pas de compte à créer. Seules les deux premières étapes sont obligatoires : tout le reste est déjà prêt, vous l’ajustez si vous le souhaitez.</p>
+      <p class="muted" id="subtitle">Seules les deux premières étapes sont obligatoires : tout le reste est déjà prêt, vous l’ajustez si vous le souhaitez. Votre compte se crée au moment de publier.</p>
       <p class="draft-note" id="draft-note" hidden>Votre brouillon a été restauré. <button type="button" class="link-btn" id="reset-draft">Recommencer à zéro</button></p>
-      <p><a id="mine-link" href="admin.html" hidden>Mes faire-part</a></p>
+      <p><a id="mine-link" href="admin.html">Se connecter</a></p>
+      <p class="draft-note" id="notice" role="status" hidden></p>
     </header>
 
-    <!-- Hors espace testeur : un seul faire-part par personne. S'il existe déjà, on propose de le modifier. -->
-    <section id="gate" class="gate" hidden aria-labelledby="gate-title">
-      <h2 id="gate-title" tabindex="-1">Vous avez déjà un faire-part</h2>
-      <p class="gate-names" id="gate-names"></p>
-      <p class="muted">Pour l’instant, Maison Meli permet de créer un faire-part par personne. Vous pouvez le modifier autant de fois que vous le souhaitez : le lien envoyé à vos invités ne change pas.</p>
-      <div class="gate-actions">
-        <a class="btn-main" id="gate-edit">Modifier mon faire-part</a>
-        <a class="btn-ghost" id="gate-rsvps">Voir les réponses</a>
-        <a class="btn-ghost" id="gate-open" target="_blank" rel="noopener">Voir le faire-part</a>
-      </div>
-      <p class="gate-foot muted">Pour repartir de zéro, supprimez-le depuis <a href="admin.html">Mes faire-part</a>.</p>
+    <!-- Au moment de publier : connexion ou création du compte (le brouillon reste dans ce navigateur pendant ce temps). -->
+    <section id="auth-step" class="gate" hidden>
+      <div id="auth-box"></div>
+      <p class="gate-foot"><button type="button" class="link-btn" id="auth-back">Revenir à mon faire-part</button></p>
     </section>
-    <p class="muted" id="gate-wait" role="status" hidden>Chargement…</p>
+    <p class="muted" id="load-wait" role="status" hidden>Chargement…</p>
 
     <ol class="steps" id="steps" aria-label="Progression">
       <li>Les mariés</li><li>Le lieu</li><li>Style</li><li>Textes</li><li>Réponses</li>
@@ -197,7 +191,7 @@
           <label class="f">Question personnalisée <span class="opt">(facultatif)</span><input type="text" data-bind-rsvp-text="customLabel" maxlength="80" placeholder="Une chanson qui vous fera danser ?"></label>
           <label class="f">Date limite de réponse <span class="opt">(facultatif)</span><input type="date" data-bind-rsvp-text="deadline" id="deadline-input" max="2050-12-31"></label>
         </div>
-        <p class="legal-note">En publiant, vous acceptez que les informations saisies soient enregistrées pour afficher votre faire-part. <a href="confidentialite.html" target="_blank" rel="noopener">Confidentialité</a></p>
+        <p class="legal-note">Pour publier, vous vous connectez ou créez votre compte (email ou Google). Les informations saisies sont enregistrées pour afficher votre faire-part. <a href="confidentialite.html" target="_blank" rel="noopener">Confidentialité</a></p>
       </fieldset>
 
       <p class="form-msg" id="step-msg" role="alert"></p>
@@ -223,17 +217,11 @@
         <div class="link-row"><input type="text" id="public-link" readonly aria-label="Lien du faire-part"><button type="button" class="btn-ghost" data-copy="public-link">Copier</button></div>
         <p class="hint done-note" id="done-note"></p>
       </div>
-      <div class="link-card warn" id="private-card" hidden>
-        <h3>Votre lien de gestion, à garder pour vous</h3>
-        <p class="card-text">Il sert à modifier le faire-part et à suivre les réponses depuis n’importe quel appareil. Il n’y a pas de compte : ce lien est votre seule clé. Ce navigateur s’en souvient, mais si vous videz ses données sans avoir gardé le lien, il ne peut pas être retrouvé.</p>
-        <div class="link-row"><input type="text" id="private-link" readonly aria-label="Lien de gestion (privé)"><button type="button" class="btn-ghost" data-copy="private-link">Copier</button></div>
-        <p class="card-more"><a class="btn-ghost small" id="mail-link">Me l’envoyer par email</a></p>
-      </div>
       <div class="done-actions">
         <a class="btn-ghost" id="public-open" target="_blank" rel="noopener">Ouvrir le faire-part</a>
         <a class="btn-ghost" id="edit-again">Modifier le faire-part</a>
       </div>
-      <a class="btn-main done-back" id="go-mine" href="admin.html">Retour à mon espace</a>
+      <a class="btn-main done-back" id="go-mine" href="admin.html">Voir les réponses de mes invités</a>
     </section>
   </main>
 
@@ -251,6 +239,7 @@
   </aside>
 </div>
 <script src="js/config.js"></script>
+<script src="js/auth.js"></script>
 <script src="js/api.js"></script>
 <script src="js/render.js"></script>
 <script src="js/onboarding.js"></script>

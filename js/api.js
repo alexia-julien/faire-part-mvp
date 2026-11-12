@@ -1,5 +1,8 @@
 // Accès aux données : Supabase (fonctions RPC) ou, sans config, stockage local du navigateur.
 // Même interface dans les deux cas, donc le reste du code ne change pas.
+//   * Invités (sans compte) : getInvitation, submitRsvp.
+//   * Compte connecté (js/auth.js) : monFaire-part… Chaque compte a AU PLUS un faire-part ; le serveur sait lequel
+//     d'après le jeton de session, il n'y a donc ni identifiant ni clé à fournir.
 (function(){
   'use strict';
   var FP = window.FP = window.FP || {};
@@ -7,249 +10,134 @@
   var remote = !!(C.supabaseUrl && C.supabaseKey);
   FP.isRemote = remote;
 
-  function rpc(fn, args){
+  function signedOut(){ var e = new Error('signed out'); e.signedOut = true; return e; }
+  function post(fn, args, token){
     return fetch(C.supabaseUrl.replace(/\/$/, '') + '/rest/v1/rpc/' + fn, {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json', apikey: C.supabaseKey, Authorization: 'Bearer ' + C.supabaseKey },
-      body: JSON.stringify(args)
+      headers: { 'Content-Type': 'application/json', apikey: C.supabaseKey, Authorization: 'Bearer ' + (token || C.supabaseKey) },
+      body: JSON.stringify(args || {})
     }).then(function(r){
       return r.text().then(function(t){
         var body = null; try{ body = t ? JSON.parse(t) : null; }catch(e){}
         if(!r.ok){
           var err = new Error((body && body.message) || ('HTTP ' + r.status));
           err.conflict = r.status === 409 || (body && body.code === '23505');
-          err.forbidden = r.status === 403 || (body && body.code === '42501');
-          err.missing = r.status === 404 || (body && body.code === 'PGRST202'); // fonction SQL pas encore déployée
+          err.forbidden = r.status === 401 || r.status === 403 || (body && body.code === '42501');
+          err.onePerAccount = /one per account/i.test(err.message);
           throw err;
         }
         return body;
       });
     });
   }
+  // Appel public (invités) : toujours avec la clé publique, jamais avec la session.
+  function rpc(fn, args){ return post(fn, args, null); }
+  // Appel réservé au compte connecté. Session absente, expirée ou refusée par le serveur : erreur « signedOut ».
+  function arpc(fn, args){
+    return FP.auth.token().then(function(tok){
+      if(!tok) throw signedOut();
+      return post(fn, args, tok).catch(function(e){
+        if(e && e.forbidden && !e.onePerAccount){ FP.auth.drop(); throw signedOut(); }
+        throw e;
+      });
+    });
+  }
 
-  // --- Mode local ---
+  // --- Mode local : db = { inv: { <slug>: { owner, config, created_at, updated_at } }, rsvps: { <slug>: [...] } } ---
   var DB_KEY = 'fp:db';
   function load(){ try{ return JSON.parse(localStorage.getItem(DB_KEY)) || { inv: {}, rsvps: {} }; }catch(e){ return { inv: {}, rsvps: {} }; } }
   function save(db){
     try{ localStorage.setItem(DB_KEY, JSON.stringify(db)); }
     catch(e){ throw new Error('Stockage local plein (essayez avec moins de photos).'); }
   }
+  function me(){ var u = FP.auth.user(); return u ? u.id : ''; }
+  function mySlug(db){ var id = me(); return Object.keys(db.inv).filter(function(s){ return id && db.inv[s].owner === id; })[0] || ''; }
+  function asAccount(fn){ // exécute fn(db, slugDuCompte) si quelqu'un est connecté ; enregistre si fn renvoie { save: true, value }
+    if(!me()) return Promise.reject(signedOut());
+    try{
+      var db = load(), out = fn(db, mySlug(db));
+      if(out && out.save) save(db);
+      return Promise.resolve(out ? out.value : undefined);
+    }catch(e){ return Promise.reject(e); }
+  }
   var local = {
-    createInvitation: function(slug, key, config){
-      var db = load();
-      if(db.inv[slug]){ var e = new Error('slug pris'); e.conflict = true; return Promise.reject(e); }
-      db.inv[slug] = { key: key, config: config }; db.rsvps[slug] = [];
-      try{ save(db); }catch(e){ return Promise.reject(e); }
-      return Promise.resolve();
-    },
-    updateInvitation: function(slug, key, config){
-      var db = load(), i = db.inv[slug];
-      if(!i || i.key !== key){ var e = new Error('forbidden'); e.forbidden = true; return Promise.reject(e); }
-      i.config = config;
-      try{ save(db); }catch(e){ return Promise.reject(e); }
-      return Promise.resolve();
-    },
     getInvitation: function(slug){ var i = load().inv[slug]; return Promise.resolve(i ? i.config : null); },
     submitRsvp: function(slug, data){
       var db = load();
       if(!db.inv[slug]) return Promise.reject(new Error('introuvable'));
+      db.rsvps[slug] = db.rsvps[slug] || [];
       var maxId = db.rsvps[slug].reduce(function(m, r){ return Math.max(m, +r.id || 0); }, 0);
       db.rsvps[slug].push({ id: maxId + 1, created_at: new Date().toISOString(), data: data });
       try{ save(db); }catch(e){ return Promise.reject(e); }
       return Promise.resolve();
     },
-    listRsvps: function(slug, key){
-      var i = load().inv[slug];
-      if(!i || i.key !== key){ var e = new Error('forbidden'); e.forbidden = true; return Promise.reject(e); }
-      return Promise.resolve(load().rsvps[slug] || []);
+    myInvitation: function(){
+      return asAccount(function(db, slug){
+        if(!slug) return { value: null };
+        var i = db.inv[slug], rs = db.rsvps[slug] || [];
+        return { value: { slug: slug, config: i.config, created_at: i.created_at, updated_at: i.updated_at, responses: rs.length,
+                          last_response: rs.length ? rs[rs.length - 1].created_at : null } };
+      });
     },
-    deleteRsvp: function(slug, key, id){
-      var db = load(), i = db.inv[slug];
-      if(!i || i.key !== key){ var e = new Error('forbidden'); e.forbidden = true; return Promise.reject(e); }
-      db.rsvps[slug] = (db.rsvps[slug] || []).filter(function(r){ return r.id !== id; });
-      try{ save(db); }catch(e){ return Promise.reject(e); }
-      return Promise.resolve();
+    createInvitation: function(slug, config){
+      return asAccount(function(db, mine){
+        var e;
+        if(mine){ e = new Error('one per account'); e.onePerAccount = true; throw e; }
+        if(db.inv[slug]){ e = new Error('slug pris'); e.conflict = true; throw e; }
+        var now = new Date().toISOString();
+        db.inv[slug] = { owner: me(), config: config, created_at: now, updated_at: now }; db.rsvps[slug] = [];
+        return { save: true };
+      });
     },
-    summarize: function(items){
-      var db = load();
-      return Promise.resolve(items.map(function(it){
-        var i = db.inv[it.slug];
-        if(!i || i.key !== it.key) return { slug: it.slug, invalid: true };
-        var rs = db.rsvps[it.slug] || [], c = i.config || {};
-        return { slug: it.slug, partner1: c.partner1, partner2: c.partner2, date: c.date, theme: c.theme, responses: rs.length,
-                 last_response: rs.length ? rs[rs.length - 1].created_at : null };
-      }));
+    updateInvitation: function(config){
+      return asAccount(function(db, slug){
+        if(!slug) throw new Error('aucun faire-part');
+        db.inv[slug].config = config; db.inv[slug].updated_at = new Date().toISOString();
+        return { save: true };
+      });
     },
-    // Espaces testeurs : en local, db.testers = { <jeton>: { name, disabled, items: { <slug>: <clé> } } } (créés à la main / par les tests).
-    deleteInvitation: function(slug, key){
-      var db = load(), i = db.inv[slug];
-      if(!i || i.key !== key){ var e = new Error('forbidden'); e.forbidden = true; return Promise.reject(e); }
-      delete db.inv[slug]; delete db.rsvps[slug];
-      Object.keys(db.testers || {}).forEach(function(t){ if(db.testers[t].items) delete db.testers[t].items[slug]; });
-      try{ save(db); }catch(e){ return Promise.reject(e); }
-      return Promise.resolve();
+    deleteInvitation: function(){
+      return asAccount(function(db, slug){
+        if(!slug) return { value: false };
+        delete db.inv[slug]; delete db.rsvps[slug];
+        return { save: true, value: true };
+      });
     },
-    testerWorkspace: function(token){
-      var t = (load().testers || {})[token];
-      if(!t || t.disabled) return Promise.resolve(null);
-      return Promise.resolve({ name: t.name, items: Object.keys(t.items || {}).map(function(s){ return { slug: s, key: t.items[s] }; }) });
+    listRsvps: function(){ return asAccount(function(db, slug){ return { value: slug ? (db.rsvps[slug] || []) : null }; }); },
+    deleteRsvp: function(id){
+      return asAccount(function(db, slug){
+        if(!slug) throw new Error('aucun faire-part');
+        db.rsvps[slug] = (db.rsvps[slug] || []).filter(function(r){ return r.id !== id; });
+        return { save: true };
+      });
     },
-    testerAttach: function(token, slug, key){
-      var db = load(), t = (db.testers || {})[token], i = db.inv[slug];
-      if(!t || t.disabled || !i || i.key !== key){ var e = new Error('forbidden'); e.forbidden = true; return Promise.reject(e); }
-      t.items = t.items || {}; t.items[slug] = key;
-      try{ save(db); }catch(e){ return Promise.reject(e); }
-      return Promise.resolve();
-    },
-    testerDetach: function(token, slug){
-      var db = load(), t = (db.testers || {})[token];
-      if(!t || t.disabled){ var e = new Error('forbidden'); e.forbidden = true; return Promise.reject(e); }
-      if(t.items) delete t.items[slug];
-      try{ save(db); }catch(e){ return Promise.reject(e); }
-      return Promise.resolve();
+    deleteAccount: function(){
+      return asAccount(function(db, slug){
+        if(slug){ delete db.inv[slug]; delete db.rsvps[slug]; }
+        return { save: true };
+      }).then(function(){ FP.auth.drop(); });
     }
   };
 
-  // --- Mode Supabase ---
+  // --- Mode Supabase (voir supabase/comptes.sql) ---
   var supa = {
-    createInvitation: function(slug, key, config){ return rpc('create_invitation', { p_slug: slug, p_key: key, p_config: config }).then(function(){}); },
-    updateInvitation: function(slug, key, config){
-      return rpc('update_invitation', { p_slug: slug, p_key: key, p_config: config }).then(function(ok){
-        if(!ok){ var e = new Error('forbidden'); e.forbidden = true; throw e; }
-      });
-    },
     getInvitation: function(slug){ return rpc('get_invitation', { p_slug: slug }); },
     submitRsvp: function(slug, data){ return rpc('submit_rsvp', { p_slug: slug, p_data: data }).then(function(){}); },
-    // Le serveur renvoie null (et non une erreur) quand la clé est mauvaise.
-    listRsvps: function(slug, key){
-      return rpc('list_rsvps', { p_slug: slug, p_key: key }).then(function(r){
-        if(r === null){ var e = new Error('forbidden'); e.forbidden = true; throw e; }
-        return r;
-      });
+    myInvitation: function(){ return arpc('account_invitation', {}).then(function(v){ return v && typeof v === 'object' && typeof v.slug === 'string' ? v : null; }); },
+    createInvitation: function(slug, config){ return arpc('account_create_invitation', { p_slug: slug, p_config: config }).then(function(){}); },
+    updateInvitation: function(config){
+      return arpc('account_update_invitation', { p_config: config }).then(function(ok){ if(!ok) throw new Error('aucun faire-part'); });
     },
-    deleteRsvp: function(slug, key, id){
-      return rpc('delete_rsvp', { p_slug: slug, p_key: key, p_id: id }).then(function(ok){
-        if(!ok){ var e = new Error('forbidden'); e.forbidden = true; throw e; }
-      });
-    },
-    // Résumé de la liste « Mes faire-part » en UN appel (summarize_invitations, chaque clé vérifiée côté serveur) :
-    // un espace testeur peut contenir des dizaines de faire-part. Si la fonction n'est pas déployée, on se rabat sur
-    // get_invitation + list_rsvps, faire-part par faire-part.
-    summarize: function(items){
-      return rpc('summarize_invitations', { p_items: items }).then(function(list){
-        if(!Array.isArray(list)) throw new Error('invalid');
-        return list;
-      }).catch(function(e){
-        if(e && /rate limit/i.test(e.message)) throw e;
-        return supa.summarizeEach(items);
-      });
-    },
-    summarizeEach: function(items){
-      return Promise.all(items.map(function(it){
-        return Promise.all([supa.getInvitation(it.slug), supa.listRsvps(it.slug, it.key)]).then(function(res){
-          var c = res[0], rs = res[1];
-          if(!c || !Array.isArray(rs)) return { slug: it.slug, invalid: true };
-          var last = rs.reduce(function(m, r){ return r && r.created_at > m ? r.created_at : m; }, '');
-          return { slug: it.slug, partner1: c.partner1, partner2: c.partner2, date: c.date, theme: c.theme,
-                   responses: rs.length, last_response: last || null };
-        }, function(e){
-          return e && e.forbidden ? { slug: it.slug, invalid: true } : { slug: it.slug, responses: null };
-        });
-      }));
-    },
-    // Suppression définitive (réponses comprises). Le serveur renvoie false si la clé est mauvaise.
-    deleteInvitation: function(slug, key){
-      return rpc('delete_invitation', { p_slug: slug, p_key: key }).then(function(ok){
-        if(!ok){ var e = new Error('forbidden'); e.forbidden = true; throw e; }
-      });
-    },
-    // Espaces testeurs. Le serveur renvoie null / false (et non une erreur) quand le jeton ou la clé est mauvais.
-    testerWorkspace: function(token){ return rpc('tester_workspace', { p_token: token }); },
-    testerAttach: function(token, slug, key){
-      return rpc('tester_attach', { p_token: token, p_slug: slug, p_key: key }).then(function(ok){
-        if(!ok){ var e = new Error('forbidden'); e.forbidden = true; throw e; }
-      });
-    },
-    testerDetach: function(token, slug){
-      return rpc('tester_detach', { p_token: token, p_slug: slug }).then(function(ok){
-        if(!ok){ var e = new Error('forbidden'); e.forbidden = true; throw e; }
-      });
-    }
+    deleteInvitation: function(){ return arpc('account_delete_invitation', {}).then(function(ok){ return !!ok; }); },
+    listRsvps: function(){ return arpc('account_rsvps', {}); },
+    deleteRsvp: function(id){ return arpc('account_delete_rsvp', { p_id: id }).then(function(){}); },
+    deleteAccount: function(){ return arpc('delete_account', {}).then(function(){ FP.auth.drop(); }); }
   };
 
   FP.api = remote ? supa : local;
 
-  // ---------- « Mes faire-part » : la liste des faire-part gérés depuis CE navigateur (pas de compte) ----------
-  // Chaque entrée retient l'espace testeur auquel elle appartient (champ t : jeton, '' = créé hors de tout espace).
-  // Un même navigateur peut ouvrir plusieurs liens personnels (ex. : Julien qui vérifie les liens envoyés) : un faire-part
-  // d'un espace ne doit JAMAIS être versé dans un autre. Les entrées anciennes (sans t) ne sont plus rattachées d'office.
-  var MINE_KEY = 'fp:mine', SLUG_RE = /^[a-z0-9][a-z0-9-]{2,62}$/, KEY_RE = /^[a-z0-9]{16,64}$/;
-  function mineRead(){
-    var list = [];
-    try{ list = JSON.parse(localStorage.getItem(MINE_KEY) || '[]'); }catch(e){}
-    list = Array.isArray(list) ? list.filter(function(x){ return x && SLUG_RE.test(x.slug) && KEY_RE.test(x.key); }) : [];
-    // Reprise de l'ancien format (un seul « dernier faire-part publié »)
-    try{
-      var last = JSON.parse(localStorage.getItem('fp:last') || 'null');
-      if(last && SLUG_RE.test(last.slug || '') && KEY_RE.test(last.key || '') && !list.some(function(x){ return x.slug === last.slug; })){
-        list.push({ slug: last.slug, key: last.key, addedAt: new Date().toISOString() });
-        localStorage.setItem(MINE_KEY, JSON.stringify(list));
-      }
-    }catch(e){}
-    return list;
-  }
-  function mineWrite(list){ try{ localStorage.setItem(MINE_KEY, JSON.stringify(list)); return true; }catch(e){ return false; } }
-  function mineFind(slug){ var l = mineRead(); for(var i = 0; i < l.length; i++) if(l[i].slug === slug) return l[i]; return null; }
-  FP.mine = {
-    // Avec un espace testeur actif : seulement ses faire-part (et ceux créés ici hors de tout espace, qui vont le rejoindre).
-    list: function(){
-      var t = FP.tester ? FP.tester.token() : '', l = mineRead();
-      return t ? l.filter(function(x){ return x.t === t || x.t === ''; }) : l;
-    },
-    all: mineRead,
-    find: mineFind,
-    // owner : jeton de l'espace (par défaut l'espace actif). Une entrée déjà rattachée à un AUTRE espace garde son propriétaire,
-    // sauf si owner est imposé (force = true : le serveur confirme que le faire-part est dans cet espace).
-    add: function(slug, key, owner, force){
-      if(!SLUG_RE.test(slug) || !KEY_RE.test(key)) return false;
-      var cur = FP.tester ? FP.tester.token() : '', l = mineRead(), prev = null;
-      l = l.filter(function(x){ if(x.slug === slug){ prev = x; return false; } return true; });
-      var t = typeof owner === 'string' ? owner : cur;
-      if(!force && prev && typeof prev.t === 'string' && prev.t !== '' && prev.t !== t) t = prev.t;
-      l.unshift({ slug: slug, key: key, t: t, addedAt: new Date().toISOString() });
-      return mineWrite(l.slice(0, 100));
-    },
-    remove: function(slug){
-      mineWrite(mineRead().filter(function(x){ return x.slug !== slug; }));
-      try{ var last = JSON.parse(localStorage.getItem('fp:last') || 'null'); if(last && last.slug === slug) localStorage.removeItem('fp:last'); }catch(e){}
-    }
-  };
-
-  // ---------- Espace testeur : lien personnel (admin.html#t=<jeton>) qui retrouve tous les faire-part d'un testeur ----------
-  // Le jeton est lu dans le fragment d'URL (jamais envoyé au serveur dans l'adresse), puis mémorisé dans ce navigateur :
-  // tout faire-part créé ou ouvert ensuite est rattaché automatiquement à l'espace.
-  var TESTER_KEY = 'fp:tester', TOKEN_RE = /^[a-z0-9]{32}$/;
-  (function(){
-    var t = new URLSearchParams(location.hash.slice(1)).get('t') || '';
-    if(TOKEN_RE.test(t)){ try{ localStorage.setItem(TESTER_KEY, t); }catch(e){} }
-  })();
-  FP.tester = {
-    token: function(){ var t = ''; try{ t = localStorage.getItem(TESTER_KEY) || ''; }catch(e){} return TOKEN_RE.test(t) ? t : ''; },
-    link: function(){
-      var t = FP.tester.token(); if(!t) return '';
-      var u = new URL('admin.html', location.href); u.search = ''; u.hash = 't=' + t; return u.href;
-    },
-    // Rattache un faire-part à l'espace (silencieux : renvoie une promesse qui ne rejette jamais ; true si rattaché).
-    // Refusé si ce navigateur sait que le faire-part appartient à un AUTRE espace, ou s'il date d'avant ce suivi (sans t).
-    attach: function(slug, key){
-      var t = FP.tester.token();
-      if(!t || !SLUG_RE.test(slug) || !KEY_RE.test(key)) return Promise.resolve(false);
-      var e = mineFind(slug);
-      if(e && (typeof e.t !== 'string' || (e.t !== '' && e.t !== t))) return Promise.resolve(false);
-      return FP.api.testerAttach(t, slug, key).then(function(){ FP.mine.add(slug, key, t, true); return true; }, function(){ return false; });
-    },
-    forget: function(){ try{ localStorage.removeItem(TESTER_KEY); }catch(e){} }
-  };
+  // Ménage : les anciens liens privés et espaces testeurs n'existent plus (tout passe par le compte).
+  try{ ['fp:mine', 'fp:last', 'fp:tester'].forEach(function(k){ localStorage.removeItem(k); }); }catch(e){}
 
   // Utilitaires partagés
   // Alphabet de exactement 32 caractères (sans 0/o/1/l) : 256 est divisible par 32, donc aucun biais statistique.
@@ -263,17 +151,18 @@
     return String(s || '').normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
       .replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 40);
   };
-  // Identifiant et clé lus dans l'URL, validés (format strict) avant toute utilisation.
+  // Identifiant du faire-part lu dans l'URL, validé (format strict) avant toute utilisation.
   FP.params = function(){
     var slug = new URLSearchParams(location.search).get('f') || (/\/f\/([a-z0-9-]+)/.exec(location.pathname) || [])[1] || '';
-    var key = new URLSearchParams(location.hash.slice(1)).get('k') || '';
-    return { slug: /^[a-z0-9][a-z0-9-]{2,62}$/.test(slug) ? slug : '', key: /^[a-z0-9]{16,64}$/.test(key) ? key : '' };
+    return { slug: /^[a-z0-9][a-z0-9-]{2,62}$/.test(slug) ? slug : '' };
   };
+  FP.publicLink = function(slug){ var u = new URL('invitation.html', location.href); u.search = '?f=' + encodeURIComponent(slug); u.hash = ''; return u.href; };
 
   // Messages d'erreur affichables : jamais le texte brut renvoyé par le serveur (peut révéler des détails internes).
   FP.userError = function(e){
     var m = String((e && e.message) || '');
-    if(e && e.forbidden) return 'Le lien privé est invalide.';
+    if(e && e.signedOut) return 'Votre session a expiré : reconnectez-vous pour continuer.';
+    if(e && e.onePerAccount) return 'Ce compte a déjà un faire-part.';
     if(/rate limit/i.test(m)) return 'Trop de tentatives en peu de temps. Réessayez dans une heure.';
     if(/too large|trop/i.test(m)) return 'Le faire-part est trop volumineux : essayez avec des photos plus légères.';
     if(/Stockage local plein/.test(m)) return m;

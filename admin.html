@@ -6,7 +6,7 @@
 <meta name="referrer" content="no-referrer">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="robots" content="noindex, nofollow">
-<title>Mes faire-part</title>
+<title>Mon faire-part — Maison Meli</title>
 <link rel="icon" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 21s-7.05-4.35-9.5-8.5C.7 9 2.2 5 6.3 5c2 0 3.6 1.1 5.7 3.6C14.1 6.1 15.7 5 17.7 5c4.1 0 5.6 4 3.8 7.5C19.05 16.65 12 21 12 21z' fill='%235F6E4E'/%3E%3C/svg%3E">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -16,58 +16,27 @@
 <body class="admin-page">
 <main class="admin">
 
-  <!-- Écran 1 : la liste des faire-part -->
-  <section id="dashboard" hidden aria-labelledby="dash-title">
-    <div class="dash-head" id="dash-head">
-      <div>
-        <h1 id="dash-title">Mes faire-part</h1>
-        <p class="muted admin-sub" id="dash-sub">Choisissez un faire-part pour voir ses réponses.</p>
-      </div>
-      <a class="btn-main" href="creer.html">Créer un faire-part</a>
-    </div>
-    <p id="dash-state" class="muted" role="status"></p>
-    <div class="fp-cards" id="fp-cards"></div>
-    <!-- Testeur sans faire-part : une seule action, créer le premier -->
-    <div class="welcome" id="welcome" hidden>
-      <svg class="welcome-art" viewBox="0 0 240 170" aria-hidden="true" focusable="false">
-        <path class="wa-back" d="M30 70 L120 20 L210 70 L210 156 Q210 160 206 160 L34 160 Q30 160 30 156 Z" fill="#E9E1D0"/>
-        <g class="wa-card">
-          <rect x="58" y="14" width="124" height="104" rx="6" fill="#FFFFFF" stroke="#E7E0D2"/>
-          <rect x="64" y="20" width="112" height="92" rx="3" fill="none" stroke="#EFE9DD"/>
-          <text x="120" y="56" text-anchor="middle" font-family="Cormorant Garamond, Georgia, serif" font-size="22" fill="#3A362E">A <tspan fill="#CE968C">&amp;</tspan> J</text>
-          <line x1="104" y1="68" x2="136" y2="68" stroke="#8C9B7C"/>
-          <text x="120" y="86" text-anchor="middle" font-family="Mulish, sans-serif" font-size="8" letter-spacing="2" fill="#6B6559">7 · 08 · 2027</text>
-        </g>
-        <path class="wa-front" d="M30 70 L120 128 L210 70 L210 156 Q210 160 206 160 L34 160 Q30 160 30 156 Z" fill="#F1EADC" stroke="#E0D6C3"/>
-        <path d="M30 156 L104 112 M210 156 L136 112" stroke="#E0D6C3" fill="none"/>
-        <g class="wa-seal">
-          <g transform="translate(106 114) scale(.2333)"><path d="M111.9 60.0C111.9 66.2 107.3 72.5 104.7 78.5C102.1 84.6 100.7 92.1 96.3 96.3C92.0 100.6 84.4 101.5 78.3 104.3C72.3 107.1 66.2 112.9 60.0 113.2C53.8 113.5 46.6 109.1 41.0 105.9C35.3 102.7 30.8 98.3 26.2 93.8C21.6 89.4 16.0 85.0 13.3 79.3C10.6 73.7 9.7 66.4 9.8 60.0C9.8 53.6 11.0 46.5 13.7 40.8C16.4 35.2 21.5 30.3 26.1 26.1C30.8 21.9 36.0 18.7 41.6 15.6C47.3 12.5 53.6 8.1 60.0 7.5C66.4 6.8 74.4 8.5 80.1 11.5C85.8 14.6 89.9 20.9 94.1 25.9C98.3 30.9 102.2 35.6 105.1 41.3C108.1 47.0 112.0 53.8 111.9 60.0Z" fill="#5F6E4E"/><path d="M60 78 C47 69 42 61 46.5 55.5 C50.5 50.6 56.5 52.5 60 57.5 C63.5 52.5 69.5 50.6 73.5 55.5 C78 61 73 69 60 78 Z" fill="#F6F2EA"/></g>
-        </g>
-      </svg>
-      <h1 id="welcome-title">Votre premier <span class="nowrap">faire-part,</span> <span class="nowrap">en 3 minutes</span></h1>
-      <p class="welcome-lead">Les prénoms, la date et le lieu suffisent : tout le reste est déjà prêt. Les réponses des invités arrivent ensuite ici, au même endroit.</p>
-      <ul class="welcome-points">
-        <li>Modifiable à tout moment</li>
-        <li>Réponses des invités intégrées</li>
-        <li>Aucun compte à créer</li>
-      </ul>
-      <a class="btn-main btn-xl" href="creer.html">Créer mon premier faire-part</a>
-    </div>
+  <p class="brand"><a href="./">Maison Meli</a></p>
 
-    <div class="empty-box" id="dash-empty" hidden>
-      <h2>Aucun faire-part pour l’instant</h2>
-      <p class="muted">Créez votre premier faire-part en quelques minutes : il apparaîtra ici automatiquement.</p>
-      <a class="btn-main" href="creer.html">Créer mon faire-part</a>
-    </div>
-  </section>
+  <!-- Non connecté : connexion (code par email ou Google) -->
+  <section id="signin" class="gate" hidden><div id="auth-box"></div></section>
 
-  <!-- Écran 2 : les réponses d'un faire-part -->
+  <!-- Connecté -->
   <div id="detail" hidden>
-    <p class="back-row"><a class="back" href="admin.html">← Mes faire-part</a></p>
+    <p class="account-bar"><span id="account-email"></span> <button type="button" class="link-btn" id="signout">Se déconnecter</button></p>
     <h1 id="admin-title">Suivi des réponses</h1>
     <p class="muted admin-sub" id="admin-sub"></p>
     <p id="state" class="muted" role="status">Chargement…</p>
+    <div class="empty-box" id="none" hidden>
+      <h2>Aucun faire-part pour l’instant</h2>
+      <p class="muted">Créez-le en quelques minutes : les réponses de vos invités arriveront ensuite ici.</p>
+      <a class="btn-main" href="creer.html">Créer mon faire-part</a>
+    </div>
     <div id="content" hidden>
+      <div class="link-card">
+        <h2 class="card-h">Le lien à envoyer à vos invités</h2>
+        <div class="link-row"><input type="text" id="public-link" readonly aria-label="Lien du faire-part"><button type="button" class="btn-ghost" id="copy-link">Copier</button></div>
+      </div>
       <div class="tiles" id="tiles"></div>
       <p class="hint" id="dup-note" hidden></p>
       <section class="diet-box" id="diet-box" hidden aria-labelledby="diet-title">
@@ -76,7 +45,7 @@
       </section>
       <div class="actions">
         <a class="btn-ghost" id="open-public" target="_blank" rel="noopener">Voir le faire-part</a>
-        <a class="btn-ghost" id="edit-link">Modifier le faire-part</a>
+        <a class="btn-ghost" id="edit-link" href="creer.html">Modifier le faire-part</a>
         <button type="button" class="btn-ghost" id="csv">Exporter en CSV</button>
         <button type="button" class="btn-ghost" id="copy-emails" hidden>Copier les emails</button>
         <button type="button" class="btn-ghost" id="refresh">Actualiser</button>
@@ -100,12 +69,19 @@
       <p class="muted" id="no-match" hidden>Aucune réponse ne correspond à votre recherche.</p>
       <p class="muted" id="empty" hidden>Aucune réponse pour l’instant. Partagez le lien du faire-part pour recevoir les premières.</p>
     </div>
+    <section class="danger-zone" id="danger" hidden aria-labelledby="danger-title">
+      <h2 id="danger-title">Suppression</h2>
+      <p class="muted">Ces actions sont définitives et immédiates.</p>
+      <p><button type="button" class="link-btn danger-link" id="delete-invitation">Supprimer mon faire-part et ses réponses</button></p>
+      <p><button type="button" class="link-btn danger-link" id="delete-account">Supprimer mon compte</button></p>
+      <p class="form-msg" id="danger-msg" role="status"></p>
+    </section>
   </div>
 </main>
 <script src="js/config.js"></script>
+<script src="js/auth.js"></script>
 <script src="js/api.js"></script>
 <script src="js/render.js"></script>
-<script src="js/dashboard.js"></script>
 <script src="js/admin.js"></script>
 </body>
 </html>

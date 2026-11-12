@@ -575,3 +575,26 @@ details.more[open]{padding-bottom:1.1rem}
 .card-more{margin:.9rem 0 0}
 .legal-note{font-size:.78rem;color:var(--soft);margin:0 0 .9rem}
 @media (max-width:480px){.gate-actions a{flex:1 1 100%;text-align:center}}
+
+/* ============================================================ Comptes
+   Panneau de connexion (éditeur au moment de publier, page « Mon faire-part »), barre de compte, suppressions. */
+.auth h2{font-size:1.7rem}
+.auth h2:focus{outline:none}
+.auth>.muted{margin:.3rem 0 1.2rem}
+.auth-google{width:100%;justify-content:center;text-align:center}
+.auth-or{display:flex;align-items:center;gap:.8rem;margin:1rem 0;color:var(--soft);font-size:.85rem}
+.auth-or::before,.auth-or::after{content:"";flex:1;height:1px;background:#E4DCCB}
+.auth-form{display:grid;gap:.5rem}
+.auth-form label{font-size:.85rem;font-weight:700}
+.auth-form input{font:inherit;font-size:16px;padding:.8rem .9rem;border:1px solid #D5CCB8;border-radius:12px;background:var(--white);color:var(--ink);min-height:3rem;width:100%}
+.auth-form .btn-main{margin-top:.4rem;width:100%}
+.auth-hint{font-size:.82rem;color:var(--soft);margin:.3rem 0 0}
+.auth-sent{font-weight:700;margin:0 0 .3rem}
+.admin .gate{max-width:30rem}
+.account-bar{font-size:.88rem;color:var(--soft);margin:0 0 1rem;display:flex;flex-wrap:wrap;gap:.3rem .8rem;align-items:baseline;overflow-wrap:anywhere}
+.card-h{font-family:var(--display);font-size:1.25rem;margin:0 0 .6rem}
+.admin .link-card{margin:0 0 1.4rem}
+.danger-zone{margin-top:3rem;padding-top:1.4rem;border-top:1px solid #E4DCCB}
+.danger-zone h2{font-size:1.3rem}
+.danger-zone p{margin:.5rem 0}
+.app.gated .hello #draft-note,.app.gated .hello #mine-link{display:none}

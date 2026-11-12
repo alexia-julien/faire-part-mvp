@@ -384,42 +384,23 @@
   });
 
   // ---------- Publication ----------
-  function links(slug, key){
-    var pub = new URL('invitation.html', location.href); pub.search = '?f=' + slug; pub.hash = '';
-    var adm = new URL('admin.html', location.href); adm.search = '?f=' + slug; adm.hash = 'k=' + key;
-    return { pub: pub.href, adm: adm.href };
-  }
   function duration(s){
     if(!s) return '';
     if(s < 90) return 'Créé en ' + s + (s > 1 ? ' secondes.' : ' seconde.');
     return 'Créé en ' + Math.round(s / 60) + ' minutes.';
   }
-  function showDone(slug, key, seconds){
-    var l = links(slug, key), tester = !!FP.tester.token();
-    $('wizard').hidden = true; $('steps').hidden = true; $('draft-note').hidden = true; $('mine-link').hidden = true;
-    $('done').hidden = false; $('app').classList.add('done'); $('app').classList.remove('show-preview-on');
+  function showDone(slug, seconds){
+    var pub = FP.publicLink(slug), u = FP.auth.user();
+    $('wizard').hidden = true; $('steps').hidden = true; $('draft-note').hidden = true; $('notice').hidden = true; $('auth-step').hidden = true;
+    $('done').hidden = false; $('app').classList.add('done'); $('app').classList.remove('show-preview-on', 'gated');
     $('done-title').textContent = editing ? 'Modifications enregistrées !' : 'C’est prêt !';
-    $('public-link').value = l.pub; $('public-open').href = l.pub;
-    var ed = new URL('creer.html', location.href); ed.search = '?f=' + slug; ed.hash = 'k=' + key;
-    $('edit-again').href = ed.href;
+    $('public-link').value = pub; $('public-open').href = pub;
+    $('edit-again').href = 'creer.html';
     $('done-time').textContent = editing ? '' : duration(seconds);
-    $('go-mine').textContent = tester ? 'Retour à mon espace' : 'Voir les réponses de mes invités';
-    $('done-note').textContent = tester
-      ? 'Pas besoin de le noter : ce faire-part et son lien restent disponibles dans votre espace, avec les réponses de vos invités.'
-      : 'Collez-le dans un message, un email ou un groupe WhatsApp : vos invités répondent directement dessus.';
-    // Hors espace testeur, pas de compte : le lien de gestion est la seule clé, on l'affiche pour qu'il soit conservé.
-    $('private-card').hidden = tester;
-    if(!tester){
-      $('private-link').value = l.adm;
-      var who = [state.partner1, state.partner2].filter(Boolean).join(' & ');
-      $('mail-link').href = 'mailto:?subject=' + encodeURIComponent('Notre faire-part' + (who ? ' ' + who : '') + ' : lien de gestion (à conserver)') +
-        '&body=' + encodeURIComponent('Lien de gestion (privé, pour modifier le faire-part et voir les réponses) :\n' + l.adm +
-        '\n\nLien à envoyer aux invités :\n' + l.pub + '\n');
-      $('go-mine').href = l.adm;
-    }
-    FP.mine.add(slug, key); // retrouvable ensuite dans « Mes faire-part » (rattaché à l'espace actif)
-    if(tester) FP.tester.attach(slug, key); // le faire-part rejoint l'espace du testeur
-    published = true; clearTimeout(draftTimer); storeDel(DRAFT_KEY);
+    $('done-note').textContent = 'Collez-le dans un message, un email ou un groupe WhatsApp : vos invités répondent directement dessus.' +
+      (u && u.email ? ' Vous retrouverez ce faire-part et les réponses en vous connectant avec ' + u.email + ', depuis n’importe quel appareil.' : '');
+    published = true; clearTimeout(draftTimer); storeDel(DRAFT_KEY); pendingDel();
+    accountLink();
     window.scrollTo({ top: 0 }); $('done-title').focus({ preventScroll: true });
   }
   function cleanForPublish(){
@@ -432,24 +413,66 @@
     cfg.meta = { durationSec: editing ? (state.meta && state.meta.durationSec) || null : Math.round((Date.now() - startedAt) / 1000), updatedAt: new Date().toISOString() };
     return cfg;
   }
+  // Publier demande un compte : sans session, on ouvre la connexion ; la publication reprend juste après.
+  var PENDING_KEY = 'fp:publish-pending';
+  function pendingSet(){ try{ sessionStorage.setItem(PENDING_KEY, String(Date.now())); }catch(e){} }
+  function pendingDel(){ try{ sessionStorage.removeItem(PENDING_KEY); }catch(e){} }
+  function pendingGet(){ try{ var t = Number(sessionStorage.getItem(PENDING_KEY)); return t > 0 && Date.now() - t < 3600000; }catch(e){ return false; } }
+  function accountLink(){
+    var a = $('mine-link'), u = FP.auth.user();
+    a.textContent = u ? 'Mon faire-part et mes réponses' : 'Se connecter';
+    a.hidden = published;
+  }
+  function openAuth(){
+    writeDraft(); pendingSet();
+    wizard.hidden = true; $('steps').hidden = true; $('app').classList.add('gated'); $('app').classList.remove('show-preview-on');
+    $('auth-step').hidden = false;
+    FP.authPanel($('auth-box'), {
+      title: 'Dernière étape : votre compte',
+      text: 'Il sert à retrouver votre faire-part, à le modifier et à voir les réponses de vos invités. Votre faire-part est publié juste après.',
+      returnTo: location.href.split('#')[0].split('?')[0],
+      onSignedIn: function(){ closeAuth(); afterSignIn(); }
+    }).focus();
+    window.scrollTo({ top: 0 });
+  }
+  function closeAuth(){ $('auth-step').hidden = true; wizard.hidden = false; $('steps').hidden = false; $('app').classList.remove('gated'); }
+  $('auth-back').addEventListener('click', function(){ pendingDel(); closeAuth(); show(step); });
+  // Juste après la connexion : si ce compte a déjà un faire-part, on l'ouvre (un seul par compte) ; sinon on publie le brouillon.
+  function afterSignIn(){
+    accountLink();
+    var btn = $('publish'), msg = $('step-msg');
+    btn.disabled = true; msg.textContent = 'Connexion réussie, publication en cours…';
+    FP.api.myInvitation().then(function(inv){
+      btn.disabled = false; msg.textContent = '';
+      if(inv){ pendingDel(); enterEdit(inv, true); return; }
+      publish();
+    }).catch(function(e){ btn.disabled = false; msg.textContent = FP.userError(e); });
+  }
   function publish(){
     var btn = $('publish'), msg = $('step-msg');
+    if(!FP.auth.user()){ openAuth(); return; }
     msg.textContent = ''; btn.disabled = true;
     var cfg = cleanForPublish(), seconds = cfg.meta.durationSec;
-    function fail(e){ btn.disabled = false; msg.textContent = FP.userError(e); }
+    function fail(e){
+      btn.disabled = false;
+      if(e && e.signedOut){ accountLink(); openAuth(); return; }
+      if(e && e.onePerAccount){ afterSignIn(); return; } // créé entre-temps ailleurs : on ouvre celui qui existe
+      msg.textContent = FP.userError(e);
+    }
     if(editing){
-      FP.api.updateInvitation(editing.slug, editing.key, cfg).then(function(){ btn.disabled = false; showDone(editing.slug, editing.key, 0); }).catch(fail);
+      FP.api.updateInvitation(cfg).then(function(){ btn.disabled = false; showDone(editing.slug, 0); }).catch(fail);
       return;
     }
-    var key = FP.randomKey(24), tries = 0;
+    var tries = 0;
     (function attempt(){
       // Suffixe aléatoire de 8 caractères (~10^12 possibilités) : les liens ne sont pas devinables par énumération.
       var slug = (FP.slugify(state.partner1 + '-' + state.partner2) || 'faire-part') + '-' + FP.randomKey(8);
-      FP.api.createInvitation(slug, key, cfg).then(function(){ showDone(slug, key, seconds); })
+      FP.api.createInvitation(slug, cfg).then(function(){ showDone(slug, seconds); })
         .catch(function(e){ if(e && e.conflict && ++tries < 4) attempt(); else fail(e); });
     })();
   }
   $('publish').addEventListener('click', function(){
+
     var err = '', bad = 0;
     for(var i = 1; i <= TOTAL && !err; i++){ err = validate(i); bad = i; }
     if(err){ if(bad !== step) show(bad, true); $('step-msg').textContent = err; return; }
@@ -464,55 +487,43 @@
       else fallback();
     });
   });
-  ['public-link', 'private-link'].forEach(function(id){ $(id).addEventListener('focus', function(){ this.select(); }); });
+  $('public-link').addEventListener('focus', function(){ this.select(); });
 
-  // ---------- Démarrage : modification via lien privé, brouillon, ou nouveau faire-part ----------
+  // ---------- Démarrage : faire-part du compte connecté (modification), sinon brouillon ou nouveau faire-part ----------
   bindInputs();
-  var p = FP.params();
-  if(p.slug && p.key){
+  accountLink();
+  // Le faire-part du compte s'ouvre en modification. fromDraft : on vient de se connecter pour publier un brouillon.
+  function enterEdit(inv, fromDraft){
+    state = FP.sanitizeConfig(inv.config); editing = { slug: inv.slug }; step = 1;
     $('title').textContent = 'Modifier mon faire-part';
     $('subtitle').textContent = 'Vos changements sont publiés sur le même lien. Les réponses déjà reçues sont conservées.';
-    wizard.hidden = true; $('steps').hidden = true;
-    // On vérifie la clé AVANT d'afficher le formulaire : inutile de laisser modifier pour refuser à l'enregistrement.
-    Promise.all([FP.api.listRsvps(p.slug, p.key), FP.api.getInvitation(p.slug)]).then(function(res){
-      if(!res[1]) throw new Error('introuvable');
-      state = FP.sanitizeConfig(res[1]);
-      editing = { slug: p.slug, key: p.key };
-      FP.mine.add(p.slug, p.key); FP.tester.attach(p.slug, p.key);
+    $('draft-note').hidden = true; $('load-wait').hidden = true;
+    $('notice').hidden = !fromDraft;
+    if(fromDraft) $('notice').textContent = 'Ce compte a déjà un faire-part : le voici. Un compte ne peut en avoir qu’un, vous pouvez le modifier autant que vous voulez.';
+    $('publish').textContent = 'Enregistrer les modifications';
+    wizard.hidden = false; $('steps').hidden = false; $('app').classList.remove('gated');
+    syncInputs(); show(1); preview();
+  }
+  if(FP.auth.user()){
+    wizard.hidden = true; $('steps').hidden = true; $('load-wait').hidden = false;
+    FP.api.myInvitation().then(function(inv){
+      $('load-wait').hidden = true;
+      if(inv){ pendingDel(); enterEdit(inv, pendingGet()); return; }
       wizard.hidden = false; $('steps').hidden = false;
-      syncInputs(); show(1); preview();
+      startNew();
+      // Retour d'une connexion par redirection (Google, lien de l'email) demandée au moment de publier : on termine la publication.
+      if(pendingGet() && FP.auth.justSignedIn && !validateAll()){ show(TOTAL); publish(); }
+      else pendingDel();
     }).catch(function(e){
-      $('subtitle').textContent = e && e.forbidden ? 'Ce lien privé est invalide : impossible de modifier ce faire-part.'
-        : 'Impossible de charger ce faire-part. Vérifiez votre lien et votre connexion.';
+      $('load-wait').hidden = true; wizard.hidden = false; $('steps').hidden = false;
+      accountLink(); startNew();
+      if(!(e && e.signedOut)){ $('notice').hidden = false; $('notice').textContent = 'Impossible de vérifier votre compte pour l’instant. Vous pouvez continuer votre brouillon.'; }
     });
   } else {
-    // Un seul faire-part par personne hors espace testeur (limite côté navigateur : il n'y a pas de compte).
-    var existing = FP.tester.token() ? [] : FP.mine.list();
-    if(!existing.length) startNew();
-    else {
-      wizard.hidden = true; $('steps').hidden = true; $('app').classList.add('gated'); $('gate-wait').hidden = false;
-      FP.api.summarize(existing.map(function(x){ return { slug: x.slug, key: x.key }; })).then(function(list){
-        var by = {};
-        (Array.isArray(list) ? list : []).forEach(function(x){ if(x && typeof x.slug === 'string') by[x.slug] = x; });
-        var valid = existing.filter(function(x){ return by[x.slug] && !by[x.slug].invalid; });
-        if(!valid.length){ ungate(); startNew(); return; } // faire-part supprimés ou liens invalides : rien ne bloque
-        showGate(valid[0], by[valid[0].slug], valid.length);
-      }).catch(function(){ showGate(existing[0], null, existing.length); });
-    }
+    startNew();
+    if(FP.auth.redirectError && pendingGet()){ show(TOTAL); openAuth(); }
   }
-  function ungate(){ wizard.hidden = false; $('steps').hidden = false; $('app').classList.remove('gated'); $('gate-wait').hidden = true; }
-  function showGate(item, sum, count){
-    var l = links(item.slug, item.key);
-    var ed = new URL('creer.html', location.href); ed.search = '?f=' + item.slug; ed.hash = 'k=' + item.key;
-    var names = sum ? [sum.partner1, sum.partner2].map(function(x){ return typeof x === 'string' ? x.slice(0, 40) : ''; }).filter(Boolean).join(' & ') : '';
-    $('gate-wait').hidden = true; $('gate').hidden = false;
-    $('title').textContent = 'Votre faire-part vous attend';
-    $('subtitle').hidden = true;
-    $('gate-names').textContent = names; $('gate-names').hidden = !names;
-    $('gate-edit').href = ed.href; $('gate-open').href = l.pub;
-    if(count > 1){ $('gate-rsvps').href = 'admin.html'; $('gate-rsvps').textContent = 'Voir mes faire-part'; $('gate-open').hidden = true; $('gate-title').textContent = 'Vous avez déjà des faire-part'; }
-    else $('gate-rsvps').href = l.adm;
-  }
+  function validateAll(){ var err = ''; for(var i = 1; i <= TOTAL && !err; i++) err = validate(i); return err; }
   function startNew(){
     var draft = storeGet(DRAFT_KEY);
     if(draft && draft.state && typeof draft.state === 'object'){
@@ -524,8 +535,6 @@
       step = Math.min(Math.max(parseInt(draft.step, 10) || 1, 1), TOTAL);
     }
     $('reset-draft').addEventListener('click', function(){ storeDel(DRAFT_KEY); location.replace('creer.html'); });
-    var mine = FP.mine.list().length;
-    if(mine || FP.tester.token()){ var a = $('mine-link'); a.hidden = false; a.textContent = FP.tester.token() ? 'Mon espace' + (mine ? ' (' + mine + ')' : '') : 'Mes faire-part (' + mine + ')'; }
     // Pas de date passée ni au-delà de 2050 dans le calendrier du navigateur
     var t0 = today(), iso = t0.getFullYear() + '-' + ('0' + (t0.getMonth() + 1)).slice(-2) + '-' + ('0' + t0.getDate()).slice(-2);
     $('date-input').min = iso; $('deadline-input').min = iso;

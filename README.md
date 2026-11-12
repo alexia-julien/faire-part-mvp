@@ -2,12 +2,19 @@
 
 Générateur de faire-part digital avec RSVP intégré. Objectif : un couple publie un faire-part de qualité en moins de 3 minutes, **sans créer de compte**.
 
-Depuis le 12/11/2026, le site s'adresse directement aux particuliers (B2C), gratuitement :
-- `index.html` : **page d'accueil** (conversion, SEO, GEO). Exemple vivant dans un téléphone, 9 ambiances, FAQ. Les prénoms et l'ambiance choisis sont transmis à l'éditeur dans le fragment d'URL (`creer.html#p1=…&p2=…&s=…`), jamais au serveur.
-- `creer.html` : **l'éditeur** (ex-`index.html`). Les anciens liens `index.html?f=…#k=…` sont redirigés.
-- **Un seul faire-part par personne** hors espace testeur : si ce navigateur en gère déjà un, l'éditeur propose de le modifier au lieu d'en créer un autre. C'est une limite côté navigateur (il n'y a pas de compte) : une navigation privée ou un autre appareil la contourne. Côté serveur, seule la limitation par IP (10 créations/h) s'applique.
-- À la publication, le **lien de gestion** (privé) est affiché avec un bouton « Me l'envoyer par email » (`mailto:`, rien n'est envoyé par le site) : sans compte, c'est la seule clé du couple.
-- `confidentialite.html`, `404.html`, `robots.txt`, `sitemap.xml`, `llms.txt`, `img/og.png` (image de partage).
+## Branche `comptes` : comptes uniquement (pas encore en ligne)
+
+Cette branche remplace les liens privés et les espaces testeurs par des **comptes** (Supabase Auth). Les sections plus bas qui parlent de lien privé, de « Mes faire-part » sur l'appareil ou d'espaces testeurs décrivent l'ancien fonctionnement, encore en ligne sur `dev` jusqu'à la bascule.
+
+- **Parcours** : le visiteur personnalise son faire-part librement (`creer.html`, brouillon gardé dans le navigateur). Au clic sur « Terminer », il se connecte ou crée son compte : code à 6 chiffres reçu par email, ou Google. Le faire-part est publié dans la foulée, y compris après une redirection (Google, lien de l'email).
+- **Un faire-part par compte**, vérifié par la base (index unique). Un compte qui en a déjà un le retrouve en modification dans l'éditeur.
+- **`admin.html` = « Mon faire-part »** : connexion si besoin, lien à envoyer, réponses, export, puis suppression du faire-part ou du compte. Plus de lien privé ni de clé nulle part.
+- **`js/auth.js`** : appels directs à Supabase Auth (pas de bibliothèque), session dans le stockage du navigateur, renouvellement du jeton. En mode local (sans config Supabase), un faux service accepte le code `123456` : c'est ce que les tests utilisent.
+- **Base** : `supabase/comptes.sql` (étape 1, n'enlève rien : colonne `owner`, fonctions `account_*` réservées aux connectés), `supabase/tests-comptes.sql` (30 vérifications, annulées à la fin), puis `supabase/bascule.sql` (étape 2, **destructive** : supprime les faire-part sans compte, les fonctions à clé et les espaces testeurs). `schema.sql` et `tests.sql` décrivent l'état d'avant la bascule.
+- **À configurer dans Supabase avant la mise en ligne** : service d'envoi d'emails (SMTP), code `{{ .Token }}` dans les modèles « Magic Link » et « Confirm signup », Site URL et redirections autorisées (`https://maison-meli.com/**`), fournisseur Google.
+- **Ordre de bascule** : 1) `comptes.sql`, 2) configuration et essai de connexion, 3) fusion de `comptes` dans `dev` et `bascule.sql` au même moment.
+
+Autres pages : `index.html` (page d'accueil : conversion, SEO, GEO ; prénoms et ambiance transmis à l'éditeur dans le fragment d'URL), `confidentialite.html`, `404.html`, `robots.txt`, `sitemap.xml`, `llms.txt`, `img/og.png`.
 
 La page d'accueil est **générée** : modifier les textes, la FAQ ou les étapes dans `tools/build_landing.py`, puis `python3 tools/build_landing.py index.html` (la FAQ visible et les données structurées JSON-LD viennent de la même liste, un test le vérifie).
 
@@ -76,7 +83,7 @@ Si l'URL du projet Supabase change, mettre à jour **aussi** la CSP (`connect-sr
 Sécurité : voir [SECURITY.md](SECURITY.md) (modèle de menace, protections, limites connues).
 
 ## Tests
-`python3 tests/e2e.py` (prérequis : `pip install playwright pillow`) rejoue 264 vérifications dans un navigateur headless, en mode local : parcours complet, validations, brouillon, photos, ambiances et réglages de style, intros (enveloppe, monogramme, mouvement réduit), sections, RSVP enrichi, suivi (filtres, tri, recherche, régimes, copie des emails, CSV, cartes mobiles), modification, anciens faire-part, agenda (fuseaux horaires), sécurité (XSS, config forgée, clickjacking), espaces testeurs, page d'accueil et parcours grand public (un seul faire-part, lien de gestion, redirection des anciens liens), mobile et contrastes des 12 palettes. Captures dans `tests/out/`.
+`python3 tests/e2e.py` (prérequis : `pip install playwright pillow`) rejoue 240 vérifications dans un navigateur headless, en mode local : parcours complet, validations, brouillon, photos, ambiances et réglages de style, intros (enveloppe, monogramme, mouvement réduit), sections, RSVP enrichi, suivi (filtres, tri, recherche, régimes, copie des emails, CSV, cartes mobiles), modification, anciens faire-part, agenda (fuseaux horaires), sécurité (XSS, config forgée, clickjacking), espaces testeurs, page d'accueil et parcours grand public (un seul faire-part, lien de gestion, redirection des anciens liens), mobile et contrastes des 12 palettes. Captures dans `tests/out/`.
 
 `supabase/tests.sql` teste la base elle-même (66 vérifications, tout est annulé à la fin) : à coller dans le SQL Editor après chaque changement du schéma.
 

@@ -29,7 +29,7 @@ a:focus-visible,button:focus-visible,input:focus-visible,summary:focus-visible{o
 .top nav a:not(.btn){color:var(--ink);text-decoration:none;font-weight:600;font-size:.9rem}
 .top nav a:not(.btn):hover{color:var(--sage-deep);text-decoration:underline}
 @media (max-width:720px){.top nav a:not(.btn):not(#nav-mine){display:none}}
-@media (max-width:420px){.top .btn{display:none}.top nav #nav-mine{display:inline}}
+@media (max-width:480px){.top .btn{display:none}}
 
 main>section{padding-block:clamp(3.2rem,8vw,6rem)}
 
