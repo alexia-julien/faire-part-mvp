@@ -484,6 +484,15 @@ try:
     gg.goto(BASE + "/creer.html"); wait_until(lambda: gg.inner_text('#title') == 'Modifier mon faire-part')
     check("après une connexion par redirection, pas de republication au rechargement", len(db_get(gg)['inv']) == len(seed['inv']) + 1)
 
+    dw = fresh("draft-week")
+    dw.evaluate("""localStorage.setItem('fp:draft', JSON.stringify({state:{partner1:'Lou',partner2:'Max',date:'2027-07-03',venueName:'La Ferme'}, startedAt: Date.now() - 7*864e5, step: 5}))""")
+    dw.goto(BASE + "/creer.html"); dw.wait_for_selector('#wizard:not([hidden])')
+    for _ in range(6):
+        if not dw.is_visible('#next'): break
+        dw.click('#next'); time.sleep(0.1)
+    dw.click('#publish'); dw.wait_for_selector('#auth-step:not([hidden])'); code_login(dw, 'lou@example.com'); dw.wait_for_selector('#done:not([hidden])')
+    check("brouillon repris une semaine plus tard : la durée affichée ne compte pas la pause", dw.inner_text('#done-time') in ('', 'Créé en moins d’une minute.')
+          and db_get(dw)['inv'][dw.input_value('#public-link').split('f=')[1]]['config']['meta']['durationSec'] < 120, dw.inner_text('#done-time'))
     n = fresh("new"); n.goto(adm); n.wait_for_selector('#signin:not([hidden])'); code_login(n, '<b>x</b>@example.com'); n.wait_for_selector('#none:not([hidden])')
     check("compte neuf : aucun faire-part, invitation à le créer, email affiché sans HTML", n.is_visible('#none a[href="creer.html"]') and not n.is_visible('#content')
           and n.locator('#account-email b').count() == 0 and '<b>x</b>@example.com' in n.inner_text('#account-email') and not n.is_visible('#delete-invitation'))

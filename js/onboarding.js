@@ -10,7 +10,17 @@
   if(window.top !== window.self){ document.body.textContent = ''; return; }
 
   var DRAFT_KEY = 'fp:draft', TOTAL = 5, MAX_PHOTOS = 3, MAX_PROGRAM = 8, MAX_YEAR = 2050;
-  var state = FP.defaults(), startedAt = Date.now(), editing = null, step = 1, pendingPhotos = 0;
+  var state = FP.defaults(), editing = null, step = 1, pendingPhotos = 0;
+  // Temps réellement passé à créer le faire-part : on ne compte que les moments où la page est visible et où la personne
+  // a agi dans les 2 dernières minutes. Un brouillon repris des jours plus tard ne compte donc pas la pause.
+  var activeMs = 0, lastTick = Date.now(), lastAct = Date.now();
+  function markActive(){ lastAct = Date.now(); }
+  ['input', 'click', 'keydown', 'pointerdown', 'scroll'].forEach(function(ev){ document.addEventListener(ev, markActive, { passive: true, capture: true }); });
+  setInterval(function(){
+    var now = Date.now();
+    if(document.visibilityState === 'visible' && now - lastAct < 120000) activeMs += Math.min(now - lastTick, 10000);
+    lastTick = now;
+  }, 5000);
 
   function storeGet(k){ try{ return JSON.parse(localStorage.getItem(k) || 'null'); }catch(e){ return null; } }
   function storeSet(k, v){ try{ localStorage.setItem(k, JSON.stringify(v)); return true; }catch(e){ return false; } }
@@ -67,9 +77,9 @@
     clearTimeout(draftTimer); draftTimer = 0;
     if(editing || published || !draftDirty) return;
     draftDirty = false;
-    var d = { state: state, startedAt: startedAt, step: step };
+    var d = { state: state, activeMs: activeMs, step: step };
     if(!storeSet(DRAFT_KEY, d)){ // photos trop lourdes pour le stockage du navigateur : on garde le reste
-      storeSet(DRAFT_KEY, { state: Object.assign({}, state, { photos: [] }), startedAt: startedAt, step: step });
+      storeSet(DRAFT_KEY, { state: Object.assign({}, state, { photos: [] }), activeMs: activeMs, step: step });
     }
   }
   function saveDraft(){
@@ -386,8 +396,10 @@
   // ---------- Publication ----------
   function duration(s){
     if(!s) return '';
-    if(s < 90) return 'Créé en ' + s + (s > 1 ? ' secondes.' : ' seconde.');
-    return 'Créé en ' + Math.round(s / 60) + ' minutes.';
+    if(s < 60) return 'Créé en moins d’une minute.';
+    var m = Math.round(s / 60);
+    if(m < 120) return 'Créé en ' + m + (m > 1 ? ' minutes.' : ' minute.');
+    return ''; // au-delà de 2 heures de travail effectif, le chiffre n'apporte rien
   }
   function showDone(slug, seconds){
     var pub = FP.publicLink(slug), u = FP.auth.user();
@@ -410,7 +422,7 @@
     ['lodging', 'gifts'].forEach(function(k){ cfg.sections[k].url = cfg.sections[k].url.trim(); });
     if(!cfg.tz){ try{ cfg.tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; }catch(e){} }
     cfg = FP.sanitizeConfig(cfg); // revalide le fuseau
-    cfg.meta = { durationSec: editing ? (state.meta && state.meta.durationSec) || null : Math.round((Date.now() - startedAt) / 1000), updatedAt: new Date().toISOString() };
+    cfg.meta = { durationSec: editing ? (state.meta && state.meta.durationSec) || null : Math.round(activeMs / 1000), updatedAt: new Date().toISOString() };
     return cfg;
   }
   // Publier demande un compte : sans session, on ouvre la connexion ; la publication reprend juste après.
@@ -529,7 +541,7 @@
     if(draft && draft.state && typeof draft.state === 'object'){
       var meta = draft.state.meta;
       state = FP.sanitizeConfig(draft.state); if(meta) state.meta = state.meta || meta;
-      if(typeof draft.startedAt === 'number' && draft.startedAt <= Date.now()) startedAt = draft.startedAt;
+      if(typeof draft.activeMs === 'number' && draft.activeMs >= 0 && draft.activeMs < 864e5) activeMs = draft.activeMs; // anciens brouillons : on repart de 0
       var hasContent = state.partner1 || state.partner2 || state.date || state.venueName || state.photos.length;
       if(hasContent) $('draft-note').hidden = false;
       step = Math.min(Math.max(parseInt(draft.step, 10) || 1, 1), TOTAL);
