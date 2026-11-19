@@ -28,6 +28,7 @@ Le repo est public et la clé Supabase `anon` est visible par tous : c'est voulu
 | Exfiltration de données | CSP `connect-src` limité à l'URL exacte du projet Supabase |
 
 ## Comptes (branche `comptes`)
+- `creer.html` et `admin.html` autorisent les styles en ligne (`style-src 'unsafe-inline'`) : le bouton officiel de Google en a besoin pour s'afficher. Les scripts restent strictement limités (`script-src 'self'` + le script de Google).
 - Aucune fonction de gestion n'est appelable sans session : les fonctions `account_*` sont réservées au rôle `authenticated` et agissent sur LE faire-part du compte, déduit du jeton vérifié par Supabase. Il n'y a plus d'identifiant ni de clé à fournir, donc rien à deviner ni à faire fuiter dans un lien.
 - Un compte ne peut ni lire ni modifier le faire-part d'un autre (testé dans `supabase/tests-comptes.sql`), et les tables restent inaccessibles en direct, connecté ou non.
 - La session (jeton d'accès et jeton de renouvellement) est gardée dans le stockage du navigateur, comme le fait la bibliothèque officielle. Un script malveillant exécuté sur la page pourrait la lire : la protection est la CSP stricte (aucun script externe ni en ligne) et l'échappement systématique des contenus.
