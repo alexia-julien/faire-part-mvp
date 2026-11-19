@@ -1,4 +1,6 @@
 // Comptes : connexion par code reçu par email ou par Google (Supabase Auth, appelé directement, sans bibliothèque).
+// Google passe par le bouton officiel de Google (Google Identity Services), ouvert depuis maison-meli.com : Google renvoie un
+// jeton d'identité que Supabase vérifie. Pas de redirection par supabase.co, donc Google affiche « Maison Meli » à l'utilisateur.
 // Sans configuration Supabase (mode local, pour développer et tester) : un faux service accepte le code 123456.
 // La session vit dans le stockage du navigateur ; le serveur vérifie le jeton à chaque appel (js/api.js).
 (function(){
@@ -121,16 +123,13 @@
         return { id: s.user.id, email: s.user.email };
       }, function(e){ throw new Error(friendly(e)); });
     },
-    // Redirige vers Google ; le retour se fait sur returnTo, avec la session (voir plus haut).
-    google: function(returnTo){
-      returnTo = returnTo || location.href.split('#')[0];
-      if(!remote){ // mode local : connexion immédiate avec un compte de démonstration
-        var u = localUser('google.demo@example.com'); write({ access_token: 'local.' + u.id, refresh_token: 'local', expires_at: 4102444800, user: u });
-        try{ sessionStorage.setItem('fp:local-redirect', '1'); }catch(e){}
-        location.assign(returnTo); if(returnTo.split('#')[0] === location.href.split('#')[0]) location.reload();
-        return;
-      }
-      location.assign(BASE + '/authorize?provider=google&redirect_to=' + encodeURIComponent(returnTo));
+    // Échange le jeton d'identité Google contre une session Supabase. nonce : la valeur brute dont l'empreinte a été donnée à Google.
+    googleIdToken: function(idToken, nonce){
+      if(!remote){ var u = localUser('google.demo@example.com'); write({ access_token: 'local.' + u.id, refresh_token: 'local', expires_at: 4102444800, user: u }); return Promise.resolve(u); }
+      return call('/token?grant_type=id_token', { provider: 'google', id_token: idToken, nonce: nonce }).then(function(t){
+        var s = store(t); if(!s) throw new Error('La connexion avec Google a échoué. Réessayez ou utilisez le code par email.');
+        return { id: s.user.id, email: s.user.email };
+      }, function(e){ throw new Error(e && e.status === 429 ? friendly(e) : 'La connexion avec Google a échoué. Réessayez ou utilisez le code par email.'); });
     },
     signOut: function(){
       var s = read(); write(null);
@@ -138,7 +137,43 @@
       return call('/logout?scope=local', {}, s.access_token).then(function(){}, function(){});
     }
   };
-  if(!remote){ try{ if(sessionStorage.getItem('fp:local-redirect')){ sessionStorage.removeItem('fp:local-redirect'); FP.auth.justSignedIn = !!read(); } }catch(e){} }
+
+  // Bouton officiel Google, chargé à la demande (script de Google, autorisé par la CSP des pages concernées).
+  var gsi = null;
+  function loadGsi(){
+    if(gsi) return gsi;
+    gsi = new Promise(function(ok, ko){
+      if(window.google && google.accounts && google.accounts.id) return ok();
+      var s = document.createElement('script'); s.src = 'https://accounts.google.com/gsi/client'; s.async = true;
+      s.onload = function(){ ok(); }; s.onerror = function(){ gsi = null; ko(new Error('gsi')); };
+      document.head.appendChild(s);
+    });
+    return gsi;
+  }
+  function sha256hex(str){
+    return crypto.subtle.digest('SHA-256', new TextEncoder().encode(str)).then(function(b){
+      return Array.prototype.map.call(new Uint8Array(b), function(x){ return ('0' + x.toString(16)).slice(-2); }).join('');
+    });
+  }
+  function randomNonce(){ var a = new Uint8Array(24); crypto.getRandomValues(a); return Array.prototype.map.call(a, function(x){ return ('0' + x.toString(16)).slice(-2); }).join(''); }
+  // Affiche le bouton Google dans holder ; onToken(idToken, nonceBrut) à la connexion, onFail() s'il ne peut pas s'afficher.
+  function googleButton(holder, onToken, onFail){
+    if(!remote || !C.googleClientId){ // mode local : faux bouton, connexion de démonstration
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'btn-ghost auth-google'; b.textContent = 'Continuer avec Google';
+      b.addEventListener('click', function(){ onToken('local', 'local'); });
+      holder.appendChild(b); return;
+    }
+    var raw = randomNonce();
+    Promise.all([loadGsi(), sha256hex(raw)]).then(function(r){
+      google.accounts.id.initialize({
+        client_id: C.googleClientId, nonce: r[1], ux_mode: 'popup', auto_select: false,
+        itp_support: true, use_fedcm_for_button: true,
+        callback: function(resp){ if(resp && resp.credential) onToken(resp.credential, raw); }
+      });
+      google.accounts.id.renderButton(holder, { type: 'standard', theme: 'outline', size: 'large', text: 'continue_with',
+        shape: 'pill', logo_alignment: 'center', locale: 'fr', width: Math.min(400, Math.max(200, holder.clientWidth || 320)) });
+    }).catch(function(){ onFail(); });
+  }
 
   // ---------- Panneau de connexion (éditeur au moment de publier, page « Mon faire-part ») ----------
   // opts : { title, text, returnTo, onSignedIn(user) }. Tout le contenu est créé avec textContent (jamais de HTML injecté).
@@ -148,8 +183,8 @@
     box.textContent = ''; box.classList.add('auth');
     var h = el('h2', null, opts.title || 'Connexion'); h.tabIndex = -1; box.appendChild(h);
     if(opts.text) box.appendChild(el('p', 'muted', opts.text));
-    var g = el('button', 'btn-ghost auth-google', 'Continuer avec Google'); g.type = 'button'; box.appendChild(g);
-    box.appendChild(el('p', 'auth-or', 'ou'));
+    var g = el('div', 'auth-google-holder'); box.appendChild(g);
+    var or = el('p', 'auth-or', 'ou'); box.appendChild(or);
 
     var f1 = el('form', 'auth-form'); f1.noValidate = true;
     var l1 = el('label', null, 'Votre adresse email'); var email = el('input'); email.type = 'email'; email.id = 'auth-email';
@@ -174,8 +209,16 @@
     if(FP.auth.redirectError){ msg.textContent = FP.auth.redirectError; FP.auth.redirectError = ''; }
 
     var busy = false;
-    function lock(v){ busy = v; b1.disabled = b2.disabled = g.disabled = v; }
-    g.addEventListener('click', function(){ if(busy) return; lock(true); msg.textContent = ''; FP.auth.google(opts.returnTo); });
+    function lock(v){ busy = v; b1.disabled = b2.disabled = v; g.classList.toggle('busy', v); }
+    googleButton(g, function(idToken, nonce){
+      if(busy) return;
+      msg.textContent = ''; lock(true);
+      FP.auth.googleIdToken(idToken, nonce).then(function(u){
+        lock(false); if(typeof opts.onSignedIn === 'function') opts.onSignedIn(u);
+      }, function(err){ lock(false); msg.textContent = err.message; });
+    }, function(){
+      g.hidden = true; or.hidden = true;
+    });
     f1.addEventListener('submit', function(e){
       e.preventDefault(); if(busy) return;
       msg.textContent = ''; lock(true);

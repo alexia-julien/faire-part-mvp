@@ -582,6 +582,8 @@ details.more[open]{padding-bottom:1.1rem}
 .auth h2:focus{outline:none}
 .auth>.muted{margin:.3rem 0 1.2rem}
 .auth-google{width:100%;justify-content:center;text-align:center}
+.auth-google-holder{display:flex;justify-content:center;min-height:44px}
+.auth-google-holder.busy{opacity:.5;pointer-events:none}
 .auth-or{display:flex;align-items:center;gap:.8rem;margin:1rem 0;color:var(--soft);font-size:.85rem}
 .auth-or::before,.auth-or::after{content:"";flex:1;height:1px;background:#E4DCCB}
 .auth-form{display:grid;gap:.5rem}

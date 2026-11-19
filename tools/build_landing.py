@@ -186,6 +186,7 @@ page = f'''<!doctype html>
     <a href="creer.html" data-create>Créer mon faire-part</a>
     <a href="admin.html">Mon faire-part</a>
     <a href="confidentialite.html">Confidentialité</a>
+    <a href="conditions.html">Conditions d’utilisation</a>
   </nav>
 </footer>
 <script src="js/render.js"></script>

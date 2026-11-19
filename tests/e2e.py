@@ -478,7 +478,7 @@ try:
     while gg.is_visible('#next'): gg.click('#next'); time.sleep(0.12)
     gg.click('#publish'); gg.wait_for_selector('#auth-step:not([hidden])'); gg.click('.auth-google'); gg.wait_for_selector('#done:not([hidden])', timeout=15000)
     gslug = gg.input_value('#public-link').split('f=')[1]
-    check("connexion par redirection (Google) : au retour, le brouillon est publié sans rien ressaisir", re.fullmatch(r'ines-paul-[a-z0-9]{8}', gslug) is not None
+    check("connexion Google : le brouillon est publié dans la foulée, sans rien ressaisir", re.fullmatch(r'ines-paul-[a-z0-9]{8}', gslug) is not None
           and db_get(gg)['inv'][gslug]['owner'] == uid('google.demo@example.com') and gg.evaluate("localStorage.getItem('fp:draft')") is None
           and gg.evaluate("sessionStorage.getItem('fp:publish-pending')") is None)
     gg.goto(BASE + "/creer.html"); wait_until(lambda: gg.inner_text('#title') == 'Modifier mon faire-part')
@@ -623,7 +623,7 @@ try:
           and hm.evaluate("document.getElementById('cta-hero').getBoundingClientRect().bottom") < 740, hm.evaluate("document.getElementById('cta-hero').getBoundingClientRect().bottom"))
     check("accueil mobile : champs à 16 px (pas de zoom iOS)", hm.evaluate("parseFloat(getComputedStyle(document.getElementById('p1')).fontSize)") >= 16)
     hm.screenshot(path=OUT + "/home-mobile.png", full_page=True)
-    for path, needle in (("/confidentialite.html", "Confidentialité"), ("/404.html", "n’existe pas")):
+    for path, needle in (("/confidentialite.html", "Confidentialité"), ("/conditions.html", "Conditions d’utilisation"), ("/404.html", "n’existe pas")):
         d = watch(hc.new_page(), "doc"); d.goto(BASE + path)
         check("page " + path + " : affichée, stylée, sans script", needle in d.inner_text('h1') and d.locator('script').count() == 0
               and d.evaluate("getComputedStyle(document.body).backgroundColor") == 'rgb(246, 242, 234)')
@@ -634,6 +634,9 @@ try:
     check("robots.txt, sitemap.xml et llms.txt présents et cohérents", 'Sitemap: https://maison-meli.com/sitemap.xml' in robots and '<loc>https://maison-meli.com/</loc>' in sm and 'Maison Meli' in llms)
     og = Image.open(os.path.join(ROOT, "img", "og.png"))
     check("image de partage 1200 × 630", og.size == (1200, 630))
+    cfg_pages = {f: open(os.path.join(ROOT, f), encoding='utf-8').read() for f in ('creer.html', 'admin.html', 'index.html', 'invitation.html')}
+    check("bouton Google officiel autorisé par la CSP seulement là où on se connecte", all("https://accounts.google.com/gsi/client" in cfg_pages[f] and "frame-src https://accounts.google.com/gsi/" in cfg_pages[f] for f in ('creer.html', 'admin.html'))
+          and not any("accounts.google.com" in cfg_pages[f] for f in ('index.html', 'invitation.html')) and "/authorize?provider=google" not in open(os.path.join(ROOT, 'js', 'auth.js'), encoding='utf-8').read())
     check("plus aucune trace des liens privés ni des espaces testeurs dans le code du site", not any(re.search(r"FP\.mine|FP\.tester|#k=|tester_|summarize_invitations", open(os.path.join(ROOT, f), encoding='utf-8').read())
           for f in ('js/api.js', 'js/auth.js', 'js/onboarding.js', 'js/admin.js', 'js/invitation.js', 'js/landing.js', 'creer.html', 'admin.html', 'index.html')) and not os.path.exists(os.path.join(ROOT, 'js', 'dashboard.js')))
     check("pages privées et éditeur non indexés", all('noindex' in open(os.path.join(ROOT, f), encoding='utf-8').read() for f in ('creer.html', 'admin.html', 'invitation.html')))
