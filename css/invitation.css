@@ -264,3 +264,10 @@
 
 @media (prefers-reduced-motion:reduce){.fp .names{animation:none!important}}
 
+/* Réponse envoyée : rappel, correction (US-13) et lien « Créez le vôtre » (US-14) */
+.fp .answer-recap{color:var(--ink-soft);font-size:.92rem;margin:.2rem 0 1rem}
+.fp .edit-rsvp{font-family:var(--body);cursor:pointer;min-height:44px}
+.fp .edit-note{margin-top:0}
+.fp .made-with{text-align:center;margin:1.4rem 0 0;font-size:.78rem}
+.fp .made-with a{color:var(--ink-soft);text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line)}
+.fp .made-with a:hover{color:var(--accent-deep)}

@@ -2,9 +2,13 @@
 Lancer depuis la racine du repo :  pip install playwright pillow && python3 tests/e2e.py
 Captures d'écran dans tests/out/. Code de sortie 1 si un test échoue.
 La base elle-même se teste avec supabase/tests.sql."""
-import subprocess, time, json, re, os, sys, tempfile
+import subprocess, time, json, re, os, sys, tempfile, base64, io, urllib.parse
 from playwright.sync_api import sync_playwright
 from PIL import Image
+try:
+    import cv2, numpy as np  # facultatif : relit les QR codes générés (sinon seule leur taille est vérifiée)
+except ImportError:
+    cv2 = None
 
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 OUT = os.path.join(ROOT, "tests", "out"); os.makedirs(OUT, exist_ok=True)
@@ -69,6 +73,15 @@ def code_login(pg, email='alexia@example.com'):
     """Connexion par l'écran : email, puis le code 123456 accepté par le faux service du mode local."""
     pg.fill('#auth-email', email); pg.click('.auth-form:not([hidden]) button[type=submit]'); pg.wait_for_selector('#auth-code')
     pg.fill('#auth-code', '123456'); pg.click('.auth-form:not([hidden]) button[type=submit]')
+
+def events(pg):
+    return json.loads(pg.evaluate("localStorage.getItem('fp:events')") or '[]')
+
+def qr_text(png_bytes):
+    """Texte contenu dans un QR code (PNG), relu par OpenCV ; None si OpenCV n'est pas installé."""
+    if cv2 is None: return None
+    img = cv2.imdecode(np.frombuffer(png_bytes, np.uint8), cv2.IMREAD_GRAYSCALE)
+    return cv2.QRCodeDetector().detectAndDecode(img)[0]
 
 def fill_basics(pg, p1='Alexia', p2='Julien', date='2027-08-07', venue='Domaine de Vauluisant'):
     pg.fill('[data-bind=partner1]', p1); pg.fill('[data-bind=partner2]', p2); pg.fill('[data-bind=date]', date); pg.click('#next')
@@ -281,6 +294,27 @@ try:
           and pg.locator('#private-card, #private-link, #mail-link').count() == 0 and '#k=' not in pg.content())
     pg.screenshot(path=OUT + "/done.png", full_page=True)
     slug = pub.split('f=')[1]; adm = BASE + '/admin.html'
+
+    print("\n== Partage (US-09 à US-11) ==")
+    wa = urllib.parse.unquote(pg.get_attribute('#share-kit .share-whatsapp', 'href').split('text=')[1])
+    check("partage WhatsApp : message avec prénoms, date et lien", pg.get_attribute('#share-kit .share-whatsapp', 'href').startswith('https://wa.me/?text=')
+          and wa.startswith('Alexia & Julien se marient le 7 août 2027 !') and wa.endswith(pub), wa)
+    check("partage SMS et email : même message, objet de l'email renseigné", urllib.parse.unquote(pg.get_attribute('#share-kit .share-sms', 'href')).endswith(pub)
+          and 'subject=' in pg.get_attribute('#share-kit .share-email', 'href') and pub in urllib.parse.unquote(pg.get_attribute('#share-kit .share-email', 'href')))
+    check("partage : boutons d'au moins 44 px de haut", pg.evaluate("[...document.querySelectorAll('#share-kit .share-row > *')].every(b=>b.getBoundingClientRect().height>=44)"))
+    check("partage natif proposé seulement si le navigateur le permet", pg.locator('#share-kit .share-native').count() == (1 if pg.evaluate("!!navigator.share") else 0))
+    qr_small = base64.b64decode(pg.get_attribute('#share-kit .qr-img', 'src').split(',')[1])
+    check("QR code affiché, et il ouvre bien le faire-part", qr_text(qr_small) in (pub, None), qr_text(qr_small))
+    with pg.expect_download() as dl: pg.click('#share-kit .qr-download')
+    qr_png = open(dl.value.path(), 'rb').read(); qr_im = Image.open(io.BytesIO(qr_png))
+    check("QR code téléchargeable en PNG haute définition (≥ 1024 px), lisible", dl.value.suggested_filename == 'qr-faire-part-alexia-julien.png'
+          and qr_im.size[0] >= 1024 and qr_im.size[0] == qr_im.size[1] and qr_text(qr_png) in (pub, None), (dl.value.suggested_filename, qr_im.size))
+    pg.click('#done [data-copy=public-link]'); time.sleep(0.2)
+    ev = events(pg); names_ev = [x['event'] for x in ev]
+    check("funnel : démarrage, écran de compte, téléchargement du QR et copie du lien mesurés", 'editor_start' in names_ev and 'auth_gate' in names_ev
+          and any(x['event'] == 'qr_download' and x['slug'] == slug for x in ev) and any(x['event'] == 'share' and x['meta'].get('channel') == 'copie' for x in ev), names_ev)
+    check("funnel : démarrage compté une seule fois, avec sa provenance", names_ev.count('editor_start') == 1 and [x for x in ev if x['event'] == 'editor_start'][0]['meta'] == {'src': 'direct'})
+    check("funnel : provenance du couple enregistrée avec le faire-part", db_get(pg)['inv'][slug]['config']['meta']['src'] == 'direct')
     check("publication : lien public non devinable, rattaché au compte", re.fullmatch(r'alexia-julien-[a-z0-9]{8}', slug) is not None
           and db_get(pg)['inv'][slug]['owner'] == uid('alexia@example.com') and 'key' not in db_get(pg)['inv'][slug])
     stored = db_get(pg)['inv'][slug]['config']
@@ -321,15 +355,35 @@ try:
     g.fill('#f-phone', '06 12 34 56 78'); g.fill('#f-guests', '2'); g.fill('#f-children', '1')
     g.fill('#f-companions', 'Paul Dupont, Léo (6 ans)'); g.check('input[name=brunch][value=yes]'); g.fill('#f-diet', 'Sans gluten')
     g.fill('#f-address', '12 rue des Lilas\n69003 Lyon'); g.fill('#f-custom', 'Dancing Queen'); g.fill('#f-msg', '=HYPERLINK("x")')
+    check("« Créez le vôtre » n'apparaît jamais avant la réponse", g.locator('.made-with').count() == 0 and 'Maison Meli' not in g.inner_text('.fp'))
     g.click('.rsvp-form button[type=submit]'); g.wait_for_selector('.thanks')
     check("réponse complète envoyée", 'Merci Marie' in g.inner_text('.thanks'))
+    mw = g.get_attribute('.made-with a', 'href') or ''
+    check("après la réponse : lien discret « Créez le vôtre avec Maison Meli », avec la provenance", g.inner_text('.made-with') == 'Créez le vôtre avec Maison Meli'
+          and mw == BASE + '/?src=faire-part' and g.is_visible('.edit-rsvp'), mw)
     saved = db_get(g)['rsvps'][slug][-1]['data']
     check("toutes les données collectées", saved['children'] == 1 and saved['email'] == 'marie.dupont@example.fr' and 'Lyon' in saved['address']
           and saved['custom'] == 'Dancing Queen' and saved['companions'].startswith('Paul'), saved)
     g.reload(); g.wait_for_selector('.fp-intro'); g.keyboard.press('Escape'); wait_until(lambda: g.locator('.fp-intro').count() == 0)
-    check("au retour : prévenu d'une réponse déjà envoyée", 'déjà répondu (Marie Dupont)' in g.inner_text('.fp'))
-    g.fill('#f-name', 'Marie Dupont'); g.check('input[name=attendance][value=no]'); g.fill('#f-email', 'marie.dupont@example.fr')
+    check("au retour : sa réponse est rappelée, avec « Modifier ma réponse »", 'Vous avez déjà répondu' in g.inner_text('.thanks')
+          and 'Marie Dupont · Présent(e), 3 personnes' in g.inner_text('.answer-recap') and g.locator('.rsvp-form').count() == 0 and g.is_visible('.made-with'))
+    g.click('.edit-rsvp'); g.wait_for_selector('.rsvp-form')
+    check("modifier : formulaire pré-rempli avec la réponse envoyée", g.input_value('#f-name') == 'Marie Dupont' and g.is_checked('input[name=attendance][value=yes]')
+          and g.input_value('#f-guests') == '2' and g.input_value('#f-diet') == 'Sans gluten' and g.input_value('#f-companions').startswith('Paul')
+          and g.is_checked('input[name=brunch][value=yes]') and 'remplacera' in g.inner_text('.edit-note'))
+    g.check('input[name=attendance][value=no]')
     g.click('.rsvp-form button[type=submit]'); g.wait_for_selector('.thanks')
+    last = db_get(g)['rsvps'][slug][-1]['data']; first = db_get(g)['rsvps'][slug][-2]['data']
+    check("réponse corrigée : même identifiant anonyme, présence mise à jour, coordonnées gardées", last['rid'] == first['rid'] and last['attendance'] == 'no'
+          and last['email'] == 'marie.dupont@example.fr' and 'Lyon' in last['address'] and 'Marie Dupont · Absent(e)' in g.inner_text('.answer-recap'))
+    g2 = watch(c.new_page(), "cta"); g2.goto(pub); g2.wait_for_selector('.fp-intro'); g2.keyboard.press('Escape'); g2.wait_for_selector('.made-with a')
+    g2.click('.made-with a'); g2.wait_for_selector('#demo .fp-intro')
+    ev = events(g2)
+    check("clic « Créez le vôtre » mesuré, puis visite de l'accueil attribuée au faire-part", any(x['event'] == 'cta_create' and x['slug'] == slug for x in ev)
+          and ev[-1]['event'] == 'landing_view' and ev[-1]['meta'] == {'src': 'faire-part'} and g2.evaluate("FP.source()") == 'faire-part', ev[-2:])
+    g2.goto(BASE + "/creer.html"); g2.wait_for_selector('#wizard:not([hidden])')
+    check("dans l'éditeur, la provenance « faire-part » est conservée (coefficient viral)", g2.evaluate("FP.source()") == 'faire-part')
+    g2.close()
     # autres invités, saisis directement
     db = db_get(g)
     db['rsvps'][slug] += [
@@ -352,7 +406,7 @@ try:
           all(h in heads for h in ['Adultes', 'Enfants', 'Accompagnants', 'Email', 'Téléphone', 'Adresse']) and any(h.startswith('Une chanson') for h in heads), heads)
     check("question perso échappée dans l'en-tête", a.locator('thead img').count() == 0)
     a.click('[data-filter=no]'); check("filtre « Absents »", a.locator('tbody tr').count() == 1 and 'Marie' in a.inner_text('tbody'))
-    a.click('[data-filter=yes]'); check("filtre « Présents »", a.locator('tbody tr').count() == 4)
+    a.click('[data-filter=yes]'); check("filtre « Présents » (l'ancienne réponse de Marie n'apparaît plus)", a.locator('tbody tr').count() == 3)
     a.click('[data-filter=all]'); a.fill('#search', 'leroy'); time.sleep(0.2)
     check("recherche par nom (sans accents ni majuscules)", a.locator('tbody tr').count() == 1 and 'Antoine' in a.inner_text('tbody'))
     a.fill('#search', 'hugo'); time.sleep(0.2); check("recherche dans les accompagnants", a.locator('tbody tr').count() == 1)
@@ -368,8 +422,16 @@ try:
     check("bouton de copie indique le nombre d'emails", a.inner_text('#copy-emails') == 'Copier les 3 emails')
     with a.expect_download() as dl: a.click('#csv')
     csv = open(dl.value.path(), encoding='utf-8-sig', newline='').read()
-    check("CSV : toutes les colonnes + formule neutralisée", all(h in csv.split('\r\n')[0] for h in ['Adultes', 'Enfants', 'Email', 'Adresse', 'Remplacée']) and '"\'=HYPERLINK' in csv)
+    check("CSV : toutes les colonnes + formule neutralisée", all(h in csv.split('\r\n')[0] for h in ['Adultes', 'Enfants', 'Email', 'Adresse']) and '"\'=HYPERLINK' in csv)
+    check("CSV pour le traiteur : une ligne par invité, sans l'ancienne réponse de Marie", csv.count('"Marie Dupont"') == 1 and 'Remplacée' not in csv
+          and len([l for l in csv.split('\r\n') if l.startswith('"')]) == 5, csv.count('"Marie Dupont"'))
     check("CSV : adresse multi-ligne conservée dans sa cellule", '"12 rue des Lilas\n69003 Lyon"' in csv)
+    check("correction d'un invité : ancienne réponse masquée, signalée, sans doublon", a.locator('tbody tr:has-text("Marie Dupont")').count() == 1
+          and '1 invité a corrigé sa réponse' in a.inner_text('#dup-note') and a.locator('tbody .badge').count() == 0)
+    a.click('#toggle-replaced')
+    check("anciennes réponses consultables à la demande (barrées)", a.locator('tbody tr:has-text("Marie Dupont")').count() == 2 and a.locator('tbody tr.superseded .badge').count() == 1)
+    a.click('#toggle-replaced'); time.sleep(0.1)
+    check("partage aussi depuis « Mon faire-part »", pub in urllib.parse.unquote(a.get_attribute('#share-kit .share-whatsapp', 'href')) and a.is_visible('#share-kit .qr-img'))
     n0 = a.locator('tbody tr').count()
     a.click('tbody tr:has-text("Hacker") .link-btn'); a.click('tbody tr:has-text("Hacker") .link-btn'); wait_count(a, 'tbody tr', n0 - 1)
     check("suppression d'une réponse (2 clics)", a.locator('tbody tr').count() == n0 - 1)
@@ -597,6 +659,11 @@ try:
           sorted(x['@type'] for x in ld) == ['FAQPage', 'HowTo', 'WebApplication', 'WebSite'] and [x for x in ld if x['@type'] == 'WebApplication'][0]['offers']['price'] == '0')
     check("accueil : la FAQ visible est celle des données structurées", [q['name'] for q in faq] == h.evaluate("[...document.querySelectorAll('.q summary')].map(e=>e.textContent)")
           and [q['acceptedAnswer']['text'] for q in faq] == h.evaluate("[...document.querySelectorAll('.q p')].map(e=>e.textContent)") and len(faq) >= 8)
+    check("funnel : visite de l'accueil mesurée (provenance directe), sans cookie", [x['event'] for x in events(h)] == ['landing_view'] and events(h)[0]['meta'] == {'src': 'direct'}
+          and h.evaluate("document.cookie") == '')
+    gpc = newctx(b); gpc.add_init_script("Object.defineProperty(Navigator.prototype,'globalPrivacyControl',{get:()=>true})")
+    gp = watch(gpc.new_page(), "gpc"); gp.goto(BASE + "/?utm_source=instagram"); gp.wait_for_selector('#demo .fp-intro')
+    check("signal Global Privacy Control : aucun événement envoyé", events(gp) == [] and gp.evaluate("FP.source()") == 'reseaux'); gpc.close()
     check("accueil : exemple vivant dans le téléphone (enveloppe), 9 ambiances", h.locator('#demo .env').count() == 1 and h.locator('.style-card').count() == 9 and h.locator('#demo-pills .pill').count() == 9)
     check("accueil non connecté : lien « Se connecter »", h.inner_text('#nav-mine') == 'Se connecter' and h.get_attribute('#nav-mine', 'href') == 'admin.html' and not h.is_visible('#back-home'))
     h.click('#demo .env', force=True); wait_until(lambda: h.locator('#demo .fp-intro').count() == 0, 6)
@@ -643,6 +710,10 @@ try:
     check("robots.txt, sitemap.xml et llms.txt présents et cohérents", 'Sitemap: https://maison-meli.com/sitemap.xml' in robots and '<loc>https://maison-meli.com/</loc>' in sm and 'Maison Meli' in llms)
     og = Image.open(os.path.join(ROOT, "img", "og.png"))
     check("image de partage 1200 × 630", og.size == (1200, 630))
+    inv_html = open(os.path.join(ROOT, 'invitation.html'), encoding='utf-8').read()
+    check("aperçu du lien d'un faire-part (Open Graph) : titre, description, image 1200 × 630", 'og:title" content="Vous êtes invités à notre mariage"' in inv_html
+          and 'https://maison-meli.com/img/og-invitation.png' in inv_html and Image.open(os.path.join(ROOT, "img", "og-invitation.png")).size == (1200, 630))
+    check("mesure : aucun cookie posé par le code du site", not any('document.cookie' in open(os.path.join(ROOT, 'js', f), encoding='utf-8').read() for f in os.listdir(os.path.join(ROOT, 'js'))))
     cfg_pages = {f: open(os.path.join(ROOT, f), encoding='utf-8').read() for f in ('creer.html', 'admin.html', 'index.html', 'invitation.html')}
     check("bouton Google officiel autorisé par la CSP seulement là où on se connecte", all("https://accounts.google.com/gsi/client" in cfg_pages[f] and "frame-src https://accounts.google.com/gsi/" in cfg_pages[f] for f in ('creer.html', 'admin.html'))
           and not any("accounts.google.com" in cfg_pages[f] for f in ('index.html', 'invitation.html')) and "/authorize?provider=google" not in open(os.path.join(ROOT, 'js', 'auth.js'), encoding='utf-8').read())

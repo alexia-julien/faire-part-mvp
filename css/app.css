@@ -600,3 +600,14 @@ details.more[open]{padding-bottom:1.1rem}
 .danger-zone h2{font-size:1.3rem}
 .danger-zone p{margin:.5rem 0}
 .app.gated .hello #draft-note,.app.gated .hello #mine-link{display:none}
+/* Partage (US-10, US-11) */
+.share-kit{margin-top:.9rem}
+.share-row{display:flex;gap:.5rem;flex-wrap:wrap}
+.share-row .btn-main,.share-row .btn-ghost{flex:1 1 7.5rem;text-align:center;min-height:44px;display:inline-flex;align-items:center;justify-content:center}
+.qr-wrap{display:flex;gap:1rem;align-items:center;margin-top:1rem;padding-top:1rem;border-top:1px solid var(--line)}
+.qr-img{width:132px;height:132px;flex:none;border:1px solid var(--line);border-radius:8px;background:#fff;image-rendering:pixelated}
+.qr-side{min-width:0}
+.qr-title{font-weight:700;margin:0 0 .2rem}
+.qr-hint{margin:0 0 .6rem}
+.qr-download{min-height:44px}
+@media (max-width:420px){.qr-wrap{flex-direction:column;align-items:flex-start}}

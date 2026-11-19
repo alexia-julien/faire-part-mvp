@@ -48,6 +48,12 @@ Le repo est public et la clé Supabase `anon` est visible par tous : c'est voulu
 - **« Public Can Execute SECURITY DEFINER Function »** (11 fonctions) : voulu. Ces fonctions sont l'API publique de l'app ; chacune valide ses entrées et exige la clé privée quand c'est nécessaire (testé dans `supabase/tests.sql`).
 - **« Function Search Path Mutable »** sur `private.check_config` : corrigé dans `schema.sql` (rejouer le fichier pour l'appliquer).
 
+## Mesure du funnel (`supabase/mesure.sql`)
+- `public.track` est appelable sans compte : liste blanche de 6 événements, métadonnées filtrées (source et canal dans des listes fermées), identifiant de faire-part retenu seulement s'il existe, 600 appels / heure / IP, aucune erreur renvoyée. Le pire abus possible est de fausser les statistiques, sans toucher aux données des couples.
+- Le journal `private.events` et les vues `private.funnel_semaine` et `private.kpis_30j` ne sont pas exposés par l'API (schéma `private`, droits retirés à `anon` et `authenticated`, testé).
+- Aucune IP en clair (empreinte SHA-256), aucun cookie, aucune adresse de page d'origine ; purge des entrées de plus de 13 mois.
+- La durée de réponse (`elapsed`) envoyée par le navigateur sert seulement au journal : elle n'est pas stockée dans la réponse vue par les mariés (testé).
+
 ## Tests de la base
 `supabase/tests.sql` (66 vérifications) se colle dans le SQL Editor. Il agit comme un visiteur anonyme (rôle `anon`), vérifie les accès directs interdits, la validation des entrées, la protection par clé privée et la limitation de débit, puis annule tout : aucune donnée de test ne reste. À rejouer après chaque changement de `schema.sql`.
 

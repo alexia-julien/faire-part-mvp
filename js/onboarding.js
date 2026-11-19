@@ -90,6 +90,11 @@
   window.addEventListener('pagehide', writeDraft);
   document.addEventListener('visibilitychange', function(){ if(document.visibilityState === 'hidden') writeDraft(); });
   function changed(){ preview(); saveDraft(); }
+  // Funnel : « démarrage » = le couple a saisi ses prénoms (une fois par onglet, jamais en modification).
+  document.addEventListener('input', function(e){
+    var b = e.target && e.target.getAttribute && e.target.getAttribute('data-bind');
+    if(!editing && (b === 'partner1' || b === 'partner2') && e.target.value.trim()) FP.track('editor_start', { src: FP.source(), once: true });
+  });
 
   // ---------- Sélecteurs de style (générés depuis le catalogue de render.js) ----------
   function radio(name, value, html, cls){
@@ -411,6 +416,7 @@
     $('done-time').textContent = editing ? '' : duration(seconds);
     $('done-note').textContent = 'Collez-le dans un message, un email ou un groupe WhatsApp : vos invités répondent directement dessus.' +
       (u && u.email ? ' Vous retrouverez ce faire-part et les réponses en vous connectant avec ' + u.email + ', depuis n’importe quel appareil.' : '');
+    FP.shareKit($('share-kit'), { url: pub, cfg: FP.sanitizeConfig(state), slug: slug });
     published = true; clearTimeout(draftTimer); storeDel(DRAFT_KEY); pendingDel();
     accountLink();
     window.scrollTo({ top: 0 }); $('done-title').focus({ preventScroll: true });
@@ -422,7 +428,9 @@
     ['lodging', 'gifts'].forEach(function(k){ cfg.sections[k].url = cfg.sections[k].url.trim(); });
     if(!cfg.tz){ try{ cfg.tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ''; }catch(e){} }
     cfg = FP.sanitizeConfig(cfg); // revalide le fuseau
-    cfg.meta = { durationSec: editing ? (state.meta && state.meta.durationSec) || null : Math.round(activeMs / 1000), updatedAt: new Date().toISOString() };
+    cfg.meta = { durationSec: editing ? (state.meta && state.meta.durationSec) || null : Math.round(activeMs / 1000), updatedAt: new Date().toISOString(),
+                 // Provenance du couple (seo, ia, faire-part…) : sert à mesurer le coefficient viral. Conservée lors des modifications.
+                 src: editing ? (state.meta && state.meta.src) || '' : FP.source() };
     return cfg;
   }
   // Publier demande un compte : sans session, on ouvre la connexion ; la publication reprend juste après.
@@ -436,7 +444,7 @@
     a.hidden = published;
   }
   function openAuth(){
-    writeDraft(); pendingSet();
+    writeDraft(); pendingSet(); FP.track('auth_gate', { once: true });
     wizard.hidden = true; $('steps').hidden = true; $('app').classList.add('gated'); $('app').classList.remove('show-preview-on');
     $('auth-step').hidden = false;
     FP.authPanel($('auth-box'), {
@@ -493,7 +501,7 @@
   $$('[data-copy]').forEach(function(b){
     b.addEventListener('click', function(){
       var input = $(b.getAttribute('data-copy')), label = b.textContent;
-      var ok = function(){ b.textContent = 'Copié ✓'; b.classList.add('copied'); setTimeout(function(){ b.textContent = label; b.classList.remove('copied'); }, 1600); };
+      var ok = function(){ FP.track('share', { channel: 'copie' }, editing ? editing.slug : ''); b.textContent = 'Copié ✓'; b.classList.add('copied'); setTimeout(function(){ b.textContent = label; b.classList.remove('copied'); }, 1600); };
       var fallback = function(){ input.focus(); input.select(); try{ if(document.execCommand('copy')) ok(); }catch(e){} };
       if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(input.value).then(ok, fallback);
       else fallback();

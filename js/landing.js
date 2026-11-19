@@ -94,4 +94,6 @@
   })();
 
   renderDemo(true); minis(); hrefs();
+  // Funnel : visite de la page d'accueil, avec la catégorie de provenance (jamais l'adresse de la page d'origine).
+  if(FP.track) FP.track('landing_view', { src: FP.source() });
 })();

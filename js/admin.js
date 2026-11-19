@@ -2,7 +2,8 @@
 (function(){
   'use strict';
   var FP = window.FP, slug = '', rows = [], cfg = null;
-  var view = { filter: 'all', q: '', sort: 'date', dir: -1 };
+  // replaced : afficher aussi les réponses remplacées par une réponse plus récente de la même personne (masquées par défaut).
+  var view = { filter: 'all', q: '', sort: 'date', dir: -1, replaced: false };
   var $ = function(id){ return document.getElementById(id); };
   // Anti-clickjacking (GitHub Pages ne permet pas d'envoyer X-Frame-Options / frame-ancestors).
   if(window.top !== window.self){ document.body.textContent = ''; return; }
@@ -101,10 +102,17 @@
       ul.appendChild(li);
     });
     $('diet-box').hidden = !diets.length;
-    var dups = rows.length - live.length;
-    $('dup-note').hidden = !dups;
-    $('dup-note').textContent = dups ? dups + ' ' + pl(dups, 'réponse a été remplacée', 'réponses ont été remplacées') +
-      ' par une réponse plus récente de la même personne (barrée' + (dups > 1 ? 's' : '') + ' dans le tableau, non comptée' + (dups > 1 ? 's' : '') + ').' : '';
+    // Une réponse corrigée par l'invité remplace l'ancienne : l'ancienne n'est ni comptée ni affichée (sauf à la demande).
+    var dups = rows.length - live.length, note = $('dup-note');
+    note.hidden = !dups; note.textContent = '';
+    if(dups){
+      note.appendChild(document.createTextNode(dups + ' ' + pl(dups, 'invité a corrigé sa réponse', 'invités ont corrigé leur réponse') +
+        ' : seule la plus récente est comptée' + (view.replaced ? ' (les anciennes sont barrées ci-dessous). ' : '. ')));
+      var tg = document.createElement('button'); tg.type = 'button'; tg.className = 'link-btn'; tg.id = 'toggle-replaced';
+      tg.textContent = view.replaced ? 'Masquer les anciennes réponses' : 'Voir les anciennes réponses';
+      tg.addEventListener('click', function(){ view.replaced = !view.replaced; render(); });
+      note.appendChild(tg);
+    }
     var emails = validEmails(live);
     $('copy-emails').hidden = !emails.length;
     $('copy-emails').textContent = emails.length ? 'Copier les ' + emails.length + ' email' + (emails.length > 1 ? 's' : '') : 'Copier les emails';
@@ -113,6 +121,7 @@
   function visibleRows(cols){
     var q = norm(view.q), col = cols.filter(function(c){ return c.id === view.sort; })[0] || cols[0];
     return rows.filter(function(r){
+      if(r.superseded && !view.replaced) return false;
       if(view.filter !== 'all' && r.data.attendance !== view.filter) return false;
       if(!q) return true;
       return [r.data.name, r.data.companions, r.data.email, r.data.phone].some(function(v){ return norm(v).indexOf(q) > -1; });
@@ -166,8 +175,8 @@
       act.appendChild(del); tr.appendChild(act);
       tb.appendChild(tr);
     });
-    var filtered = view.filter !== 'all' || view.q;
-    $('count').textContent = rows.length ? (filtered ? list.length + ' sur ' + rows.length + ' ' + pl(rows.length, 'réponse affichée', 'réponses affichées') : '') : '';
+    var filtered = view.filter !== 'all' || view.q, shown = view.replaced ? rows.length : live.length;
+    $('count').textContent = rows.length ? (filtered ? list.length + ' sur ' + shown + ' ' + pl(shown, 'réponse affichée', 'réponses affichées') : '') : '';
     $('count').hidden = !filtered || !rows.length;
     $('empty').hidden = rows.length > 0;
     $('no-match').hidden = !rows.length || list.length > 0;
@@ -195,12 +204,13 @@
     if(/^[=+\-@\t\r]/.test(v)) v = "'" + v; // évite l'interprétation en formule dans Excel
     return '"' + v.replace(/"/g, '""') + '"';
   }
+  // Export pour le traiteur : une ligne par invité, uniquement la réponse en vigueur (pas de doublon).
   function exportCsv(){
     markDuplicates();
     var cols = columns();
-    var head = cols.map(function(c){ return c.label; }).concat(['Remplacée']);
-    var lines = [head.map(csvCell).join(';')].concat(rows.map(function(r){
-      return cols.map(function(c){ return c.get(r); }).concat([r.superseded ? 'Oui' : '']).map(csvCell).join(';');
+    var head = cols.map(function(c){ return c.label; });
+    var lines = [head.map(csvCell).join(';')].concat(rows.filter(function(r){ return !r.superseded; }).map(function(r){
+      return cols.map(function(c){ return c.get(r); }).map(csvCell).join(';');
     }));
     var url = URL.createObjectURL(new Blob(['﻿' + lines.join('\r\n')], { type: 'text/csv;charset=utf-8' }));
     var a = document.createElement('a'); a.href = url; a.download = 'reponses-' + slug + '.csv';
@@ -240,6 +250,7 @@
       var dl = FP.parseDate(cfg.rsvp.deadline), wd = FP.formatDate(cfg, false);
       $('admin-sub').textContent = [wd ? 'Mariage le ' + wd : '', dl ? 'réponses attendues avant le ' + FP.longDate(dl) : ''].filter(Boolean).join(' · ');
       $('public-link').value = FP.publicLink(slug); $('open-public').href = FP.publicLink(slug);
+      FP.shareKit($('share-kit'), { url: FP.publicLink(slug), cfg: cfg, slug: slug });
       $('delete-invitation').parentNode.hidden = false; $('danger').hidden = false;
       state(''); $('content').hidden = false; render();
     }).catch(function(e){
@@ -279,7 +290,7 @@
   $('signout').addEventListener('click', function(){ FP.auth.signOut().then(function(){ location.replace('./'); }); });
   $('copy-link').addEventListener('click', function(){
     var b = this, input = $('public-link'), label = 'Copier';
-    var ok = function(){ b.textContent = 'Copié ✓'; setTimeout(function(){ b.textContent = label; }, 1600); };
+    var ok = function(){ FP.track('share', { channel: 'copie' }, slug); b.textContent = 'Copié ✓'; setTimeout(function(){ b.textContent = label; }, 1600); };
     var fallback = function(){ input.focus(); input.select(); try{ if(document.execCommand('copy')) ok(); }catch(e){} };
     if(navigator.clipboard && navigator.clipboard.writeText) navigator.clipboard.writeText(input.value).then(ok, fallback); else fallback();
   });

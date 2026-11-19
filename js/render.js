@@ -238,7 +238,8 @@
     out.rsvp.customLabel = str(r.customLabel, 80);
     out.rsvp.deadline = DATE_RE.test(str(r.deadline, 10)) ? r.deadline : '';
     var meta = obj(c.meta);
-    if(c.meta) out.meta = { durationSec: typeof meta.durationSec === 'number' ? meta.durationSec : null, updatedAt: str(meta.updatedAt, 40) };
+    if(c.meta) out.meta = { durationSec: typeof meta.durationSec === 'number' ? meta.durationSec : null, updatedAt: str(meta.updatedAt, 40),
+                            src: /^[a-z-]{1,12}$/.test(meta.src || '') ? meta.src : '' };
     return out;
   };
 
@@ -382,54 +383,104 @@
   var EMAIL_RE = /^[A-Za-z0-9._%+'\-]{1,64}@[A-Za-z0-9.\-]{1,255}\.[A-Za-z]{2,24}$/, PHONE_RE = /^[0-9 +().\-]{6,30}$/;
   FP.EMAIL_RE = EMAIL_RE; FP.PHONE_RE = PHONE_RE;
 
-  function bindRsvp(root, opts){
-    var form = root.querySelector('.rsvp-form');
-    if(!form) return;
-    var whenYes = form.querySelectorAll('.when-yes'), whenPlus = form.querySelectorAll('.when-plus');
-    function num(n){ var el = form.querySelector('[name=' + n + ']'); return el ? parseInt(el.value, 10) || 0 : 0; }
-    function toggle(){
-      var c = form.querySelector('input[name=attendance]:checked');
-      var no = !!(c && c.value === 'no'), plus = num('guests') > 1 || num('children') > 0;
-      for(var i = 0; i < whenYes.length; i++) whenYes[i].hidden = no;
-      for(var j = 0; j < whenPlus.length; j++) whenPlus[j].hidden = no || !plus;
+  // Réponse de l'invité. Après l'envoi (ou au retour sur le faire-part, si ce navigateur a déjà répondu) :
+  // confirmation, bouton « Modifier ma réponse » (formulaire pré-rempli, la nouvelle réponse remplace l'ancienne côté couple)
+  // et, seulement à ce moment-là, le lien discret « Créez le vôtre avec Maison Meli » (opts.madeWith).
+  var RSVP_FIELDS = ['name', 'attendance', 'guests', 'children', 'companions', 'brunch', 'diet', 'email', 'phone', 'address', 'custom', 'message'];
+  function recap(d){
+    var yes = d.attendance === 'yes', n = (+d.guests || 1) + (+d.children || 0);
+    return esc(String(d.name || '')) + ' · ' + (yes ? 'Présent(e)' + (n > 1 ? ', ' + n + ' personnes' : '') : 'Absent(e)');
+  }
+  function bindRsvp(root, cfg, opts){
+    var wrap = root.querySelector('.form-wrap');
+    if(!wrap) return;
+    var formHtml = wrap.innerHTML;
+
+    function madeWith(){
+      if(!opts.madeWith) return '';
+      return '<p class="made-with"><a href="' + esc(opts.madeWith) + '" data-made-with>Créez le vôtre avec Maison Meli</a></p>';
     }
-    form.addEventListener('change', toggle); form.addEventListener('input', toggle); toggle();
-    form.addEventListener('submit', function(e){
-      e.preventDefault();
-      if(opts.preview || !opts.onSubmit) return;
-      var fd = new FormData(form), msg = form.querySelector('.form-msg'), btn = form.querySelector('button[type=submit]');
-      if(fd.get('website')) return; // anti-spam : champ piège rempli par les robots
-      var get = function(k, max){ return String(fd.get(k) || '').trim().slice(0, max); };
-      var name = get('name', 120), att = fd.get('attendance');
-      if(!name || !att){ msg.textContent = 'Merci d’indiquer votre nom et si vous serez présent(e).'; return; }
-      var email = get('email', 200), phone = get('phone', 30);
-      if(email && !EMAIL_RE.test(email)){ msg.textContent = 'L’adresse email ne semble pas valide.'; return; }
-      if(phone && !PHONE_RE.test(phone)){ msg.textContent = 'Le numéro de téléphone ne semble pas valide.'; return; }
-      var yes = att === 'yes', plus = num('guests') > 1 || num('children') > 0;
-      var data = {
-        name: name, attendance: att,
-        guests: yes ? Math.max(1, Math.min(20, num('guests') || 1)) : 0,
-        children: yes ? Math.max(0, Math.min(20, num('children'))) : 0,
-        companions: yes && plus ? get('companions', 300) : '',
-        diet: yes ? get('diet', 300) : '',
-        brunch: yes ? String(fd.get('brunch') || '') : '',
-        email: email, phone: phone, address: get('address', 300), custom: get('custom', 500),
-        message: get('message', 1000)
-      };
-      btn.disabled = true; msg.textContent = '';
-      opts.onSubmit(data).then(function(){
-        root.querySelector('.form-wrap').innerHTML = '<div class="thanks" tabindex="-1"><h3>Merci ' + esc(name.split(' ')[0]) + ' !</h3><p>' +
-          (yes ? 'Votre réponse est bien enregistrée. À très vite !' : 'Merci de nous avoir prévenus, vous nous manquerez.') + '</p></div>';
-        var t = root.querySelector('.thanks'); if(t) t.focus();
-      }).catch(function(err){
-        btn.disabled = false;
-        var m = String((err && err.message) || '');
-        msg.textContent = /invalid email/.test(m) ? 'L’adresse email ne semble pas valide.'
-          : /invalid phone/.test(m) ? 'Le numéro de téléphone ne semble pas valide.'
-          : /rate limit/.test(m) ? 'Trop de réponses envoyées depuis cette connexion. Réessayez dans une heure.'
-          : 'Oups, l’envoi a échoué. Merci de réessayer dans un instant.';
+    function mountThanks(d, fresh){
+      var yes = d.attendance === 'yes', first = String(d.name || '').trim().split(' ')[0];
+      wrap.innerHTML = '<div class="thanks" tabindex="-1">' +
+        (fresh ? '<h3>Merci ' + esc(first) + ' !</h3><p>' + (yes ? 'Votre réponse est bien enregistrée. À très vite !' : 'Merci de nous avoir prévenus, vous nous manquerez.') + '</p>'
+               : '<h3>Vous avez déjà répondu</h3>') +
+        (d.attendance ? '<p class="answer-recap">' + recap(d) + '</p>' : (d.name ? '<p class="answer-recap">' + esc(String(d.name)) + '</p>' : '')) +
+        '<div class="center"><button type="button" class="maps-btn edit-rsvp">Modifier ma réponse</button></div></div>' + madeWith();
+      wrap.querySelector('.edit-rsvp').addEventListener('click', function(){ mountForm(d); });
+      var mw = wrap.querySelector('[data-made-with]');
+      if(mw && opts.onMadeWith) mw.addEventListener('click', function(){ opts.onMadeWith(); });
+      if(fresh){ var t = wrap.querySelector('.thanks'); if(t) t.focus(); }
+    }
+    function mountForm(prefill){
+      wrap.innerHTML = (prefill ? '<p class="preview-note edit-note">Modifiez ce qui a changé : votre nouvelle réponse remplacera la précédente.</p>' : '') + formHtml;
+      wire();
+      if(prefill) fill(prefill);
+      if(prefill){ var f = wrap.querySelector('#f-name'); if(f) f.focus({ preventScroll: false }); }
+    }
+    function fill(d){
+      var form = wrap.querySelector('.rsvp-form');
+      RSVP_FIELDS.forEach(function(k){
+        var v = d[k]; if(v == null || v === '') return;
+        var els = form.querySelectorAll('[name=' + k + ']');
+        if(!els.length) return;
+        if(els[0].type === 'radio') Array.prototype.forEach.call(els, function(r){ r.checked = r.value === String(v); });
+        else if(!(k === 'guests' && d.attendance !== 'yes')) els[0].value = String(v).slice(0, 1000);
       });
-    });
+      form.dispatchEvent(new Event('change'));
+    }
+
+    function wire(){
+      var form = wrap.querySelector('.rsvp-form');
+      if(!form) return;
+      var whenYes = form.querySelectorAll('.when-yes'), whenPlus = form.querySelectorAll('.when-plus');
+      function num(n){ var el = form.querySelector('[name=' + n + ']'); return el ? parseInt(el.value, 10) || 0 : 0; }
+      function toggle(){
+        var c = form.querySelector('input[name=attendance]:checked');
+        var no = !!(c && c.value === 'no'), plus = num('guests') > 1 || num('children') > 0;
+        for(var i = 0; i < whenYes.length; i++) whenYes[i].hidden = no;
+        for(var j = 0; j < whenPlus.length; j++) whenPlus[j].hidden = no || !plus;
+      }
+      form.addEventListener('change', toggle); form.addEventListener('input', toggle); toggle();
+      form.addEventListener('submit', function(e){
+        e.preventDefault();
+        if(opts.preview || !opts.onSubmit) return;
+        var fd = new FormData(form), msg = form.querySelector('.form-msg'), btn = form.querySelector('button[type=submit]');
+        if(fd.get('website')) return; // anti-spam : champ piège rempli par les robots
+        var get = function(k, max){ return String(fd.get(k) || '').trim().slice(0, max); };
+        var name = get('name', 120), att = fd.get('attendance');
+        if(!name || !att){ msg.textContent = 'Merci d’indiquer votre nom et si vous serez présent(e).'; return; }
+        var email = get('email', 200), phone = get('phone', 30);
+        if(email && !EMAIL_RE.test(email)){ msg.textContent = 'L’adresse email ne semble pas valide.'; return; }
+        if(phone && !PHONE_RE.test(phone)){ msg.textContent = 'Le numéro de téléphone ne semble pas valide.'; return; }
+        var yes = att === 'yes', plus = num('guests') > 1 || num('children') > 0;
+        var data = {
+          name: name, attendance: att,
+          guests: yes ? Math.max(1, Math.min(20, num('guests') || 1)) : 0,
+          children: yes ? Math.max(0, Math.min(20, num('children'))) : 0,
+          companions: yes && plus ? get('companions', 300) : '',
+          diet: yes ? get('diet', 300) : '',
+          brunch: yes ? String(fd.get('brunch') || '') : '',
+          email: email, phone: phone, address: get('address', 300), custom: get('custom', 500),
+          message: get('message', 1000)
+        };
+        btn.disabled = true; msg.textContent = '';
+        opts.onSubmit(data).then(function(){
+          mountThanks(data, true);
+        }).catch(function(err){
+          btn.disabled = false;
+          var m = String((err && err.message) || '');
+          msg.textContent = /invalid email/.test(m) ? 'L’adresse email ne semble pas valide.'
+            : /invalid phone/.test(m) ? 'Le numéro de téléphone ne semble pas valide.'
+            : /rate limit/.test(m) ? 'Trop de réponses envoyées depuis cette connexion. Réessayez dans une heure.'
+            : 'Oups, l’envoi a échoué. Merci de réessayer dans un instant.';
+        });
+      });
+    }
+
+    var prev = opts.previous;
+    if(!opts.preview && prev && typeof prev === 'object' && prev.name) mountThanks(prev, false);
+    else wire();
   }
 
   // ------------------------------------------------------------------ Intro (enveloppe / monogramme)
@@ -611,7 +662,6 @@
         : 'Merci de répondre avant le ' + esc(longDate(dl)) + '.') + '</p>';
     }
     if(preview) rs += '<p class="preview-note">Aperçu : le formulaire sera actif une fois le faire-part publié.</p>';
-    if(opts.previousName) rs += '<p class="preview-note">Vous avez déjà répondu (' + esc(opts.previousName) + '). Une nouvelle réponse remplacera la précédente.</p>';
     var contact = cfg.rsvp.email || cfg.rsvp.phone || cfg.rsvp.address;
     rs += '<div class="form-wrap">' + rsvpHtml(cfg, preview) + '<p class="privacy">' +
       (contact ? 'Vos réponses et coordonnées sont transmises uniquement aux mariés, pour l’organisation de leur mariage.'
@@ -622,7 +672,7 @@
     h += '<footer>' + divider() + '<div class="fnames">' + names + '</div>' + (dateLong ? '<div class="fdate">' + esc(dateLong) + '</div>' : '') + '</footer>';
 
     root.innerHTML = '<div class="fp-content">' + h + '</div>';
-    bindRsvp(root, opts);
+    bindRsvp(root, cfg, opts);
 
     var ics = root.querySelector('[data-ics]');
     if(ics) ics.addEventListener('click', function(){ downloadIcs(cfg); });

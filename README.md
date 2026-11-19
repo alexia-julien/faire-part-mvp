@@ -22,6 +22,16 @@ La page d'accueil est **générée** : modifier les textes, la FAQ ou les étape
 
 Projet indépendant du site du mariage d'Alexia & Julien (aucun lien avec ce repo ni ses branches `main` / `test`).
 
+## Phase « Stabiliser » de la PRD (19/11/2026)
+Développements suivant la [PRD Maison Meli](https://claude.ai/artifact/4SKbVCw7TaBdXzTuxMgASG), roadmap phase 1 :
+
+- **Partage (US-09 à US-11)** : `js/share.js`, sur l'écran de fin et sur « Mon faire-part ». Partage natif du téléphone (si disponible), WhatsApp, SMS, email : le message contient prénoms, date et lien. QR code affiché et téléchargeable en PNG ≥ 1024 px (`js/qr.js`, encodeur autonome, niveau de correction M, sans bibliothèque).
+- **Aperçu du lien** : `invitation.html` a un aperçu Open Graph générique (`img/og-invitation.png`). Les prénoms et la date ne peuvent pas y figurer : le site est statique et les robots d'aperçu n'exécutent pas le JavaScript. Ils sont donc dans le texte du message de partage.
+- **« Créez le vôtre » (US-14)** : lien discret affiché seulement après la réponse de l'invité, vers `/?src=faire-part`.
+- **Correction par l'invité (US-13)** : la réponse envoyée reste sur l'appareil de l'invité. À son retour, il voit un rappel et le bouton « Modifier ma réponse », qui ouvre le formulaire pré-rempli. Côté couple, l'ancienne réponse n'est ni comptée, ni affichée, ni exportée (« Voir les anciennes réponses » pour les consulter).
+- **Mesure du funnel** : `js/track.js` (navigateur) + `supabase/mesure.sql` (fonction `track`, journalisation dans `submit_rsvp` et `account_create_invitation`, vues `private.funnel_semaine` et `private.kpis_30j`). Pas de cookie, provenance en catégories, Do Not Track et GPC respectés, rétention 13 mois. Tests de la base : `supabase/tests-mesure.sql` (13 vérifications, annulées). Lecture dans le SQL Editor : `select * from private.kpis_30j;` et `select * from private.funnel_semaine;`.
+- **Mentions légales** : `tools/build_mentions.py` génère `mentions-legales.html` à partir de `tools/editeur.json` (identité de l'éditeur, à fournir). La page n'est pas générée tant qu'un champ manque, et le lien en pied de page n'apparaît qu'une fois la page générée.
+
 ## Parcours
 1. `creer.html` : onboarding en 5 étapes avec aperçu en direct. **Seules les étapes 1 et 2 sont obligatoires** (prénoms, date, lieu) : tout le reste a des réglages par défaut, on peut publier en cliquant « Continuer ».
    - **Les mariés** (heure de la cérémonie facultative ; année plafonnée à 2050), **Le lieu**

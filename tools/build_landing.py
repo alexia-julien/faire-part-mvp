@@ -1,5 +1,5 @@
 # Génère index.html (page d'accueil) : la FAQ visible et les données structurées viennent de la même liste.
-import json, html, sys
+import json, html, sys, os
 OUT = sys.argv[1]
 SITE = "https://maison-meli.com/"
 TITLE = "Faire-part de mariage digital gratuit avec RSVP | Maison Meli"
@@ -48,11 +48,13 @@ ldjson = json.dumps(ld, ensure_ascii=False, separators=(",",":")).replace("</","
 faq_html = "\n".join('      <details class="q"><summary>%s</summary><p>%s</p></details>' % (e(q, False), e(a, False)) for q,a in FAQ)
 steps_html = "\n".join('      <li><h3>%s</h3><p>%s</p></li>' % (e(n, False), e(t, False)) for n,t in STEPS)
 HEART = "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M12 21s-7.05-4.35-9.5-8.5C.7 9 2.2 5 6.3 5c2 0 3.6 1.1 5.7 3.6C14.1 6.1 15.7 5 17.7 5c4.1 0 5.6 4 3.8 7.5C19.05 16.65 12 21 12 21z' fill='%235F6E4E'/%3E%3C/svg%3E"
+# Lien vers les mentions légales seulement quand la page existe (générée par tools/build_mentions.py avec les infos de l'éditeur).
+MENTIONS = '    <a href="mentions-legales.html">Mentions légales</a>\n' if os.path.exists(os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__file__))), 'mentions-legales.html')) else ''
 page = f'''<!doctype html>
 <html lang="fr">
 <head>
 <meta charset="utf-8">
-<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src 'none'; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
+<meta http-equiv="Content-Security-Policy" content="default-src 'none'; script-src 'self'; style-src 'self' https://fonts.googleapis.com; font-src https://fonts.gstatic.com; img-src 'self' data:; connect-src https://pmtwhrqfdvbxbgrzcytl.supabase.co; frame-src 'none'; object-src 'none'; base-uri 'none'; form-action 'none'">
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
 <meta name="theme-color" content="#F6F2EA">
@@ -187,8 +189,10 @@ page = f'''<!doctype html>
     <a href="admin.html">Mon faire-part</a>
     <a href="confidentialite.html">Confidentialité</a>
     <a href="conditions.html">Conditions d’utilisation</a>
-  </nav>
+{MENTIONS}  </nav>
 </footer>
+<script src="js/config.js"></script>
+<script src="js/track.js"></script>
 <script src="js/render.js"></script>
 <script src="js/landing.js"></script>
 </body>
