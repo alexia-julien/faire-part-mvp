@@ -15,6 +15,8 @@ drop function if exists public.tester_attach(text, text, text);
 drop function if exists public.tester_detach(text, text);
 
 -- Espaces testeurs : tables et fonctions internes. Le journal private.events garde ses lignes (colonne tester_id sans référence).
+drop view if exists private.tester_stats;      -- vues du récapitulatif testeurs
+drop view if exists private.events_timeline;
 alter table private.events drop constraint if exists events_tester_id_fkey;
 drop table if exists private.tester_invitations;
 drop table if exists private.testers;
