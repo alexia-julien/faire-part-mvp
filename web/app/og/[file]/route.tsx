@@ -7,6 +7,7 @@ import { AMBIANCES } from "@/lib/ambiances";
 import { PALETTES } from "@/lib/invitation";
 import { allPages } from "@/lib/pages";
 import { ogFile } from "@/lib/site";
+import { SEAL_M, SEAL_PATH } from "@/lib/brand";
 
 export const dynamic = "force-static";
 
@@ -34,7 +35,10 @@ export async function GET(_req: Request, { params }: { params: Promise<{ file: s
     (
       <div style={{ width: "100%", height: "100%", display: "flex", flexDirection: "column", justifyContent: "space-between", padding: "72px 84px", background: "radial-gradient(70% 80% at 80% 20%, #F1E9DC, #FAF7F2 70%)", color: "#1C1A17" }}>
         <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-          <div style={{ fontFamily: "Cormorant", fontSize: 44 }}>Maison Meli</div>
+          <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+            <svg width="60" height="60" viewBox="0 0 100 100"><path d={SEAL_PATH} fill="#1C1A17" /><circle cx="50" cy="50" r="36.7" fill="none" stroke="#B8975A" strokeOpacity="0.55" strokeWidth="1.2" /><path transform={`translate(${SEAL_M.x} ${SEAL_M.y})`} d={SEAL_M.d} fill="#B8975A" /></svg>
+            <div style={{ fontFamily: "Cormorant", fontSize: 44 }}>Maison Meli</div>
+          </div>
           {amb && (
             <div style={{ display: "flex", gap: 14 }}>
               {amb.palette.colors.map(([, c]) => <div key={c} style={{ width: 46, height: 46, borderRadius: 999, background: c, border: "2px solid rgba(28,26,23,.12)" }} />)}

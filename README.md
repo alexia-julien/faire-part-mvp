@@ -19,7 +19,7 @@ Adresses propres avec barre finale (`trailingSlash: true`). **`/invitation.html?
 
 Pages publiques ajoutées (registre unique : `web/lib/site.ts`, `lib/ambiances.ts`, `lib/guides.ts`) : `/ambiances/` et une page par ambiance, `/rsvp-mariage-en-ligne/`, `/faire-part-mariage-whatsapp/`, `/exemples/camille-et-thomas/` (faire-part fictif testable), `/tarifs/`, `/a-propos/`, `/mentions-legales/`, `/guide/` (3 piliers), `/comparatif/…` (2), `/outils/` (générateur de texte, rétroplanning). Plan du site, `robots.txt`, images Open Graph (`/og/*.png`) et logo (`/logo.png`) générés au build.
 
-**Guides et comparatifs** : en `noindex` (hors plan du site) tant que Julien ne les a pas relus. Pour publier un article relu : `index: true` et `updated` dans `web/lib/guides.ts`, puis déploiement et `npm run indexnow`. Un article par semaine au maximum (brief, section 8).
+**Guides et comparatifs** : les 6 premiers (3 piliers, 2 comparatifs, « Quand envoyer ») sont relus par Julien et indexés depuis le 21/11/2026. Un nouvel article naît en `index: false` (noindex, hors plan du site) ; une fois relu : `index: true` et `updated` dans `web/lib/guides.ts`, puis déploiement et `npm run indexnow`. Un article par semaine au maximum (brief, section 8).
 
 ### Pages
 - `/` : page d'accueil (SEO/GEO : données structurées, FAQ, `llms.txt`, `sitemap.xml`), héros vivant (un vrai faire-part dans un téléphone, prénoms écrits en direct), carrousel des 9 ambiances, récit « Ce que vivent vos invités ».
@@ -64,7 +64,7 @@ Domaine : zone `maison-meli.com` sur Cloudflare (DNS chez Cloudflare, e-mails to
 cd web && npm ci && npm run build:local && cd ..
 pip install playwright pillow opencv-python && python3 tests/e2e.py
 ```
-220 vérifications au 20/11/2026 (dont pages SEO/GEO, générateur, rétroplanning, exemple) : page d'accueil (SEO, données structurées, accroche, mesure, Do Not Track), éditeur (validations, brouillon, photos, ambiances et réglages, ouverture dans l'aperçu, sections, réponses), publication (compte par code ou Google, rituel, lien, partage, QR relu par OpenCV), modification et règle « un faire-part par compte », faire-part invité (ouverture, mouvement réduit, monogramme, fuseau de l'agenda, liens filtrés), réponse pas à pas et correction, tableau de suivi (doublons, recherche, filtres, tri, CSV sans formule, emails, suppressions), accessibilité (axe-core, WCAG 2.2 AA), absence de débordement à 375/390/430/1440 px, CSP sans violation, aucune erreur JavaScript, XSS. Captures dans `tests/out/`.
+230 vérifications au 21/11/2026 (dont pages SEO/GEO, générateur, rétroplanning, exemple) : page d'accueil (SEO, données structurées, accroche, mesure, Do Not Track), éditeur (validations, brouillon, photos, ambiances et réglages, ouverture dans l'aperçu, sections, réponses), publication (compte par code ou Google, rituel, lien, partage, QR relu par OpenCV), modification et règle « un faire-part par compte », faire-part invité (ouverture, mouvement réduit, monogramme, fuseau de l'agenda, liens filtrés), réponse pas à pas et correction, tableau de suivi (doublons, recherche, filtres, tri, CSV sans formule, emails, suppressions), accessibilité (axe-core, WCAG 2.2 AA), absence de débordement à 375/390/430/1440 px, CSP sans violation, aucune erreur JavaScript, XSS. Captures dans `tests/out/`.
 
 La base se teste avec `supabase/tests.sql` (invités), `tests-comptes.sql` et `tests-mesure.sql` dans le SQL Editor (tout est annulé à la fin).
 
@@ -73,8 +73,17 @@ La base se teste avec `supabase/tests.sql` (invités), `tests-comptes.sql` et `t
 - Toute donnée venant de la base est revalidée (`sanitizeConfig`) ; liens Maps et liens libres en liste blanche ; anti-clickjacking ; champ piège anti-robots. Voir [SECURITY.md](SECURITY.md).
 - Lighthouse mobile mesuré le 20/11/2026 : faire-part invité 97–98 (LCP 0,9 s), page d'accueil 91–95 (LCP 1,1 s, CLS 0) ; ouverture de l'enveloppe ≈ 57–59 images/s avec un processeur ralenti 4×. Animations chargées après l'affichage (`LazyMotion`), sections hors écran non calculées (`content-visibility`).
 
+## Marque (audit du 21/11/2026)
+Logo « le cachet » : cachet de cire encre, M doré en Cormorant Garamond. Tracés dans `web/lib/brand.ts`, composant `BrandMark` (en-tête, pied de page, éditeur, tableau, images Open Graph, pied de chaque faire-part). Icônes statiques dans `web/public/` : `favicon.ico` (16/32/48), `icon.svg`, `apple-touch-icon.png`, `icon-192/512.png`, `icon-maskable-512.png`, `site.webmanifest`, `logo.png` (JSON-LD). Contact public : contact@maison-meli.com.
+
 ## Supabase
 Projet `pmtwhrqfdvbxbgrzcytl` (Francfort). `supabase/schema.sql` décrit toute la base (comptes uniquement, mesure, aperçu de lien) ; toute modification se fait dans ce fichier puis se rejoue dans le SQL Editor. Si l'URL du projet change : `web/lib/config.ts`, `SUPA` dans `web/scripts/postbuild.mjs` et `vars` dans `wrangler.jsonc`. Mesure : `select * from private.kpis_30j;` et `select * from private.funnel_semaine;`.
+
+### Récapitulatif e-mail des réponses (US-17)
+Tâche pg_cron `rsvp-digest` (7 h 30 UTC) → `private.send_rsvp_digests()` → API Resend via pg_net, au plus un e-mail par jour et par couple, désactivable dans « Mon faire-part ». **Inactive tant que la clé Resend n'est pas dans le coffre** : `select vault.create_secret('re_…', 'resend_api_key');` (SQL Editor). Expéditeur : `notifications@maison-meli.com`, réponse : `contact@maison-meli.com`.
+
+### Fausse porte Premium et réponses manuelles
+Bouton « Passer en Premium » (écran final de l'éditeur, tableau) : clic mesuré (`premium_click`), e-mails dans `private.premium_waitlist`. Le couple peut ajouter une réponse reçue par téléphone (`account_add_rsvp`, marquée « ajoutée par vous »). Suivi : colonnes `clics_premium`, `emails_premium`, `reponses_manuelles` de `private.funnel_semaine`.
 
 ## Limites connues
 - Photos stockées en base (JPEG 1600 px, 3 max).

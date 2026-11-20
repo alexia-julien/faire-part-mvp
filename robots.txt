@@ -34,5 +34,4 @@ Allow: /
 User-Agent: *
 Allow: /
 
-Host: https://maison-meli.com
 Sitemap: https://maison-meli.com/sitemap.xml

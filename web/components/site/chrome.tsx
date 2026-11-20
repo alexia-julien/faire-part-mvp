@@ -4,6 +4,7 @@ import type { ReactNode } from "react";
 import { ArrowRight, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NavAccount } from "@/components/site/landing-islands";
+import { BrandMark } from "@/components/site/brand-mark";
 import { AMBIANCES } from "@/lib/ambiances";
 import { ENTITY, PAGES, type Page } from "@/lib/site";
 import { GUIDE_LINKS } from "@/lib/guides";
@@ -17,7 +18,7 @@ export function SiteHeader({ current }: { current?: string }) {
   return (
     <header className="pointer-events-none fixed inset-x-0 top-3 z-40 px-3">
       <nav aria-label="Navigation principale" className="glass pointer-events-auto mx-auto flex h-14 max-w-[1180px] items-center justify-between gap-3 rounded-full pl-5 pr-2">
-        <a href="/" className="font-serif text-[22px] font-medium tracking-[-0.01em]" aria-label="Maison Meli, accueil">Maison Meli</a>
+        <a href="/" className="flex items-center gap-2 font-serif text-[22px] font-medium tracking-[-0.01em]" aria-label="Maison Meli, accueil"><BrandMark className="size-8" />Maison Meli</a>
         <div className="flex items-center gap-1 text-[14px]">
           {NAV.map((p) => (
             <a key={p.path} href={p.path} aria-current={current === p.path ? "page" : undefined}
@@ -38,7 +39,7 @@ export function SiteFooter() {
     <footer className="border-t border-border/70">
       <div className="mx-auto grid max-w-[1180px] gap-10 px-5 py-14 text-[14px] text-muted-foreground sm:grid-cols-2 sm:px-8 lg:grid-cols-[1.3fr_1fr_1fr_1fr_1fr]">
         <div className="flex flex-col gap-3">
-          <a href="/" className="font-serif text-[26px] text-foreground">Maison Meli</a>
+          <a href="/" className="flex items-center gap-2.5 font-serif text-[26px] text-foreground"><BrandMark className="size-10" />Maison Meli</a>
           <p className="max-w-[34ch] leading-relaxed">{ENTITY}</p>
         </div>
         <nav aria-label="Créer" className={col}>
@@ -65,7 +66,7 @@ export function SiteFooter() {
           <a href={PAGES.mentions.path} className={link}>Mentions légales</a>
           <a href={PAGES.confidentialite.path} className={link}>Confidentialité</a>
           <a href={PAGES.conditions.path} className={link}>Conditions d’utilisation</a>
-          <a href="mailto:julien.meli.jm@gmail.com" className={link}>Contact</a>
+          <a href="mailto:contact@maison-meli.com" className={link}>Contact</a>
         </nav>
       </div>
     </footer>

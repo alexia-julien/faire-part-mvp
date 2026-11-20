@@ -26,7 +26,7 @@ export type Page = {
 const P = (p: Page) => p;
 
 export const PAGES = {
-  home: P({ path: "/", title: "Faire-part de mariage digital gratuit avec RSVP | Maison Meli", crumb: "Accueil", index: true, updated: "2026-11-20", priority: 1,
+  home: P({ path: "/", title: "Faire-part mariage digital gratuit avec RSVP | Maison Meli", crumb: "Accueil", index: true, updated: "2026-11-20", priority: 1,
     description: "Créez votre faire-part de mariage en 3 minutes : 9 ambiances, une enveloppe qui s’ouvre, un lien à partager et les réponses de vos invités. Gratuit.",
     og: "accueil", ogTitle: "Le faire-part de mariage digital qui fait dire « oh »" }),
   ambiances: P({ path: "/ambiances/", title: "Ambiances de faire-part de mariage digital | Maison Meli", crumb: "Ambiances", index: true, updated: "2026-11-20", priority: 0.9,
@@ -47,10 +47,10 @@ export const PAGES = {
   apropos: P({ path: "/a-propos/", title: "Maison Meli : née d’un vrai mariage", crumb: "À propos", index: true, updated: "2026-11-20", priority: 0.6,
     description: "Qui est derrière Maison Meli, pourquoi ce faire-part de mariage digital existe et comment il est conçu : l’histoire, les principes et le contact.",
     ogTitle: "Pourquoi Maison Meli existe" }),
-  mentions: P({ path: "/mentions-legales/", title: "Mentions légales | Maison Meli", crumb: "Mentions légales", index: true, updated: "2026-11-20", priority: 0.2,
+  mentions: P({ path: "/mentions-legales/", title: "Mentions légales | Maison Meli", crumb: "Mentions légales", index: true, updated: "2026-11-21", priority: 0.2,
     description: "Mentions légales du site maison-meli.com : éditeur, directeur de la publication, hébergeur, propriété intellectuelle et contact de Maison Meli.",
     ogTitle: "Mentions légales" }),
-  confidentialite: P({ path: "/confidentialite/", title: "Confidentialité et données personnelles | Maison Meli", crumb: "Confidentialité", index: true, updated: "2026-11-20", priority: 0.3,
+  confidentialite: P({ path: "/confidentialite/", title: "Confidentialité et données personnelles | Maison Meli", crumb: "Confidentialité", index: true, updated: "2026-11-21", priority: 0.3,
     description: "Ce que Maison Meli enregistre, pourquoi, combien de temps et chez qui : compte, faire-part, réponses des invités, mesure d’audience sans cookie.",
     ogTitle: "Confidentialité" }),
   conditions: P({ path: "/conditions/", title: "Conditions d’utilisation | Maison Meli", crumb: "Conditions d’utilisation", index: true, updated: "2026-11-19", priority: 0.2,

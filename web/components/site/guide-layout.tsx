@@ -38,7 +38,7 @@ export function GuideLayout({ guide, intro, toc, sources, children }: {
             <section aria-labelledby="h-sources" className="mt-16 border-t border-border pt-8">
               <h2 id="h-sources" className="!mt-0 !text-[22px]">Sources</h2>
               <ul className="!text-[15px]">{sources.map(([label, href]) => <li key={href} className="!text-[15px]"><a href={href} rel="noopener" target="_blank">{label}</a></li>)}</ul>
-              <p className="!text-[14px] !text-muted-foreground">Rédigé avec l’aide d’une IA, relu et vérifié par Julien Meli. Une erreur ? Écrivez à <a href="mailto:julien.meli.jm@gmail.com">julien.meli.jm@gmail.com</a>.</p>
+              <p className="!text-[14px] !text-muted-foreground">Rédigé avec l’aide d’une IA, relu et vérifié par Julien Meli. Une erreur ? Écrivez à <a href="mailto:contact@maison-meli.com">contact@maison-meli.com</a>.</p>
             </section>
             {guide !== GUIDES.digital && guide.kind === "guide" && <p className="!mt-8">Pour tout savoir sur le format : <a href={GUIDES.digital.path}>le faire-part de mariage digital, le guide complet</a>.</p>}
           </div>

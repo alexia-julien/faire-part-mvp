@@ -5,7 +5,7 @@
 // Les événements serveur (faire-part créé, ouvert, réponse envoyée) sont journalisés par les fonctions SQL.
 import { CONFIG, IS_REMOTE } from "./config";
 
-const EVENTS = ["landing_view", "editor_start", "auth_gate", "share", "qr_download", "cta_create"];
+const EVENTS = ["landing_view", "editor_start", "auth_gate", "share", "qr_download", "cta_create", "premium_click"];
 const SOURCES = ["direct", "seo", "ia", "faire-part", "reseaux", "email", "autre"];
 const CHANNELS = ["natif", "whatsapp", "sms", "email", "copie"];
 const SRC_KEY = "fp:src", SRC_DAYS = 30;

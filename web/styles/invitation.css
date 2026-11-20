@@ -32,12 +32,12 @@
 .fp[data-font="editorial"]{--display:'Playfair Display', Georgia, serif;--names-size:.92}
 .fp[data-font="bodoni"]{--display:'Bodoni Moda', 'Didot', Georgia, serif;--names-size:.92}
 .fp[data-font="artdeco"]{--display:'Italiana', Georgia, serif;--body:'Jost', system-ui, -apple-system, sans-serif;--names-size:.74;--names-case:uppercase;--names-track:.14em}
-.fp[data-font="artdeco"] h2{letter-spacing:.1em;text-transform:uppercase;font-size:clamp(1.4rem,4vw,2rem)}
+.fp[data-font="artdeco"] h2,.fp[data-font="artdeco"] .sh-title{letter-spacing:.1em;text-transform:uppercase;font-size:clamp(1.4rem,4vw,2rem)}
 .fp[data-font="editorial"] .names .amp,.fp[data-font="bodoni"] .names .amp{font-family:var(--display);font-style:italic}
 
 .fp *{box-sizing:border-box}
-.fp h1,.fp h2,.fp h3{font-family:var(--display);font-weight:400;margin:0;line-height:1.08;color:var(--ink);overflow-wrap:break-word}
-.fp[data-font="minimal"] h2{font-weight:300;letter-spacing:.06em;text-transform:uppercase;font-size:clamp(1.4rem,4vw,2rem)}
+.fp h1,.fp h2,.fp h3,.fp .sh-title{font-family:var(--display);font-weight:400;margin:0;line-height:1.08;color:var(--ink);overflow-wrap:break-word}
+.fp[data-font="minimal"] h2,.fp[data-font="minimal"] .sh-title{font-weight:300;letter-spacing:.06em;text-transform:uppercase;font-size:clamp(1.4rem,4vw,2rem)}
 .fp .narrow,.fp .lieu-name,.fp .lieu-address,.fp .subtitle,.fp footer .fnames{overflow-wrap:break-word}
 .fp p{margin:0 0 .8rem}
 .fp .amp{font-style:italic;color:var(--blush)}
@@ -73,7 +73,7 @@
 /* Sections */
 .fp section{padding:3.4rem 1.4rem}
 .fp .section-head{text-align:center;margin-bottom:1.8rem}
-.fp .section-head h2{font-size:clamp(1.9rem,5vw,2.8rem)}
+.fp .section-head h2,.fp .section-head .sh-title{margin:0;font-size:clamp(1.9rem,5vw,2.8rem)}
 .fp .divider-heart{display:flex;align-items:center;justify-content:center;gap:.85rem;max-width:240px;margin:1rem auto 0;width:100%}
 .fp .divider-heart .dh-line{flex:1;height:1px;background:var(--line)}
 .fp .divider-heart svg{width:15px;height:15px;flex:none;color:var(--accent-deep)}
@@ -322,6 +322,8 @@ html.fp-locked,html.fp-locked body{overflow:hidden}
 .fp .rq-title{display:block;font-family:var(--display);font-size:clamp(1.45rem,6cqw,1.9rem);line-height:1.15;color:var(--ink);margin:0 0 1.1rem;outline:none}
 .fp .rq-sub{display:block;font-weight:700;font-size:.8rem;margin:.9rem 0 .35rem;color:var(--ink)}
 .fp .rq-sub span{font-weight:400;color:var(--ink-soft)}
+.fp .rq-note{font-size:.8rem;line-height:1.45;margin:.5rem 0 0;color:var(--ink-soft)}
+.fp .rq-note a{color:inherit;text-decoration:underline;text-underline-offset:2px}
 .fp .rq-input{width:100%;font:inherit;font-size:17px;color:var(--ink);background:var(--paper);border:1px solid var(--line);border-radius:14px;padding:.85rem 1rem;min-height:52px;
   transition:border-color .2s,box-shadow .2s}
 .fp textarea.rq-input{resize:vertical;min-height:96px;line-height:1.5}
@@ -390,6 +392,8 @@ html.fp-locked,html.fp-locked body{overflow:hidden}
 .fp footer{border-top:1px solid var(--line);color:var(--ink-soft);text-align:center;padding:2.4rem 1.4rem 6rem;background:var(--paper-2)}
 .fp footer .fnames{font-family:var(--names);font-weight:var(--names-weight);text-transform:var(--names-case);letter-spacing:var(--names-track);font-size:calc(1.7rem * var(--names-size));color:var(--ink)}
 .fp footer .fnames .amp{font-family:var(--display);text-transform:none}
+.fp footer .fp-brand{display:flex;align-items:center;justify-content:center;gap:.45rem;margin:2.2rem 0 0;font-size:.68rem;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft)}
+.fp footer .fp-brand-mark{width:18px;height:18px}
 .fp footer .fdate{font-size:.74rem;letter-spacing:.18em;text-transform:uppercase;margin-top:.3rem}
 .fp .rq{min-height:0}
 .fp .rq-fields{display:flex;flex-direction:column}

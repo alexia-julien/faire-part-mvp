@@ -1,4 +1,4 @@
--- Schéma Supabase de Maison Meli : TOUTE la base, telle qu'elle tourne en production (relevée le 20/11/2026).
+-- Schéma Supabase de Maison Meli : TOUTE la base, telle qu'elle tourne en production (relevée le 21/11/2026).
 -- Remplace les anciens schema.sql (liens privés), comptes.sql, bascule.sql et mesure.sql, tous déjà appliqués
 -- (historique dans git). À exécuter dans Supabase > SQL Editor. Idempotent : rejouable en entier à tout moment,
 -- c'est ce qu'il faut faire pour appliquer une mise à jour. Une seule transaction : si une instruction échoue,
@@ -15,8 +15,9 @@
 --   - Fonctions et tables internes dans le schéma « private », non exposé par l'API.
 --
 -- Mesure du funnel (PRD, section KPIs), sans cookie : private.events. Un visiteur = empreinte SHA-256 de son IP.
---   landing_view, editor_start, auth_gate, share, qr_download, cta_create : navigateur (public.track)
---   invitation_created / updated / deleted, invitation_viewed, rsvp_submitted, rsvps_listed, account_deleted : base
+--   landing_view, editor_start, auth_gate, share, qr_download, cta_create, premium_click : navigateur (public.track)
+--   invitation_created / updated / deleted, invitation_viewed, rsvp_submitted, rsvp_added_manual, rsvps_listed,
+--   account_deleted, premium_interest, digest_sent : base
 -- Lecture : select * from private.kpis_30j;  select * from private.funnel_semaine;
 
 begin;
@@ -73,6 +74,23 @@ create index if not exists events_tester_idx on private.events (tester_id, creat
 alter table private.rate_limits enable row level security;
 alter table private.events enable row level security;
 revoke all on private.rate_limits, private.events from public, anon, authenticated;
+
+-- Préférences de notification du couple (US-17) et date du dernier récapitulatif envoyé.
+create table if not exists private.notify_prefs (
+  owner      uuid primary key references auth.users(id) on delete cascade,
+  digest     boolean not null default true,
+  last_sent  timestamptz
+);
+-- Test « fausse porte » du Pack Premium (PRD, modèle économique) : qui voudrait être prévenu du lancement.
+create table if not exists private.premium_waitlist (
+  email      text primary key,
+  created_at timestamptz not null default now(),
+  account    uuid references auth.users(id) on delete set null,
+  origin     text
+);
+alter table private.notify_prefs enable row level security;
+alter table private.premium_waitlist enable row level security;
+revoke all on private.notify_prefs, private.premium_waitlist from public, anon, authenticated;
 
 -- ---------------------------------------------------------------- Fonctions internes
 -- Identifiant anonymisé du visiteur (hash de l'IP fournie par Cloudflare/Supabase). Null si l'IP est inconnue.
@@ -223,7 +241,7 @@ create or replace function public.track(p_event text, p_slug text default null, 
 language plpgsql security definer set search_path = public, extensions as $$
 declare v_meta jsonb := '{}'::jsonb; v_slug text;
 begin
-  if p_event is null or p_event not in ('landing_view', 'editor_start', 'auth_gate', 'share', 'qr_download', 'cta_create') then return; end if;
+  if p_event is null or p_event not in ('landing_view', 'editor_start', 'auth_gate', 'share', 'qr_download', 'cta_create', 'premium_click') then return; end if;
   begin
     perform private.rate_limit('track', 600);
   exception when others then return;
@@ -335,19 +353,83 @@ begin
   return true;
 end $$;
 
+
+-- Réponse saisie à la main par le couple (invité qui a répondu par téléphone). Marquée « manual ».
+create or replace function public.account_add_rsvp(p_data jsonb) returns bigint
+language plpgsql security definer set search_path = public, extensions as $$
+declare v_uid uuid := private.account_id(); v_slug text; v_att text; v_yes boolean; v_guests integer := 0; v_children integer := 0; v_id bigint;
+begin
+  if v_uid is null then raise exception 'not signed in' using errcode = '42501'; end if;
+  perform private.rate_limit('manual', 200);
+  select slug into v_slug from invitations where owner = v_uid;
+  if v_slug is null then raise exception 'not found'; end if;
+  if p_data is null or jsonb_typeof(p_data) <> 'object' or octet_length(p_data::text) > 4000 then raise exception 'invalid data'; end if;
+  v_att := p_data->>'attendance';
+  if v_att is null or v_att not in ('yes', 'no') then raise exception 'invalid attendance'; end if;
+  if coalesce(btrim(p_data->>'name'), '') = '' then raise exception 'name required'; end if;
+  if (select count(*) from rsvps where slug = v_slug) >= 1000 then raise exception 'too many responses'; end if;
+  v_yes := v_att = 'yes';
+  if v_yes then
+    v_guests := case when (p_data->>'guests') ~ '^[0-9]{1,2}$' then least(greatest((p_data->>'guests')::integer, 1), 20) else 1 end;
+    v_children := case when (p_data->>'children') ~ '^[0-9]{1,2}$' then least((p_data->>'children')::integer, 20) else 0 end;
+  end if;
+  insert into rsvps(slug, data) values (v_slug, jsonb_build_object(
+    'rid', encode(gen_random_bytes(8), 'hex'), 'manual', true,
+    'name', left(btrim(p_data->>'name'), 120), 'attendance', v_att, 'guests', v_guests, 'children', v_children,
+    'companions', case when v_yes then left(btrim(coalesce(p_data->>'companions', '')), 300) else '' end,
+    'diet', case when v_yes then left(coalesce(p_data->>'diet', ''), 300) else '' end,
+    'brunch', '', 'email', '', 'phone', '', 'address', '', 'custom', '',
+    'message', left(coalesce(p_data->>'message', ''), 1000)
+  )) returning id into v_id;
+  perform private.log_event('rsvp_added_manual', null, v_slug, jsonb_build_object('attendance', v_att));
+  return v_id;
+end $$;
+
+-- Récapitulatif e-mail des nouvelles réponses (US-17) : lire (p_digest null) ou changer la préférence du compte.
+create or replace function public.account_notify(p_digest boolean default null) returns boolean
+language plpgsql security definer set search_path = public, extensions as $$
+declare v_uid uuid := private.account_id(); v_on boolean;
+begin
+  if v_uid is null then raise exception 'not signed in' using errcode = '42501'; end if;
+  perform private.rate_limit('account', 240);
+  if p_digest is not null then
+    insert into private.notify_prefs(owner, digest) values (v_uid, p_digest)
+    on conflict (owner) do update set digest = excluded.digest;
+  end if;
+  select digest into v_on from private.notify_prefs where owner = v_uid;
+  return coalesce(v_on, true);
+end $$;
+
+-- Fausse porte Premium : enregistre l'e-mail d'un couple intéressé. Ouvert aux visiteurs (brouillon sans compte).
+create or replace function public.premium_interest(p_email text, p_origin text default null) returns void
+language plpgsql security definer set search_path = public, extensions as $$
+declare v_email text := lower(left(btrim(coalesce(p_email, '')), 200));
+begin
+  perform private.rate_limit('premium', 10);
+  if v_email !~ '^[a-z0-9._%+''-]{1,64}@[a-z0-9.-]{1,255}\.[a-z]{2,24}$' then raise exception 'invalid email'; end if;
+  insert into private.premium_waitlist(email, account, origin)
+  values (v_email, private.account_id(), case when p_origin in ('editeur', 'tableau', 'tarifs') then p_origin end)
+  on conflict (email) do nothing;
+  perform private.log_event('premium_interest', null, null,
+    jsonb_strip_nulls(jsonb_build_object('origin', case when p_origin in ('editeur', 'tableau', 'tarifs') then p_origin end)));
+end $$;
+
 -- ---------------------------------------------------------------- Droits d'exécution
 -- Supabase accorde par défaut l'exécution à public, anon et authenticated : on referme tout, puis on ouvre au cas par cas.
 revoke all on function public.get_invitation(text), public.get_invitation_preview(text), public.submit_rsvp(text, jsonb),
   public.track(text, text, jsonb), public.account_invitation(), public.account_create_invitation(text, jsonb),
   public.account_update_invitation(jsonb), public.account_delete_invitation(), public.account_rsvps(),
-  public.account_delete_rsvp(bigint), public.delete_account() from public, anon, authenticated;
+  public.account_delete_rsvp(bigint), public.delete_account(), public.account_add_rsvp(jsonb), public.account_notify(boolean),
+  public.premium_interest(text, text) from public, anon, authenticated;
 
 grant execute on function public.get_invitation(text), public.submit_rsvp(text, jsonb), public.track(text, text, jsonb)
   to anon, authenticated;
 grant execute on function public.get_invitation_preview(text) to anon;
+grant execute on function public.premium_interest(text, text) to anon, authenticated;
 grant execute on function public.account_invitation(), public.account_create_invitation(text, jsonb),
   public.account_update_invitation(jsonb), public.account_delete_invitation(), public.account_rsvps(),
-  public.account_delete_rsvp(bigint), public.delete_account() to authenticated, service_role;
+  public.account_delete_rsvp(bigint), public.delete_account(), public.account_add_rsvp(jsonb), public.account_notify(boolean)
+  to authenticated, service_role;
 
 -- ---------------------------------------------------------------- Vues de pilotage (SQL Editor uniquement)
 -- Funnel par semaine (6 derniers mois).
@@ -367,7 +449,10 @@ select s.semaine,
   (select count(*) from w where w.semaine = s.semaine and event = 'rsvp_submitted' and coalesce((meta->>'edit')::boolean, false) = false) as reponses,
   (select count(*) from w where w.semaine = s.semaine and event = 'rsvp_submitted' and (meta->>'edit')::boolean) as corrections,
   (select count(*) from w where w.semaine = s.semaine and event = 'share') as partages,
-  (select count(*) from w where w.semaine = s.semaine and event = 'cta_create') as clics_creez_le_votre
+  (select count(*) from w where w.semaine = s.semaine and event = 'cta_create') as clics_creez_le_votre,
+  (select count(*) from w where w.semaine = s.semaine and event = 'premium_click') as clics_premium,
+  (select count(*) from w where w.semaine = s.semaine and event = 'premium_interest') as emails_premium,
+  (select count(*) from w where w.semaine = s.semaine and event = 'rsvp_added_manual') as reponses_manuelles
 from (select distinct semaine from w union select date_trunc('week', now())::date) s
 order by s.semaine desc;
 
@@ -414,5 +499,90 @@ select
 from v, c, r, a;
 
 revoke all on private.funnel_semaine, private.kpis_30j from public, anon, authenticated;
+
+
+-- ---------------------------------------------------------------- Récapitulatif e-mail des réponses (US-17)
+-- Une fois par jour (8 h 30 heure de Paris en hiver, 9 h 30 en été), chaque couple qui a reçu de nouvelles réponses
+-- depuis le dernier envoi reçoit UN e-mail (au plus un par jour, désactivable depuis « Mon faire-part »).
+-- Envoi par l'API Resend via pg_net. Inactif tant que la clé n'est pas dans le coffre :
+--   select vault.create_secret('re_…', 'resend_api_key');
+create extension if not exists pg_net with schema extensions;
+create extension if not exists pg_cron;
+
+create or replace function private.html(p text) returns text
+language sql immutable set search_path = '' as $$
+  select replace(replace(replace(replace(replace(coalesce(p, ''), '&', '&amp;'), '<', '&lt;'), '>', '&gt;'), '"', '&quot;'), '''', '&#39;');
+$$;
+
+create or replace function private.send_rsvp_digests() returns integer
+language plpgsql security definer set search_path = public, extensions as $$
+declare
+  v_key text; v_n integer := 0; r record; v_since timestamptz; v_new integer; v_list text; v_txt text;
+  v_yes integer; v_no integer; v_people integer; v_couple text; v_html text; v_subject text;
+begin
+  select decrypted_secret into v_key from vault.decrypted_secrets where name = 'resend_api_key' limit 1;
+  if v_key is null or v_key = '' then return 0; end if;
+  for r in
+    select i.slug, i.config, i.created_at as inv_created, u.id as uid, u.email, p.last_sent
+    from invitations i join auth.users u on u.id = i.owner
+    left join private.notify_prefs p on p.owner = i.owner
+    where coalesce(p.digest, true) and u.email is not null
+  loop
+    v_since := greatest(coalesce(r.last_sent, r.inv_created), now() - interval '7 days');
+    select count(*) into v_new from rsvps
+      where slug = r.slug and created_at > v_since and coalesce((data->>'manual')::boolean, false) = false;
+    continue when v_new = 0;
+    -- Dernière version de chaque réponse (les corrections d'une même réponse partagent « rid »).
+    with last as (
+      select distinct on (coalesce(nullif(data->>'rid', ''), 'id' || id)) data
+      from rsvps where slug = r.slug order by coalesce(nullif(data->>'rid', ''), 'id' || id), created_at desc
+    )
+    select count(*) filter (where data->>'attendance' = 'yes'), count(*) filter (where data->>'attendance' = 'no'),
+           coalesce(sum((data->>'guests')::int + (data->>'children')::int) filter (where data->>'attendance' = 'yes'), 0)
+      into v_yes, v_no, v_people from last;
+    select string_agg('<li style="margin:0 0 6px">' || private.html(data->>'name') || ' : ' ||
+             case when data->>'attendance' = 'yes'
+               then 'vient' || case when (data->>'guests')::int + (data->>'children')::int > 1
+                 then ' (' || ((data->>'guests')::int + (data->>'children')::int) || ' personnes)' else '' end
+               else 'ne pourra pas venir' end || '</li>', '' order by created_at),
+           string_agg('- ' || (data->>'name') || ' : ' || case when data->>'attendance' = 'yes' then 'vient' else 'ne vient pas' end,
+             E'\n' order by created_at)
+      into v_list, v_txt
+      from (select data, created_at from rsvps where slug = r.slug and created_at > v_since
+              and coalesce((data->>'manual')::boolean, false) = false order by created_at limit 30) n;
+    v_couple := btrim(coalesce(r.config->>'partner1', '') || ' & ' || coalesce(r.config->>'partner2', ''), ' &');
+    v_subject := case when v_new = 1 then '1 nouvelle réponse à votre faire-part' else v_new || ' nouvelles réponses à votre faire-part' end;
+    v_html := '<div style="background:#FAF7F2;padding:32px 16px;font-family:Helvetica,Arial,sans-serif;color:#1C1A17">'
+      || '<div style="max-width:520px;margin:0 auto;background:#ffffff;border-radius:20px;padding:32px">'
+      || '<p style="margin:0 0 4px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#8A6D33">Maison Meli</p>'
+      || '<h1 style="margin:0 0 16px;font-family:Georgia,serif;font-weight:400;font-size:28px">' || private.html(v_couple) || '</h1>'
+      || '<p style="margin:0 0 16px;font-size:16px">' || private.html(v_subject) || ' depuis le dernier récapitulatif :</p>'
+      || '<ul style="margin:0 0 20px;padding-left:20px;font-size:16px">' || coalesce(v_list, '') || '</ul>'
+      || '<p style="margin:0 0 24px;font-size:16px">À ce jour : <strong>' || v_yes || ' oui</strong> (' || v_people
+      || ' personne' || case when v_people > 1 then 's' else '' end || '), ' || v_no || ' non.</p>'
+      || '<p style="margin:0 0 28px"><a href="https://maison-meli.com/mon-faire-part/?src=email" style="display:inline-block;background:#1C1A17;color:#FAF7F2;text-decoration:none;padding:14px 24px;border-radius:999px;font-size:15px">Voir toutes les réponses</a></p>'
+      || '<p style="margin:0;font-size:13px;color:#6B645B">Vous recevez au plus un e-mail par jour, seulement quand il y a du nouveau. Pour ne plus les recevoir : « Mon faire-part », puis « Récapitulatif par e-mail ».</p>'
+      || '</div></div>';
+    perform net.http_post(
+      url := 'https://api.resend.com/emails',
+      headers := jsonb_build_object('Authorization', 'Bearer ' || v_key, 'Content-Type', 'application/json'),
+      body := jsonb_build_object(
+        'from', 'Maison Meli <notifications@maison-meli.com>', 'reply_to', 'contact@maison-meli.com',
+        'to', jsonb_build_array(r.email), 'subject', v_subject || ' · ' || v_couple, 'html', v_html,
+        'text', v_subject || E' :\n' || coalesce(v_txt, '') || E'\n\nÀ ce jour : ' || v_yes || ' oui (' || v_people || ' personnes), '
+                || v_no || E' non.\nToutes les réponses : https://maison-meli.com/mon-faire-part/\n\n'
+                || 'Pour ne plus recevoir ces e-mails : Mon faire-part > Récapitulatif par e-mail.'));
+    insert into private.notify_prefs(owner, last_sent) values (r.uid, now())
+    on conflict (owner) do update set last_sent = now();
+    perform private.log_event('digest_sent', null, r.slug, jsonb_build_object('reponses', v_new));
+    v_n := v_n + 1;
+  end loop;
+  return v_n;
+end $$;
+
+revoke all on function private.html(text), private.send_rsvp_digests() from public, anon, authenticated;
+
+select cron.unschedule(jobid) from cron.job where jobname = 'rsvp-digest';
+select cron.schedule('rsvp-digest', '30 7 * * *', 'select private.send_rsvp_digests()');
 
 commit;

@@ -22,6 +22,7 @@ import { AuthPanel } from "@/components/site/auth-panel";
 import { ShareKit } from "@/components/site/share-kit";
 import { StepCustomize, StepDate, StepNames, StepReview, StepRsvp, StepStyle, StepTexts, StepVenue } from "./steps";
 import { PublishRitual } from "./publish-ritual";
+import { BrandMark } from "@/components/site/brand-mark";
 
 export const STEPS = [
   { id: "names", label: "Les mariés" },
@@ -396,6 +397,7 @@ export function Editor() {
 
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[minmax(440px,40%)_1fr]" onKeyDown={onKey}>
+      <Toaster position="top-center" toastOptions={{ classNames: { toast: "!rounded-[20px] !shadow-lift !border-border !font-sans" } }} />
       <div className="relative flex min-h-dvh flex-col">
         <Header user={user} progress={(step + 1) / TOTAL} saved={!editing && saved} />
         <main id="wizard" className="mx-auto flex w-full max-w-[560px] flex-1 flex-col px-5 pb-40 pt-4 sm:px-8 lg:pt-10">
@@ -495,7 +497,7 @@ function Header({ user, progress, saved, hideAccount, noBar }: { user: User | nu
   return (
     <header className="sticky top-0 z-20 bg-background/85 backdrop-blur-md">
       <div className="mx-auto flex h-16 w-full max-w-[560px] items-center justify-between gap-4 px-5 sm:px-8 lg:max-w-none">
-        <a href="/" className="font-serif text-[22px] font-medium tracking-[-0.01em]">Maison Meli</a>
+        <a href="/" className="flex items-center gap-2 font-serif text-[22px] font-medium tracking-[-0.01em]"><BrandMark className="size-8" />Maison Meli</a>
         <div className="flex items-center gap-4 text-[14px]">
           <AnimatePresence>
             {saved && (

@@ -75,8 +75,11 @@ export function Hero() {
   return (
     <div className="relative mx-auto grid max-w-[1180px] items-center gap-14 px-5 pb-20 pt-28 sm:px-8 md:pt-36 lg:grid-cols-[1.05fr_0.95fr] lg:gap-10 lg:pb-28">
       <div className="flex flex-col items-start">
-        <p className="t-label mb-5 flex items-center gap-2"><span className="inline-block size-1.5 rounded-full bg-accent" aria-hidden="true" />Faire-part de mariage digital · gratuit</p>
-        <h1 id="h-hero" className="t-display max-w-[13ch]">Le faire-part de mariage qui fait dire «&nbsp;oh&nbsp;»</h1>
+        {/* Le H1 porte la requête principale (brief SEO) : le surtitre en fait partie, l'accroche reste l'émotion. */}
+        <h1 id="h-hero">
+          <span className="t-label mb-5 flex items-center gap-2"><span className="inline-block size-1.5 rounded-full bg-accent" aria-hidden="true" />Faire-part de mariage digital, gratuit<span className="sr-only"> :</span></span>
+          <span className="t-display block max-w-[13ch]">Le faire-part de mariage qui fait dire «&nbsp;oh&nbsp;»</span>
+        </h1>
         <p className="t-lead mt-6 max-w-[34ch]">Écrivez vos prénoms, choisissez une ambiance, partagez un lien. Vos invités ouvrent l’enveloppe sur leur téléphone et vous répondent en un geste.</p>
         <div id="start" data-hero-cta role="group" aria-label="Commencer mon faire-part" className="mt-9 flex w-full max-w-[520px] flex-col gap-2 rounded-[28px] border border-white/70 bg-card/80 p-2 shadow-lift backdrop-blur sm:flex-row sm:items-center sm:rounded-full">
           <div className="flex min-w-0 flex-1 items-center">

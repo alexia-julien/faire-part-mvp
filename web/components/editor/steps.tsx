@@ -17,6 +17,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { MiniCard } from "@/components/invitation/mini-card";
 import { ShineBorder } from "@/components/magic/shine-border";
 import type { EditorApi } from "./editor";
+import { PremiumDoor } from "@/components/site/dashboard-extras";
 
 type P = { ed: EditorApi; titleRef: RefObject<HTMLHeadingElement | null> };
 const isoToday = () => { const t = today(); return t.getFullYear() + "-" + String(t.getMonth() + 1).padStart(2, "0") + "-" + String(t.getDate()).padStart(2, "0"); };
@@ -378,6 +379,8 @@ export function StepReview({ ed, titleRef, phone }: P & { phone: ReactNode }) {
       <p className="legal-note mt-6 text-[13px] leading-relaxed text-muted-foreground">
         {ed.editing ? "" : "Pour publier, vous vous connectez ou créez votre compte (email ou Google). "}Les informations saisies sont enregistrées pour afficher votre faire-part. <a href="/confidentialite/" target="_blank" rel="noopener" className="underline underline-offset-4">Confidentialité</a>
       </p>
+      {/* Fausse porte Premium juste avant le partage (PRD : moment d'achat idéal). Le gratuit reste complet. */}
+      {!ed.editing && <div className="mt-8"><PremiumDoor origin="editeur" /></div>}
     </>
   );
 }

@@ -220,7 +220,8 @@ export function RsvpFlow({ cfg, preview, previous, couple, madeWith, onMadeWith,
                 })}
               </div>
               <label className="rq-sub" htmlFor="f-diet">Autre précision <span>(facultatif)</span></label>
-              <input id="f-diet" name="diet" type="text" className="rq-input" maxLength={200} placeholder="Allergie aux crustacés…" value={x.dietNote} onChange={(e) => set("dietNote", e.target.value)} />
+              <input id="f-diet" name="diet" type="text" className="rq-input" maxLength={200} placeholder="Sans porc, allergie…" aria-describedby="diet-info" value={x.dietNote} onChange={(e) => set("dietNote", e.target.value)} />
+              <p id="diet-info" className="rq-note">Facultatif. Visible seulement par les mariés, pour le repas, et supprimé avec votre réponse. <a href="/confidentialite/" target="_blank" rel="noopener">En savoir plus</a></p>
             </>)}
             {step === "brunch" && (<>
               <p className="rq-title" id="lab-brunch" tabIndex={-1}>Serez-vous au brunch du lendemain ?</p>

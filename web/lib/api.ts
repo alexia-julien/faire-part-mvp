@@ -101,6 +101,22 @@ const local = {
     await asAccount<void>((db, slug) => { if (slug) { delete db.inv[slug]; delete db.rsvps[slug]; } return { save: true }; });
     auth.drop();
   },
+  addRsvp: (data: Record<string, unknown>) => asAccount<number>((db, slug) => {
+    if (!slug) throw new Error("aucun faire-part");
+    db.rsvps[slug] = db.rsvps[slug] || [];
+    const id = db.rsvps[slug].reduce((m, r) => Math.max(m, +r.id || 0), 0) + 1;
+    db.rsvps[slug].push({ id, created_at: new Date().toISOString(), data: { ...data, manual: true, rid: "manuel" + id } });
+    return { save: true, value: id };
+  }),
+  notify: (on?: boolean) => asAccount<boolean>(() => {
+    const k = "fp:notify:" + me();
+    try { if (on !== undefined) localStorage.setItem(k, on ? "1" : "0"); return { value: localStorage.getItem(k) !== "0" }; }
+    catch { return { value: true }; }
+  }),
+  async premiumInterest(email: string, _origin = "editeur") { void _origin;
+    if (!/^[^\s@]{1,64}@[^\s@]+\.[a-z]{2,24}$/i.test(email.trim())) throw new Error("invalid email");
+    try { localStorage.setItem("fp:premium", email.trim()); } catch {}
+  },
 };
 
 // --- Mode Supabase (fonctions décrites dans supabase/schema.sql) ---
@@ -117,6 +133,13 @@ const supa = {
   listRsvps: async () => (await arpc("account_rsvps", {})) as RsvpRow[] | null,
   deleteRsvp: async (id: number) => { await arpc("account_delete_rsvp", { p_id: id }); },
   deleteAccount: async () => { await arpc("delete_account", {}); auth.drop(); },
+  addRsvp: async (data: Record<string, unknown>) => Number(await arpc("account_add_rsvp", { p_data: data })),
+  notify: async (on?: boolean) => !!(await arpc("account_notify", on === undefined ? {} : { p_digest: on })),
+  // Fausse porte Premium : avec la session si le couple est connecté (le compte est alors relié), sinon en invité.
+  premiumInterest: async (email: string, origin = "editeur") => {
+    const tok = await auth.token();
+    await post("premium_interest", { p_email: email.trim(), p_origin: origin }, tok);
+  },
 };
 
 export const api = IS_REMOTE ? supa : local;
@@ -148,5 +171,7 @@ export function userError(e: unknown) {
   if (/rate limit/i.test(m)) return "Trop de tentatives en peu de temps. Réessayez dans une heure.";
   if (/too large|trop/i.test(m)) return "Le faire-part est trop volumineux : essayez avec des photos plus légères.";
   if (/Stockage local plein/.test(m)) return m;
+  if (/invalid email/i.test(m)) return "Cette adresse email ne semble pas valide.";
+  if (/name required/i.test(m)) return "Indiquez le nom de l’invité.";
   return "L’opération a échoué. Vérifiez votre connexion et réessayez.";
 }

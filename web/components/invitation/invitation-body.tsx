@@ -7,6 +7,7 @@ import {
   type Config,
 } from "@/lib/invitation";
 import { DecorBottom, DecorCorners, DecorTop, Heart, styleAttrs } from "./ornaments";
+import { BrandMark } from "@/components/site/brand-mark";
 
 function Paras({ text, preview }: { text: string; preview?: boolean }) {
   const t = String(text || "").trim();
@@ -16,8 +17,11 @@ function Paras({ text, preview }: { text: string; preview?: boolean }) {
 function Divider() {
   return <div className="divider-heart" aria-hidden="true"><span className="dh-line" /><Heart /><span className="dh-line" /></div>;
 }
-function Head({ title }: { title: string }) {
-  return <div className="section-head"><h2>{title}</h2><Divider /></div>;
+// Dans une maquette intégrée à une autre page (accueil, éditeur : namesTag ≠ "h1"), les titres de sections ne sont pas
+// de vrais titres de la page : on les rend en paragraphe stylé pour ne pas polluer sa structure (SEO, lecteurs d'écran).
+function Head({ title, tag = "h2" }: { title: string; tag?: "h2" | "p" }) {
+  const T = tag;
+  return <div className="section-head"><T className="sh-title">{title}</T><Divider /></div>;
 }
 function LinkBtn({ url, label }: { url: string; label: string }) {
   const l = safeLink(url);
@@ -61,6 +65,7 @@ type Props = {
 
 // Le faire-part lui-même (page publique ET aperçus) : héros, sections au fond alterné, réponse, pied de page.
 export const InvitationBody = forwardRef<HTMLDivElement, Props>(function InvitationBody({ cfg, preview, namesTag = "h1", reveal, revealKey = 0, rsvp, className }, ref) {
+  const ht = namesTag === "h1" ? "h2" : "p";
   const photos = cfg.photos.map(safeImg).filter(Boolean), sec = cfg.sections;
   const p1 = cfg.partner1 || "Prénom", p2 = cfg.partner2 || "Prénom";
   const dateLong = formatDate(cfg, false), time = hm(cfg.time), hasDate = !!eventDate(cfg), maps = mapsHref(cfg);
@@ -69,17 +74,17 @@ export const InvitationBody = forwardRef<HTMLDivElement, Props>(function Invitat
 
   const blocks: { id: string; node: ReactNode }[] = [];
   if (cfg.message) blocks.push({ id: "message", node: <div className="narrow"><Paras text={cfg.message} /></div> });
-  if (sec.story.on && (sec.story.text.trim() || preview)) blocks.push({ id: "story", node: <><Head title="Notre histoire" /><div className="narrow"><Paras text={sec.story.text} preview={preview} /></div></> });
+  if (sec.story.on && (sec.story.text.trim() || preview)) blocks.push({ id: "story", node: <><Head tag={ht} title="Notre histoire" /><div className="narrow"><Paras text={sec.story.text} preview={preview} /></div></> });
   const items = sec.program.items.filter((it) => it.label.trim());
   if (sec.program.on && (items.length || preview)) {
-    blocks.push({ id: "program", node: <><Head title="Programme" />{items.length ? (
+    blocks.push({ id: "program", node: <><Head tag={ht} title="Programme" />{items.length ? (
       <ol className="timeline">{items.map((it, i) => (
         <li key={i}><span className="t-time">{hm(it.time)}</span><span className="t-dot" aria-hidden="true" /><span className="t-label">{it.label}</span></li>
       ))}</ol>) : <p className="ph center">Votre texte apparaîtra ici.</p>}</> });
   }
   if (cfg.venueName) {
     blocks.push({ id: "lieu", node: <>
-      <Head title="Lieu" />
+      <Head tag={ht} title="Lieu" />
       <div className="lieu-card">
         <span className="lieu-pin" aria-hidden="true"><MapPin /></span>
         <div className="lieu-name">{cfg.venueName}</div>
@@ -92,14 +97,14 @@ export const InvitationBody = forwardRef<HTMLDivElement, Props>(function Invitat
   ([["dress", "Dress code", ""], ["lodging", "Hébergement", "Voir les hébergements"], ["practical", "Infos pratiques", ""], ["gifts", "Liste de mariage", "Voir la liste"]] as const).forEach(([id, title, btn]) => {
     const s = sec[id], l = btn ? safeLink(s.url || "") : null;
     if (!s.on || !(s.text.trim() || l || preview)) return;
-    blocks.push({ id, node: <><Head title={title} /><div className="narrow">{s.text.trim() ? <Paras text={s.text} /> : (l ? null : <Paras text="" preview={preview} />)}</div>{btn && <LinkBtn url={s.url || ""} label={btn} />}</> });
+    blocks.push({ id, node: <><Head tag={ht} title={title} /><div className="narrow">{s.text.trim() ? <Paras text={s.text} /> : (l ? null : <Paras text="" preview={preview} />)}</div>{btn && <LinkBtn url={s.url || ""} label={btn} />}</> });
   });
 
   const dl = parseDate(cfg.rsvp.deadline);
   const todayD = new Date(); todayD.setHours(0, 0, 0, 0);
   const contact = cfg.rsvp.email || cfg.rsvp.phone || cfg.rsvp.address;
   blocks.push({ id: "rsvp", node: <>
-    <Head title="Merci de confirmer votre présence" />
+    <Head tag={ht} title="Merci de confirmer votre présence" />
     {dl && <p className="deadline">{dl < todayD && !preview ? `La date limite de réponse (${longDate(dl)}) est passée, mais vous pouvez encore nous répondre.` : `Merci de répondre avant le ${longDate(dl)}.`}</p>}
     {preview && <p className="preview-note">Aperçu : le formulaire sera actif une fois le faire-part publié.</p>}
     <div className="form-wrap">
@@ -134,6 +139,8 @@ export const InvitationBody = forwardRef<HTMLDivElement, Props>(function Invitat
           <Divider />
           <div className="fnames">{names}</div>
           {dateLong && <div className="fdate">{dateLong}</div>}
+          {/* Signature discrète, non cliquable (PRD US-14 : aucun lien commercial avant la réponse). Retirée en Premium (US-22). */}
+          <p className="fp-brand"><BrandMark className="fp-brand-mark" />Maison Meli</p>
         </footer>
       </div>
     </div>

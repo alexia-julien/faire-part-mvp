@@ -23,7 +23,7 @@ export default function Page() {
         <h2 id="julien">Julien Meli, fondateur</h2>
         <p>Julien conçoit et développe Maison Meli en France. Il est aussi l’auteur et le relecteur des guides publiés sur ce site : certains sont rédigés avec l’aide d’une intelligence artificielle, puis vérifiés (faits, chiffres, sources) et validés par lui avant publication. Chaque guide indique sa date de mise à jour et ses sources.</p>
         <h2>Nous contacter</h2>
-        <p>Une question, une idée, un bug ? Écrivez à <a href="mailto:julien.meli.jm@gmail.com">julien.meli.jm@gmail.com</a>. Les informations légales sont dans les <a href={PAGES.mentions.path}>mentions légales</a>.</p>
+        <p>Une question, une idée, un bug ? Écrivez à <a href="mailto:contact@maison-meli.com">contact@maison-meli.com</a>. Les informations légales sont dans les <a href={PAGES.mentions.path}>mentions légales</a>.</p>
         <Cta />
       </div>
     </ContentPage>

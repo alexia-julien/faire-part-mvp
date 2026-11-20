@@ -19,6 +19,8 @@ import { BlurFade } from "@/components/magic/blur-fade";
 import { MiniCard } from "@/components/invitation/mini-card";
 import { AuthPanel } from "./auth-panel";
 import { ShareKit } from "./share-kit";
+import { BrandMark } from "@/components/site/brand-mark";
+import { DigestToggle, ManualRsvp, PremiumDoor } from "./dashboard-extras";
 
 // « Mon faire-part » : le faire-part du compte connecté et les réponses de ses invités. Sans session : connexion.
 // Les réponses viennent d'inconnus : on ne fait jamais confiance à leur forme, même si le serveur les filtre aussi.
@@ -283,6 +285,7 @@ export function Dashboard() {
                                 <td key={c.id} data-label={c.label} data-empty={v ? undefined : ""} className={cn("px-4 py-3 align-top", c.wide && "min-w-[240px] max-w-[340px]", (c.id === "email" || c.id === "phone" || c.id === "date") && "whitespace-nowrap", c.sticky && "sticky left-0 whitespace-nowrap bg-card font-medium")}>
                                   {c.id === "att" ? <Badge variant="outline" className={cn("rounded-full px-2.5", r.data.attendance === "yes" ? "pres-yes border-[#5F6E4E]/30 bg-[#5F6E4E]/10 text-[#46533A]" : "pres-no border-foreground/10 bg-muted text-muted-foreground")}>{v}</Badge> : v}
                                   {c.id === "name" && r.superseded && <Badge variant="outline" className="badge ml-2 rounded-full no-underline">remplacée</Badge>}
+                                  {c.id === "name" && r.data.manual === true && <Badge variant="outline" className="ml-2 rounded-full">ajoutée par vous</Badge>}
                                 </td>
                               );
                             })}
@@ -316,6 +319,9 @@ export function Dashboard() {
               </ul>
             </section>
           )}
+          <ManualRsvp onAdded={load} onSignedOut={() => setUser(null)} />
+          <DigestToggle onSignedOut={() => setUser(null)} />
+          <PremiumDoor email={user.email} origin="tableau" />
         </aside>
       </div>
       {danger}
@@ -354,7 +360,7 @@ function Shell({ user, onSignOut, children }: { user: User | null; onSignOut?: (
     <div className="paper-grain min-h-dvh">
       <Toaster position="top-center" toastOptions={{ classNames: { toast: "!rounded-[20px] !shadow-lift !border-border !font-sans" } }} />
       <header className="glass sticky top-3 z-20 mx-auto mt-3 flex h-14 w-[calc(100%-24px)] max-w-6xl items-center justify-between rounded-full px-5">
-        <a href="/" className="font-serif text-[22px] font-medium">Maison Meli</a>
+        <a href="/" className="flex items-center gap-2 font-serif text-[22px] font-medium"><BrandMark className="size-8" />Maison Meli</a>
         {user && (
           <div className="flex items-center gap-3 text-[14px]">
             <span id="account-email" className="hidden text-muted-foreground sm:inline">{user.email ? "Connecté : " + user.email : "Connecté"}</span>
