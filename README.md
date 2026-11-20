@@ -49,12 +49,10 @@ npm run deploy         # build de production puis copie de web/out à la racine 
 
 Mise en ligne : `cd web && npm run deploy`, puis commit et push sur `dev`. Après chaque mise en ligne : `npm run indexnow` (prévient Bing et Copilot).
 
-### Changer d'hébergeur (recommandé : Cloudflare Pages)
-GitHub Pages ne fait ni 301 ni en-têtes HTTP. Le code est prêt pour Cloudflare Pages ou Netlify (`web/public/_redirects`, `web/public/_headers`) :
-1. Créer le projet en le reliant au dépôt `alexia-julien/faire-part-mvp`, branche `dev` ; répertoire racine `web`, commande `npm ci && npm run build`, sortie `out` ; variable `NODE_VERSION=22`.
-2. **Avant de toucher au DNS**, tester sur l'adresse provisoire : un vrai lien `invitation.html?f=…`, `/creer.html#p1=A&s=gatsby` (doit arriver sur `/creer/`), `/robots.txt`, `/sitemap.xml`.
-3. Cloudflare : laisser **autorisés** les robots IA (Security → Bots / AI Crawl Control : ne pas bloquer la recherche ni l'entraînement), sinon le travail GEO est perdu.
-4. Brancher `maison-meli.com` (et rediriger `www` vers la racine en 301), puis désactiver GitHub Pages.
+### Hébergement Cloudflare (Worker avec fichiers statiques)
+Le Worker `faire-part-mvp` est relié au dépôt (branche `dev`) : chaque push redéploie le site. `wrangler.jsonc` (racine) sert le site déjà publié à la racine par `npm run deploy` ; `.assetsignore` exclut les sources ; `_redirects` fait les vraies 301 et `_headers` les en-têtes (X-Robots-Tag, cache). Tant que le domaine n'est pas basculé, GitHub Pages sert toujours maison-meli.com à partir des mêmes fichiers.
+
+Bascule du domaine (tableau de bord Cloudflare) : ajouter la zone `maison-meli.com` et vérifier les enregistrements DNS importés ; Worker → Domaines → ajouter `maison-meli.com` et `www.maison-meli.com` ; chez OVH, remplacer les serveurs DNS par ceux de Cloudflare ; laisser les robots IA autorisés (pas de blocage, pas de robots.txt géré par Cloudflare) ; rediriger `www` vers la racine ; puis, une fois tout vérifié, désactiver GitHub Pages.
 
 ## Tests
 
