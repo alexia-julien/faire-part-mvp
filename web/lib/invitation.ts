@@ -94,17 +94,7 @@ export const PRESETS: Preset[] = [
 ];
 export const STYLE_FIELDS = ["theme", "font", "intro", "photoShape", "decor", "foil", "texture"] as const;
 
-export const SECTIONS = [
-  { id: "story", label: "Notre histoire" },
-  { id: "program", label: "Programme" },
-  { id: "dress", label: "Dress code" },
-  { id: "lodging", label: "Hébergement" },
-  { id: "practical", label: "Infos pratiques" },
-  { id: "gifts", label: "Liste de mariage" },
-] as const;
-
 const ids = (list: readonly { id: string }[]) => list.map((x) => x.id);
-export const labelOf = (list: readonly { id: string; label: string }[], id: string) => list.find((x) => x.id === id)?.label || "";
 
 export function applyPreset(cfg: Config, p: Preset): Config {
   return { ...cfg, theme: p.theme, font: p.font, intro: p.intro, photoShape: p.photoShape, decor: p.decor, foil: p.foil, texture: p.texture };

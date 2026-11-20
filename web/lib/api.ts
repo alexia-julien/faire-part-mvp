@@ -103,7 +103,7 @@ const local = {
   },
 };
 
-// --- Mode Supabase (voir supabase/comptes.sql) ---
+// --- Mode Supabase (fonctions décrites dans supabase/schema.sql) ---
 const supa = {
   getInvitation: (slug: string) => rpc("get_invitation", { p_slug: slug }),
   submitRsvp: async (slug: string, data: unknown) => { await rpc("submit_rsvp", { p_slug: slug, p_data: data }); },

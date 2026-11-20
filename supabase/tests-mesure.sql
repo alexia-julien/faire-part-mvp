@@ -1,4 +1,4 @@
--- Tests de la mesure du funnel, à exécuter après supabase/mesure.sql.
+-- Tests de la mesure du funnel, à exécuter après chaque changement de supabase/schema.sql.
 -- Tout s'exécute dans une transaction TOUJOURS annulée : aucune donnée de test ne reste.
 -- Le résultat s'affiche dans un message d'erreur volontaire « RESULTATS » : une ligne PASS ou FAIL par vérification.
 do $$

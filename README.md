@@ -10,7 +10,7 @@ Références : [PRD](https://claude.ai/artifact/4SKbVCw7TaBdXzTuxMgASG) (prime e
 | --- | --- |
 | `web/` | **Le code source** : Next.js (App Router) + TypeScript + Tailwind CSS v4 + shadcn/ui + Magic UI + composants façon Aceternity + Motion, en **export statique**. |
 | racine | **Le site publié** (généré par `npm run deploy`, ne pas modifier à la main) : `index.html`, `creer/`, `mon-faire-part/`, `invitation.html`, `_next/`… GitHub Pages sert la branche `dev` depuis la racine. La liste des fichiers publiés est dans `.deploy-manifest`. |
-| `supabase/` | Schéma, migrations et tests SQL de la base (inchangés par la refonte). |
+| `supabase/` | `schema.sql` : toute la base telle qu'elle tourne en production (rejouable) ; `tests*.sql` : recettes SQL. |
 | `tests/e2e.py` | Recette de bout en bout (Playwright). |
 | `tests/seo.py` | Recette SEO/GEO de l'export (title, description, canonical, JSON-LD, liens, plan du site, noindex…). |
 
@@ -66,7 +66,7 @@ pip install playwright pillow opencv-python && python3 tests/e2e.py
 ```
 220 vérifications au 20/11/2026 (dont pages SEO/GEO, générateur, rétroplanning, exemple) : page d'accueil (SEO, données structurées, accroche, mesure, Do Not Track), éditeur (validations, brouillon, photos, ambiances et réglages, ouverture dans l'aperçu, sections, réponses), publication (compte par code ou Google, rituel, lien, partage, QR relu par OpenCV), modification et règle « un faire-part par compte », faire-part invité (ouverture, mouvement réduit, monogramme, fuseau de l'agenda, liens filtrés), réponse pas à pas et correction, tableau de suivi (doublons, recherche, filtres, tri, CSV sans formule, emails, suppressions), accessibilité (axe-core, WCAG 2.2 AA), absence de débordement à 375/390/430/1440 px, CSP sans violation, aucune erreur JavaScript, XSS. Captures dans `tests/out/`.
 
-La base se teste avec `supabase/tests*.sql` dans le SQL Editor (tout est annulé à la fin).
+La base se teste avec `supabase/tests.sql` (invités), `tests-comptes.sql` et `tests-mesure.sql` dans le SQL Editor (tout est annulé à la fin).
 
 ## Sécurité et performance
 - **CSP stricte** posée dans chaque page par `scripts/postbuild.mjs` (GitHub Pages n'envoie pas d'en-têtes) : scripts autorisés par empreinte SHA-256, jamais `unsafe-inline` ; Google Identity Services seulement sur `/creer/` et `/mon-faire-part/`. Polices auto-hébergées (plus aucun appel à Google Fonts).
@@ -74,10 +74,9 @@ La base se teste avec `supabase/tests*.sql` dans le SQL Editor (tout est annulé
 - Lighthouse mobile mesuré le 20/11/2026 : faire-part invité 97–98 (LCP 0,9 s), page d'accueil 91–95 (LCP 1,1 s, CLS 0) ; ouverture de l'enveloppe ≈ 57–59 images/s avec un processeur ralenti 4×. Animations chargées après l'affichage (`LazyMotion`), sections hors écran non calculées (`content-visibility`).
 
 ## Supabase
-Projet `pmtwhrqfdvbxbgrzcytl` (Francfort). La refonte ne change rien côté base. Si l'URL du projet change : `web/lib/config.ts` et `SUPA` dans `web/scripts/postbuild.mjs`. Mesure : `select * from private.kpis_30j;` et `select * from private.funnel_semaine;`.
+Projet `pmtwhrqfdvbxbgrzcytl` (Francfort). `supabase/schema.sql` décrit toute la base (comptes uniquement, mesure, aperçu de lien) ; toute modification se fait dans ce fichier puis se rejoue dans le SQL Editor. Si l'URL du projet change : `web/lib/config.ts`, `SUPA` dans `web/scripts/postbuild.mjs` et `vars` dans `wrangler.jsonc`. Mesure : `select * from private.kpis_30j;` et `select * from private.funnel_semaine;`.
 
 ## Limites connues
-- Aperçu WhatsApp générique (`/img/og-invitation.png`) : les prénoms et la date demanderaient un rendu côté serveur (fonction edge ou autre hébergement). Ils sont dans le texte du message de partage.
 - Photos stockées en base (JPEG 1600 px, 3 max).
-- Mentions légales : reportées (décision du 20/11/2026).
+- Mentions légales : SIREN à compléter.
 - Email de notification des réponses (US-17) : phase « Acquérir » de la roadmap.

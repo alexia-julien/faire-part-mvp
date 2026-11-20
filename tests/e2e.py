@@ -1,7 +1,7 @@
 """Recette de bout en bout de Maison Meli (navigateur headless, mode local sans Supabase).
 Prérequis : cd web && npm ci && npm run build:local   (export statique en mode local dans web/out)
 Puis, depuis la racine du dépôt :  pip install playwright pillow opencv-python && python3 tests/e2e.py
-Captures d'écran dans tests/out/. Code de sortie 1 si un test échoue. La base elle-même se teste avec supabase/tests*.sql."""
+Captures d'écran dans tests/out/. Code de sortie 1 si un test échoue. La base elle-même se teste avec supabase/tests.sql, tests-comptes.sql et tests-mesure.sql."""
 import subprocess, time, json, re, os, sys, tempfile, base64, csv, io
 from playwright.sync_api import sync_playwright
 from PIL import Image

@@ -11,3 +11,6 @@ tests/out/
 web/node_modules/
 web/.next/
 web/out/
+
+# État local de wrangler (cache, bases simulées) : jamais dans le dépôt
+.wrangler/

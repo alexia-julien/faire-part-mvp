@@ -1,16 +1,23 @@
--- Schéma Supabase du MVP faire-part (version durcie).
--- À exécuter dans Supabase > SQL Editor. Le fichier est idempotent : on peut le rejouer en entier à tout moment
--- (c'est ce qu'il faut faire pour appliquer une mise à jour). Tout est dans UNE transaction : si une instruction
--- échoue, rien n'est modifié.
+-- Schéma Supabase de Maison Meli : TOUTE la base, telle qu'elle tourne en production (relevée le 20/11/2026).
+-- Remplace les anciens schema.sql (liens privés), comptes.sql, bascule.sql et mesure.sql, tous déjà appliqués
+-- (historique dans git). À exécuter dans Supabase > SQL Editor. Idempotent : rejouable en entier à tout moment,
+-- c'est ce qu'il faut faire pour appliquer une mise à jour. Une seule transaction : si une instruction échoue,
+-- rien n'est modifié.
 --
 -- Modèle de sécurité
---   - Tables verrouillées (RLS activé, aucune policy, aucun droit direct pour anon) : le navigateur ne passe
---     QUE par les fonctions ci-dessous (SECURITY DEFINER).
---   - Public : lire un faire-part publié (get_invitation), y répondre (submit_rsvp).
---   - Clé privée requise : modifier le faire-part, lire les réponses. La clé n'est stockée que hashée (bcrypt).
---   - Validation côté serveur de tout ce qui entre (on ne fait pas confiance au navigateur).
---   - Limitation de débit par IP (hashée) pour freiner le spam et le remplissage de la base.
---   - Les fonctions et la table internes sont dans le schéma "private", non exposé par l'API.
+--   - Tables verrouillées (RLS activé, aucune policy, aucun droit direct) : le navigateur ne passe QUE par les
+--     fonctions ci-dessous (SECURITY DEFINER).
+--   - Invités (anon) : lire un faire-part (get_invitation), y répondre (submit_rsvp), mesure (track).
+--     Worker Cloudflare (anon) : aperçu de lien (get_invitation_preview : prénoms, date, palette, ne compte rien).
+--   - Compte connecté (authenticated, Supabase Auth) : les fonctions account_* agissent sur LE faire-part du
+--     compte (un au plus), sans identifiant ni clé à fournir ; delete_account supprime tout.
+--   - Validation côté serveur de tout ce qui entre ; limitation de débit par IP (hashée).
+--   - Fonctions et tables internes dans le schéma « private », non exposé par l'API.
+--
+-- Mesure du funnel (PRD, section KPIs), sans cookie : private.events. Un visiteur = empreinte SHA-256 de son IP.
+--   landing_view, editor_start, auth_gate, share, qr_download, cta_create : navigateur (public.track)
+--   invitation_created / updated / deleted, invitation_viewed, rsvp_submitted, rsvps_listed, account_deleted : base
+-- Lecture : select * from private.kpis_30j;  select * from private.funnel_semaine;
 
 begin;
 
@@ -22,11 +29,12 @@ revoke all on schema private from public, anon, authenticated;
 -- ---------------------------------------------------------------- Tables
 create table if not exists public.invitations (
   slug       text primary key check (slug ~ '^[a-z0-9][a-z0-9-]{2,62}$'),
-  key_hash   text not null,
   config     jsonb not null,
   created_at timestamptz not null default now(),
-  updated_at timestamptz not null default now()
+  updated_at timestamptz not null default now(),
+  owner      uuid not null references auth.users(id) on delete cascade
 );
+create unique index if not exists invitations_owner_one on public.invitations(owner) where owner is not null; -- un faire-part par compte
 
 create table if not exists public.rsvps (
   id         bigint generated always as identity primary key,
@@ -47,7 +55,24 @@ create table if not exists private.rate_limits (
   hits         integer not null default 1,
   primary key (bucket, ip_hash, window_start)
 );
-revoke all on private.rate_limits from public, anon, authenticated;
+
+create table if not exists private.events (
+  id         bigint generated always as identity primary key,
+  created_at timestamptz not null default now(),
+  event      text not null,
+  tester_id  bigint,            -- historique : espaces testeurs supprimés le 19/11/2026, toujours null depuis
+  slug       text,
+  visitor    text,
+  meta       jsonb not null default '{}'::jsonb
+);
+create index if not exists events_created_idx on private.events (created_at desc);
+create index if not exists events_slug_idx on private.events (slug, created_at desc);
+create index if not exists events_event_created_idx on private.events (event, created_at);
+create index if not exists events_tester_idx on private.events (tester_id, created_at desc); -- historique
+
+alter table private.rate_limits enable row level security;
+alter table private.events enable row level security;
+revoke all on private.rate_limits, private.events from public, anon, authenticated;
 
 -- ---------------------------------------------------------------- Fonctions internes
 -- Identifiant anonymisé du visiteur (hash de l'IP fournie par Cloudflare/Supabase). Null si l'IP est inconnue.
@@ -65,7 +90,7 @@ begin
   return encode(digest(ip, 'sha256'), 'hex');
 end $$;
 
--- Limite le nombre d'appels par heure et par IP. Si l'IP est inconnue, on ne bloque personne.
+-- Limitation de débit : p_limit appels par heure, par IP et par « bucket ». Erreur 54000 au-delà.
 create or replace function private.rate_limit(p_bucket text, p_limit integer) returns void
 language plpgsql security definer set search_path = public, extensions as $$
 declare v_ip text := private.client_id(); v_hits integer;
@@ -81,7 +106,7 @@ begin
   end if;
 end $$;
 
--- Contrôle de forme et de taille d'un faire-part (3 photos max, 3 Mo max au total).
+-- Garde-fous sur la configuration d'un faire-part (le contenu est revalidé à l'affichage par sanitizeConfig).
 create or replace function private.check_config(p_config jsonb) returns void
 language plpgsql set search_path = public as $$
 begin
@@ -93,44 +118,58 @@ begin
   end if;
 end $$;
 
+-- Le compte connecté (null pour un visiteur, et pour une session anonyme si elles étaient activées un jour).
+create or replace function private.account_id() returns uuid
+language sql stable set search_path = '' as $$
+  select case when coalesce((auth.jwt()->>'is_anonymous')::boolean, false) then null else auth.uid() end;
+$$;
+
+-- Journal de mesure. Ne casse jamais l'app ; conservation 13 mois. p_tester_id : historique, toujours null.
+create or replace function private.log_event(p_event text, p_tester_id bigint default null, p_slug text default null,
+                                             p_meta jsonb default '{}'::jsonb) returns void
+language plpgsql set search_path = public, extensions as $$
+begin
+  insert into private.events(event, tester_id, slug, visitor, meta)
+  values (p_event, p_tester_id, left(p_slug, 63), private.client_id(), coalesce(p_meta, '{}'::jsonb));
+  if random() < 0.01 then delete from private.events where created_at < now() - interval '13 months'; end if; -- durée de conservation
+exception when others then
+  null; -- la mesure ne doit jamais casser l'app
+end $$;
+
 revoke all on function private.client_id() from public, anon, authenticated;
 revoke all on function private.rate_limit(text, integer) from public, anon, authenticated;
 revoke all on function private.check_config(jsonb) from public, anon, authenticated;
+revoke all on function private.account_id() from public, anon, authenticated;
+revoke all on function private.log_event(text, bigint, text, jsonb) from public, anon, authenticated;
 
--- ---------------------------------------------------------------- API publique
--- Création (la clé privée est générée dans le navigateur : 16 à 64 caractères). 10 créations / heure / IP.
-create or replace function public.create_invitation(p_slug text, p_key text, p_config jsonb)
-returns void language plpgsql security definer set search_path = public, extensions as $$
+-- ---------------------------------------------------------------- Invités (publiques)
+-- Lire un faire-part publié (compte une ouverture).
+create or replace function public.get_invitation(p_slug text) returns jsonb
+language plpgsql security definer set search_path = public, extensions as $$
+declare v_cfg jsonb;
 begin
-  perform private.rate_limit('create', 10);
-  if length(coalesce(p_key, '')) < 16 or length(p_key) > 64 then raise exception 'invalid key'; end if;
-  perform private.check_config(p_config);
-  insert into invitations(slug, key_hash, config) values (p_slug, crypt(p_key, gen_salt('bf')), p_config);
+  select config into v_cfg from invitations where slug = p_slug;
+  if v_cfg is not null then perform private.log_event('invitation_viewed', null, p_slug); end if;
+  return v_cfg;
 end $$;
 
--- Modification (clé privée requise). Renvoie false si la clé est mauvaise. 30 appels / heure / IP.
-create or replace function public.update_invitation(p_slug text, p_key text, p_config jsonb)
-returns boolean language plpgsql security definer set search_path = public, extensions as $$
-begin
-  perform private.rate_limit('update', 30);
-  perform private.check_config(p_config);
-  update invitations set config = p_config, updated_at = now()
-   where slug = p_slug and key_hash = crypt(p_key, key_hash);
-  return found;
-end $$;
-
--- Lecture publique d'un faire-part publié (renvoie null s'il n'existe pas).
-create or replace function public.get_invitation(p_slug text)
-returns jsonb language sql security definer set search_path = public as $$
-  select config from invitations where slug = p_slug;
+-- Aperçu de lien (Worker Cloudflare) : prénoms, date et palette seulement ; ne journalise rien, pour ne pas
+-- compter les robots d'aperçu comme des ouvertures.
+create or replace function public.get_invitation_preview(p_slug text) returns jsonb
+language sql stable security definer set search_path = public as $$
+  select jsonb_build_object(
+    'p1', left(coalesce(config->>'partner1', ''), 40),
+    'p2', left(coalesce(config->>'partner2', ''), 40),
+    'date', case when config->>'date' ~ '^\d{4}-\d{2}-\d{2}$' then config->>'date' else '' end,
+    'theme', left(coalesce(config->>'theme', ''), 20))
+  from invitations where slug = p_slug;
 $$;
 
--- Réponse d'un invité (publique). Le contenu est reconstruit champ par champ : tout ce qui n'est pas prévu est
--- ignoré. 100 réponses / heure / IP / faire-part, 1000 réponses max par faire-part.
--- Les coordonnées (email, téléphone, adresse) sont validées ici : on refuse plutôt que d'enregistrer n'importe quoi.
-create or replace function public.submit_rsvp(p_slug text, p_data jsonb)
-returns void language plpgsql security definer set search_path = public as $$
-declare v_att text; v_yes boolean; v_guests integer; v_children integer; v_email text; v_phone text;
+-- Réponse d'un invité : tout est revalidé et tronqué. Une nouvelle ligne à chaque envoi ; « rid » relie les
+-- corrections d'une même réponse (US-13). 100 envois / heure / IP / faire-part, 1 000 réponses max.
+create or replace function public.submit_rsvp(p_slug text, p_data jsonb) returns void
+language plpgsql security definer set search_path = public as $$
+declare v_att text; v_yes boolean; v_guests integer; v_children integer; v_email text; v_phone text; v_rid text; v_edit boolean; v_sec integer;
 begin
   perform private.rate_limit('rsvp:' || coalesce(p_slug, ''), 100);
   if p_data is null or jsonb_typeof(p_data) <> 'object' then raise exception 'invalid data'; end if;
@@ -141,12 +180,10 @@ begin
   if coalesce(btrim(p_data->>'name'), '') = '' then raise exception 'name required'; end if;
   if (select count(*) from rsvps where slug = p_slug) >= 1000 then raise exception 'too many responses'; end if;
   v_yes := v_att = 'yes';
-
   v_email := left(btrim(coalesce(p_data->>'email', '')), 200);
   if v_email <> '' and v_email !~ '^[A-Za-z0-9._%+''-]{1,64}@[A-Za-z0-9.-]{1,255}\.[A-Za-z]{2,24}$' then raise exception 'invalid email'; end if;
   v_phone := btrim(coalesce(p_data->>'phone', ''));
   if v_phone <> '' and v_phone !~ '^[0-9 +().-]{6,30}$' then raise exception 'invalid phone'; end if;
-
   if not v_yes then
     v_guests := 0;
   elsif (p_data->>'guests') ~ '^[0-9]{1,2}$' then
@@ -159,10 +196,11 @@ begin
   else
     v_children := 0;
   end if;
-
+  v_rid := case when (p_data->>'rid') ~ '^[a-z0-9]{12,32}$' then p_data->>'rid' else '' end;
+  v_edit := v_rid <> '' and exists (select 1 from rsvps where slug = p_slug and data->>'rid' = v_rid);
+  v_sec := case when (p_data->>'elapsed') ~ '^[0-9]{1,5}$' then least((p_data->>'elapsed')::integer, 86400) end;
   insert into rsvps(slug, data) values (p_slug, jsonb_build_object(
-    -- identifiant anonyme du navigateur de l'invité : sert à repérer une réponse corrigée (doublon)
-    'rid',        case when (p_data->>'rid') ~ '^[a-z0-9]{12,32}$' then p_data->>'rid' else '' end,
+    'rid',        v_rid,
     'name',       left(btrim(p_data->>'name'), 120),
     'attendance', v_att,
     'guests',     v_guests,
@@ -176,194 +214,205 @@ begin
     'custom',     left(btrim(coalesce(p_data->>'custom', '')), 500),
     'message',    left(coalesce(p_data->>'message', ''), 1000)
   ));
+  perform private.log_event('rsvp_submitted', null, p_slug,
+    jsonb_strip_nulls(jsonb_build_object('attendance', v_att, 'edit', v_edit, 'seconds', v_sec)));
 end $$;
 
--- Lecture des réponses (clé privée requise). Renvoie null si la clé est mauvaise (sans lever d'erreur, pour que
--- les tentatives ratées comptent dans la limitation de débit). 120 appels / heure / IP.
-create or replace function public.list_rsvps(p_slug text, p_key text)
-returns jsonb language plpgsql security definer set search_path = public, extensions as $$
+-- Mesure côté navigateur : liste blanche d'événements et de valeurs ; ne renvoie jamais d'erreur.
+create or replace function public.track(p_event text, p_slug text default null, p_meta jsonb default '{}'::jsonb) returns void
+language plpgsql security definer set search_path = public, extensions as $$
+declare v_meta jsonb := '{}'::jsonb; v_slug text;
 begin
+  if p_event is null or p_event not in ('landing_view', 'editor_start', 'auth_gate', 'share', 'qr_download', 'cta_create') then return; end if;
+  begin
+    perform private.rate_limit('track', 600);
+  exception when others then return;
+  end;
+  if jsonb_typeof(p_meta) = 'object' then
+    if p_meta->>'src' in ('direct', 'seo', 'ia', 'faire-part', 'reseaux', 'email', 'autre') then v_meta := v_meta || jsonb_build_object('src', p_meta->>'src'); end if;
+    if p_meta->>'channel' in ('natif', 'whatsapp', 'sms', 'email', 'copie') then v_meta := v_meta || jsonb_build_object('channel', p_meta->>'channel'); end if;
+  end if;
+  if p_slug ~ '^[a-z0-9][a-z0-9-]{2,62}$' and exists (select 1 from invitations where slug = p_slug) then v_slug := p_slug; end if;
+  perform private.log_event(p_event, null, v_slug, v_meta);
+end $$;
+
+-- ---------------------------------------------------------------- Compte connecté
+-- Le faire-part du compte : { slug, config, created_at, updated_at, responses, last_response }, ou null.
+create or replace function public.account_invitation() returns jsonb
+language plpgsql security definer set search_path = public, extensions as $$
+declare v_uid uuid := private.account_id();
+begin
+  if v_uid is null then raise exception 'not signed in' using errcode = '42501'; end if;
+  perform private.rate_limit('account', 240);
+  return (select jsonb_build_object('slug', i.slug, 'config', i.config, 'created_at', i.created_at, 'updated_at', i.updated_at,
+            'responses', (select count(*) from rsvps r where r.slug = i.slug),
+            'last_response', (select max(r.created_at) from rsvps r where r.slug = i.slug))
+            from invitations i where i.owner = v_uid);
+end $$;
+
+-- Création. Erreurs : 'one per account', ou 23505 si l'identifiant (slug) est déjà pris.
+create or replace function public.account_create_invitation(p_slug text, p_config jsonb) returns void
+language plpgsql security definer set search_path = public, extensions as $$
+declare v_uid uuid := private.account_id(); v_constraint text; v_src text := p_config->'meta'->>'src';
+begin
+  if v_uid is null then raise exception 'not signed in' using errcode = '42501'; end if;
+  perform private.rate_limit('create', 10);
+  perform private.check_config(p_config);
+  if exists (select 1 from invitations where owner = v_uid) then raise exception 'one per account'; end if;
+  begin
+    insert into invitations(slug, config, owner) values (p_slug, p_config, v_uid);
+  exception when unique_violation then
+    get stacked diagnostics v_constraint = constraint_name;
+    if v_constraint = 'invitations_owner_one' then raise exception 'one per account'; end if; -- deux créations simultanées
+    raise;
+  end;
+  if v_src is null or v_src not in ('direct', 'seo', 'ia', 'faire-part', 'reseaux', 'email', 'autre') then v_src := 'inconnue'; end if;
+  perform private.log_event('invitation_created', null, p_slug, jsonb_build_object('theme', p_config->>'theme', 'account', true, 'src', v_src));
+end $$;
+
+-- Modification : false si le compte n'a pas de faire-part.
+create or replace function public.account_update_invitation(p_config jsonb) returns boolean
+language plpgsql security definer set search_path = public, extensions as $$
+declare v_uid uuid := private.account_id(); v_slug text;
+begin
+  if v_uid is null then raise exception 'not signed in' using errcode = '42501'; end if;
+  perform private.rate_limit('update', 30);
+  perform private.check_config(p_config);
+  update invitations set config = p_config, updated_at = now() where owner = v_uid returning slug into v_slug;
+  if v_slug is null then return false; end if;
+  perform private.log_event('invitation_updated', null, v_slug, jsonb_build_object('theme', p_config->>'theme'));
+  return true;
+end $$;
+
+-- Suppression définitive du faire-part (et de ses réponses, en cascade).
+create or replace function public.account_delete_invitation() returns boolean
+language plpgsql security definer set search_path = public, extensions as $$
+declare v_uid uuid := private.account_id(); v_slug text;
+begin
+  if v_uid is null then raise exception 'not signed in' using errcode = '42501'; end if;
+  perform private.rate_limit('delete', 120);
+  delete from invitations where owner = v_uid returning slug into v_slug;
+  if v_slug is null then return false; end if;
+  perform private.log_event('invitation_deleted', null, v_slug);
+  return true;
+end $$;
+
+-- Réponses du faire-part du compte : [{ id, created_at, data }], ou null s'il n'a pas de faire-part.
+create or replace function public.account_rsvps() returns jsonb
+language plpgsql security definer set search_path = public, extensions as $$
+declare v_uid uuid := private.account_id(); v_slug text;
+begin
+  if v_uid is null then raise exception 'not signed in' using errcode = '42501'; end if;
   perform private.rate_limit('list', 120);
-  if not exists (select 1 from invitations where slug = p_slug and key_hash = crypt(p_key, key_hash)) then
-    return null;
-  end if;
+  select slug into v_slug from invitations where owner = v_uid;
+  if v_slug is null then return null; end if;
+  perform private.log_event('rsvps_listed', null, v_slug);
   return coalesce((select jsonb_agg(jsonb_build_object('id', id, 'created_at', created_at, 'data', data) order by created_at)
-                     from rsvps where slug = p_slug), '[]'::jsonb);
+                     from rsvps where slug = v_slug), '[]'::jsonb);
 end $$;
 
--- Suppression d'une réponse (réponse de test, spam, doublon). Clé privée requise. Renvoie false si la clé est
--- mauvaise. 120 appels / heure / IP.
-create or replace function public.delete_rsvp(p_slug text, p_key text, p_id bigint)
-returns boolean language plpgsql security definer set search_path = public, extensions as $$
+-- Suppression d'une réponse du faire-part du compte.
+create or replace function public.account_delete_rsvp(p_id bigint) returns boolean
+language plpgsql security definer set search_path = public, extensions as $$
+declare v_uid uuid := private.account_id();
 begin
+  if v_uid is null then raise exception 'not signed in' using errcode = '42501'; end if;
   perform private.rate_limit('delete', 120);
-  if not exists (select 1 from invitations where slug = p_slug and key_hash = crypt(p_key, key_hash)) then
-    return false;
-  end if;
-  delete from rsvps where slug = p_slug and id = p_id;
-  return true;
-end $$;
-
--- Résumé de plusieurs faire-part en un appel (liste « Mes faire-part »). Chaque élément doit fournir la bonne clé
--- privée, sinon il est renvoyé comme « invalide » (sans aucune donnée). 100 faire-part max, 120 appels / heure / IP.
-create or replace function public.summarize_invitations(p_items jsonb)
-returns jsonb language plpgsql security definer set search_path = public, extensions as $$
-declare it jsonb; v_cfg jsonb; v_out jsonb := '[]'::jsonb;
-begin
-  perform private.rate_limit('summary', 120);
-  if p_items is null or jsonb_typeof(p_items) <> 'array' then raise exception 'invalid data'; end if;
-  if jsonb_array_length(p_items) > 100 then raise exception 'too many'; end if;
-  for it in select value from jsonb_array_elements(p_items) loop
-    v_cfg := null;
-    if jsonb_typeof(it) = 'object' then
-      select config into v_cfg from invitations
-       where slug = it->>'slug' and key_hash = crypt(coalesce(it->>'key', ''), key_hash);
-    end if;
-    if v_cfg is null then
-      v_out := v_out || jsonb_build_array(jsonb_build_object('slug', left(coalesce(it->>'slug', ''), 63), 'invalid', true));
-    else
-      v_out := v_out || jsonb_build_array(jsonb_build_object(
-        'slug', it->>'slug',
-        'partner1', v_cfg->>'partner1', 'partner2', v_cfg->>'partner2', 'date', v_cfg->>'date', 'theme', v_cfg->>'theme',
-        'responses', (select count(*) from rsvps where slug = it->>'slug'),
-        'last_response', (select max(created_at) from rsvps where slug = it->>'slug')));
-    end if;
-  end loop;
-  return v_out;
-end $$;
-
--- ---------------------------------------------------------------- Espaces testeurs (wedding planners)
--- Chaque testeur reçoit un lien personnel (admin.html#t=<jeton>) qui retrouve TOUS ses faire-part, sur n'importe
--- quel appareil. Le jeton (32 caractères aléatoires, ~160 bits) n'est stocké que hashé (SHA-256). Les clés privées
--- des faire-part rattachés sont stockées CHIFFRÉES avec ce jeton (pgp_sym_encrypt) : sans le lien du testeur,
--- même une copie de la base ne permet pas de les relire.
--- Création d'un testeur : dans le SQL Editor, select private.create_tester('Nom du testeur');  → renvoie le jeton.
--- Désactiver un testeur : update private.testers set disabled = true where name = '...';
-create table if not exists private.testers (
-  id           bigint generated always as identity primary key,
-  name         text not null check (length(btrim(name)) between 1 and 80),
-  token_hash   text not null unique,
-  disabled     boolean not null default false,
-  created_at   timestamptz not null default now(),
-  last_seen_at timestamptz
-);
-create table if not exists private.tester_invitations (
-  tester_id bigint not null references private.testers(id) on delete cascade,
-  slug      text not null references public.invitations(slug) on delete cascade,
-  key_enc   bytea not null,
-  added_at  timestamptz not null default now(),
-  primary key (tester_id, slug)
-);
-revoke all on private.testers, private.tester_invitations from public, anon, authenticated;
-
--- Jeton → identifiant du testeur actif (null si jeton mal formé, inconnu ou désactivé).
-create or replace function private.tester_id(p_token text) returns bigint
-language sql stable set search_path = public, extensions as $$
-  select id from private.testers
-   where coalesce(p_token, '') ~ '^[a-z0-9]{32}$'
-     and token_hash = encode(digest(p_token, 'sha256'), 'hex') and not disabled;
-$$;
-
--- Réservé au propriétaire (SQL Editor) : crée un testeur et renvoie son jeton, affiché UNE seule fois.
-create or replace function private.create_tester(p_name text) returns text
-language plpgsql set search_path = public, extensions as $$
-declare v_chars text := 'abcdefghijkmnpqrstuvwxyz23456789'; v_bytes bytea := gen_random_bytes(32); v_token text := '';
-begin
-  for i in 0..31 loop v_token := v_token || substr(v_chars, (get_byte(v_bytes, i) & 31) + 1, 1); end loop;
-  insert into private.testers(name, token_hash) values (btrim(p_name), encode(digest(v_token, 'sha256'), 'hex'));
-  return v_token;
-end $$;
-
-revoke all on function private.tester_id(text) from public, anon, authenticated;
-revoke all on function private.create_tester(text) from public, anon, authenticated;
-
--- Espace d'un testeur : son nom et ses faire-part (avec leurs clés privées). Null si le jeton est invalide.
--- 120 appels / heure / IP.
-create or replace function public.tester_workspace(p_token text)
-returns jsonb language plpgsql security definer set search_path = public, extensions as $$
-declare v_id bigint; v_name text;
-begin
-  perform private.rate_limit('tester', 120);
-  v_id := private.tester_id(p_token);
-  if v_id is null then return null; end if;
-  update private.testers set last_seen_at = now() where id = v_id returning name into v_name;
-  return jsonb_build_object('name', v_name, 'items', coalesce((
-    select jsonb_agg(jsonb_build_object('slug', ti.slug, 'key', pgp_sym_decrypt(ti.key_enc, p_token)) order by ti.added_at desc)
-      from private.tester_invitations ti where ti.tester_id = v_id), '[]'::jsonb));
-end $$;
-
--- Rattache un faire-part à l'espace (jeton du testeur ET clé privée du faire-part requis). Idempotent.
--- 200 faire-part max par espace, 60 appels / heure / IP. Renvoie false si le jeton ou la clé est mauvais.
-create or replace function public.tester_attach(p_token text, p_slug text, p_key text)
-returns boolean language plpgsql security definer set search_path = public, extensions as $$
-declare v_id bigint;
-begin
-  perform private.rate_limit('tester-attach', 60);
-  v_id := private.tester_id(p_token);
-  if v_id is null or coalesce(p_key, '') !~ '^[a-z0-9]{16,64}$' then return false; end if;
-  if not exists (select 1 from invitations where slug = p_slug and key_hash = crypt(p_key, key_hash)) then return false; end if;
-  if not exists (select 1 from private.tester_invitations where tester_id = v_id and slug = p_slug)
-     and (select count(*) from private.tester_invitations where tester_id = v_id) >= 200 then
-    raise exception 'too many';
-  end if;
-  insert into private.tester_invitations(tester_id, slug, key_enc) values (v_id, p_slug, pgp_sym_encrypt(p_key, p_token))
-  on conflict (tester_id, slug) do nothing;
-  return true;
-end $$;
-
--- Retire un faire-part de l'espace (ne supprime PAS le faire-part). Renvoie false si le jeton est mauvais.
-create or replace function public.tester_detach(p_token text, p_slug text)
-returns boolean language plpgsql security definer set search_path = public, extensions as $$
-declare v_id bigint;
-begin
-  perform private.rate_limit('tester-attach', 60);
-  v_id := private.tester_id(p_token);
-  if v_id is null then return false; end if;
-  delete from private.tester_invitations where tester_id = v_id and slug = p_slug;
-  return true;
-end $$;
-
-revoke execute on function public.tester_workspace(text) from public, authenticated;
-revoke execute on function public.tester_attach(text, text, text) from public, authenticated;
-revoke execute on function public.tester_detach(text, text) from public, authenticated;
-grant execute on function public.tester_workspace(text) to anon;
-grant execute on function public.tester_attach(text, text, text) to anon;
-grant execute on function public.tester_detach(text, text) to anon;
-
--- Suppression définitive d'un faire-part (clé privée requise) : ses réponses et son rattachement aux espaces testeurs
--- partent avec lui (on delete cascade). Renvoie false si la clé est mauvaise. 120 appels / heure / IP.
-create or replace function public.delete_invitation(p_slug text, p_key text)
-returns boolean language plpgsql security definer set search_path = public, extensions as $$
-begin
-  perform private.rate_limit('delete', 120);
-  delete from invitations where slug = p_slug and key_hash = crypt(coalesce(p_key, ''), key_hash);
+  delete from rsvps r using invitations i where i.owner = v_uid and r.slug = i.slug and r.id = p_id;
   return found;
 end $$;
-revoke execute on function public.delete_invitation(text, text) from public, authenticated;
-grant execute on function public.delete_invitation(text, text) to anon;
 
--- Seules ces 11 fonctions sont appelables depuis le navigateur (les 7 ci-dessous + delete_invitation + les 3 des espaces testeurs).
-revoke execute on function public.summarize_invitations(jsonb) from public;
-grant execute on function public.summarize_invitations(jsonb) to anon;
-revoke execute on function public.summarize_invitations(jsonb) from authenticated;
-revoke execute on function public.delete_rsvp(text, text, bigint) from public;
-grant execute on function public.delete_rsvp(text, text, bigint) to anon;
-revoke execute on function public.create_invitation(text, text, jsonb) from public;
-revoke execute on function public.update_invitation(text, text, jsonb) from public;
-revoke execute on function public.get_invitation(text) from public;
-revoke execute on function public.submit_rsvp(text, jsonb) from public;
-revoke execute on function public.list_rsvps(text, text) from public;
-grant execute on function public.create_invitation(text, text, jsonb) to anon;
-grant execute on function public.update_invitation(text, text, jsonb) to anon;
-grant execute on function public.get_invitation(text) to anon;
-grant execute on function public.submit_rsvp(text, jsonb) to anon;
-grant execute on function public.list_rsvps(text, text) to anon;
--- Supabase accorde par défaut l'exécution aux utilisateurs connectés : l'app n'en utilise pas, on referme.
-revoke execute on function public.create_invitation(text, text, jsonb) from authenticated;
-revoke execute on function public.update_invitation(text, text, jsonb) from authenticated;
-revoke execute on function public.get_invitation(text) from authenticated;
-revoke execute on function public.submit_rsvp(text, jsonb) from authenticated;
-revoke execute on function public.list_rsvps(text, text) from authenticated;
-revoke execute on function public.delete_rsvp(text, text, bigint) from authenticated;
+-- Suppression du compte et de tout ce qui lui appartient (RGPD).
+create or replace function public.delete_account() returns boolean
+language plpgsql security definer set search_path = public, extensions as $$
+declare v_uid uuid := private.account_id();
+begin
+  if v_uid is null then raise exception 'not signed in' using errcode = '42501'; end if;
+  perform private.rate_limit('delete', 120);
+  delete from invitations where owner = v_uid;
+  delete from auth.users where id = v_uid;
+  perform private.log_event('account_deleted');
+  return true;
+end $$;
+
+-- ---------------------------------------------------------------- Droits d'exécution
+-- Supabase accorde par défaut l'exécution à public, anon et authenticated : on referme tout, puis on ouvre au cas par cas.
+revoke all on function public.get_invitation(text), public.get_invitation_preview(text), public.submit_rsvp(text, jsonb),
+  public.track(text, text, jsonb), public.account_invitation(), public.account_create_invitation(text, jsonb),
+  public.account_update_invitation(jsonb), public.account_delete_invitation(), public.account_rsvps(),
+  public.account_delete_rsvp(bigint), public.delete_account() from public, anon, authenticated;
+
+grant execute on function public.get_invitation(text), public.submit_rsvp(text, jsonb), public.track(text, text, jsonb)
+  to anon, authenticated;
+grant execute on function public.get_invitation_preview(text) to anon;
+grant execute on function public.account_invitation(), public.account_create_invitation(text, jsonb),
+  public.account_update_invitation(jsonb), public.account_delete_invitation(), public.account_rsvps(),
+  public.account_delete_rsvp(bigint), public.delete_account() to authenticated, service_role;
+
+-- ---------------------------------------------------------------- Vues de pilotage (SQL Editor uniquement)
+-- Funnel par semaine (6 derniers mois).
+create or replace view private.funnel_semaine as
+with w as (
+  select date_trunc('week', created_at)::date as semaine, event, visitor, slug, meta
+  from private.events where created_at >= now() - interval '182 days'
+)
+select s.semaine,
+  (select count(distinct visitor) from w where w.semaine = s.semaine and event = 'landing_view') as visiteurs,
+  (select count(distinct visitor) from w where w.semaine = s.semaine and event = 'editor_start') as demarrages,
+  (select count(distinct visitor) from w where w.semaine = s.semaine and event = 'auth_gate') as ecran_compte,
+  (select count(*) from auth.users u where date_trunc('week', u.created_at)::date = s.semaine) as comptes_crees,
+  (select count(*) from w where w.semaine = s.semaine and event = 'invitation_created') as publications,
+  (select count(*) from w where w.semaine = s.semaine and event = 'invitation_created' and meta->>'src' = 'faire-part') as publications_virales,
+  (select count(distinct (slug, visitor)) from w where w.semaine = s.semaine and event = 'invitation_viewed') as ouvertures_uniques,
+  (select count(*) from w where w.semaine = s.semaine and event = 'rsvp_submitted' and coalesce((meta->>'edit')::boolean, false) = false) as reponses,
+  (select count(*) from w where w.semaine = s.semaine and event = 'rsvp_submitted' and (meta->>'edit')::boolean) as corrections,
+  (select count(*) from w where w.semaine = s.semaine and event = 'share') as partages,
+  (select count(*) from w where w.semaine = s.semaine and event = 'cta_create') as clics_creez_le_votre
+from (select distinct semaine from w union select date_trunc('week', now())::date) s
+order by s.semaine desc;
+
+-- Indicateurs du PRD sur 30 jours glissants.
+create or replace view private.kpis_30j as
+with e as (
+  select * from private.events where created_at >= now() - interval '30 days'
+), v as (
+  select
+    count(distinct visitor) filter (where event = 'landing_view') as visiteurs,
+    count(distinct visitor) filter (where event = 'editor_start') as demarrages,
+    count(*) filter (where event = 'invitation_created') as publications,
+    count(*) filter (where event = 'invitation_created' and meta->>'src' = 'faire-part') as virales,
+    count(distinct (slug, visitor)) filter (where event = 'invitation_viewed') as ouvertures,
+    count(*) filter (where event = 'rsvp_submitted' and coalesce((meta->>'edit')::boolean, false) = false) as reponses,
+    count(*) filter (where event = 'cta_create') as clics_cta,
+    percentile_cont(0.5) within group (order by (meta->>'seconds')::numeric)
+      filter (where event = 'rsvp_submitted' and coalesce((meta->>'edit')::boolean, false) = false and meta ? 'seconds') as duree_mediane_s
+  from e
+), c as (
+  select count(*) as comptes from auth.users where created_at >= now() - interval '30 days'
+), r as (
+  select count(*) filter (where x.premier is not null and x.premier <= i.created_at + interval '7 days') as avec_rsvp_7j,
+         count(*) as eligibles
+  from public.invitations i
+  left join lateral (select min(created_at) as premier from public.rsvps where slug = i.slug) x on true
+  where i.created_at <= now() - interval '7 days'
+), a as (
+  select count(*) as actifs from public.invitations i
+  where (select count(distinct coalesce(nullif(data->>'rid', ''), lower(data->>'name'))) from public.rsvps where slug = i.slug) >= 10
+)
+select
+  v.visiteurs as visiteurs_uniques,
+  round(100.0 * v.demarrages / nullif(v.visiteurs, 0), 1) as demarrage_pct,
+  round(100.0 * c.comptes / nullif(v.demarrages, 0), 1) as compte_cree_pct,
+  round(100.0 * v.publications / nullif(c.comptes, 0), 1) as publication_pct,
+  round(100.0 * r.avec_rsvp_7j / nullif(r.eligibles, 0), 1) as premier_rsvp_7j_pct,
+  a.actifs as faire_part_actifs,
+  round(100.0 * v.reponses / nullif(v.ouvertures, 0), 1) as taux_reponse_pct,
+  v.duree_mediane_s as duree_reponse_mediane_s,
+  round(100.0 * v.clics_cta / nullif(v.reponses, 0), 1) as clics_creez_le_votre_pct,
+  round(v.virales::numeric / nullif(v.publications, 0), 2) as coefficient_viral_k,
+  v.publications, v.reponses, c.comptes
+from v, c, r, a;
+
+revoke all on private.funnel_semaine, private.kpis_30j from public, anon, authenticated;
 
 commit;
