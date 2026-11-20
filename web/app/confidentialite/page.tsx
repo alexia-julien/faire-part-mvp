@@ -1,16 +1,12 @@
 import type { Metadata } from "next";
 import { DocPage } from "@/components/site/doc-page";
-import { SITE } from "@/lib/config";
+import { PAGES, meta } from "@/lib/site";
 
-export const metadata: Metadata = {
-  title: "Confidentialité",
-  description: "Ce que Maison Meli enregistre quand vous créez un faire-part ou répondez à une invitation, et comment le supprimer.",
-  alternates: { canonical: SITE + "/confidentialite.html" },
-};
+export const metadata: Metadata = meta(PAGES.confidentialite);
 
 export default function Page() {
   return (
-    <DocPage>
+    <DocPage trail={[PAGES.confidentialite]}>
       <h1>Confidentialité</h1>
       <p>Cette page décrit, sans jargon, ce que Maison Meli enregistre et pourquoi. Dernière mise à jour : 20 novembre 2026.</p>
 
@@ -48,8 +44,11 @@ export default function Page() {
       </ul>
       <p>Les polices de caractères sont hébergées avec le site : aucun service de polices tiers ne reçoit l’adresse IP des visiteurs. Aucune donnée n’est vendue ni utilisée à des fins publicitaires.</p>
 
+      <h2>Statistiques agrégées</h2>
+      <p>Pour améliorer le service et, le cas échéant, publier des études sur le faire-part digital (par exemple le délai moyen de réponse des invités), Maison Meli peut calculer des statistiques <strong>agrégées et anonymes</strong> sur l’ensemble des faire-part : moyennes, proportions, totaux. Aucune statistique publiée ne permet d’identifier un couple, un faire-part ou un invité.</p>
+
       <h2>Durée de conservation et suppression</h2>
-      <p>Un faire-part, ses réponses et le compte associé sont conservés tant que vous ne les supprimez pas. Tout se fait depuis la page <a href="admin.html">Mon faire-part</a> : supprimer une réponse, supprimer le faire-part et ses réponses, ou supprimer le compte entier. La suppression est immédiate et définitive.</p>
+      <p>Un faire-part, ses réponses et le compte associé sont conservés tant que vous ne les supprimez pas. Tout se fait depuis la page <a href="/mon-faire-part/">Mon faire-part</a> : supprimer une réponse, supprimer le faire-part et ses réponses, ou supprimer le compte entier. La suppression est immédiate et définitive.</p>
     </DocPage>
   );
 }

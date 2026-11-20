@@ -1,0 +1,21 @@
+# En-têtes HTTP (Cloudflare Pages et Netlify ; ignorés par GitHub Pages). La CSP reste posée dans chaque page
+# (scripts/postbuild.mjs) ; le noindex des pages privées est AUSSI dans leur HTML (balise robots).
+/invitation.html
+  X-Robots-Tag: noindex, nofollow, noarchive
+/invitation
+  X-Robots-Tag: noindex, nofollow, noarchive
+/invitation/*
+  X-Robots-Tag: noindex, nofollow, noarchive
+/creer/*
+  X-Robots-Tag: noindex, follow
+/mon-faire-part/*
+  X-Robots-Tag: noindex, follow
+/composants/*
+  X-Robots-Tag: noindex
+/_next/static/*
+  Cache-Control: public, max-age=31536000, immutable
+/*
+  X-Content-Type-Options: nosniff
+  Referrer-Policy: strict-origin-when-cross-origin
+  X-Frame-Options: DENY
+  Permissions-Policy: camera=(), microphone=(), geolocation=()

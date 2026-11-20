@@ -1,0 +1,10 @@
+# Redirections permanentes (Cloudflare Pages et Netlify). GitHub Pages ignore ce fichier : il reçoit à la place des
+# pages de redirection (scripts/publish.mjs). invitation.html?f=… n'est JAMAIS redirigé : liens déjà envoyés aux invités.
+/creer.html            /creer/                              301
+/admin.html            /mon-faire-part/                     301
+/confidentialite.html  /confidentialite/                    301
+/conditions.html       /conditions/                         301
+/exemples              /exemples/camille-et-thomas/         302
+/exemples/             /exemples/camille-et-thomas/         302
+/comparatif            /guide/                              302
+/comparatif/           /guide/                              302

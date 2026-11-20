@@ -181,6 +181,9 @@ export function Editor() {
     });
     const hp = PRESETS.find((x) => x.id === h.get("s"));
     if (hp) { s = applyPreset(s, hp); touched = true; }
+    // Depuis le générateur de texte (/outils/generateur-texte-faire-part/) : sous-titre et message choisis par le couple.
+    const sub = (h.get("sub") || "").trim(), msg = (h.get("msg") || "").trim();
+    if (sub || msg) { s = sanitizeConfig({ ...s, ...(sub ? { subtitle: sub } : {}), ...(msg ? { message: msg } : {}) }); touched = true; }
     if (touched) { restoredDraft = false; try { history.replaceState(null, "", location.pathname + location.search); } catch {} }
     setState(s); setStep(st); setRestored(restoredDraft); setReady(true);
     if (touched) { dirty.current = true; timer.current = window.setTimeout(writeDraft, 300); }
@@ -377,9 +380,9 @@ export function Editor() {
               <p className="done-note text-[14px] text-muted-foreground">Collez-le dans un message, un email ou un groupe WhatsApp : vos invités répondent directement dessus.{user?.email ? ` Vous retrouverez ce faire-part et les réponses en vous connectant avec ${user.email}, depuis n’importe quel appareil.` : ""}</p>
             </div>
             <div className="flex flex-wrap gap-3">
-              <Button asChild size="lg"><a id="go-mine" href="admin.html">Voir les réponses de mes invités</a></Button>
+              <Button asChild size="lg"><a id="go-mine" href="/mon-faire-part/">Voir les réponses de mes invités</a></Button>
               <Button asChild variant="outline" size="lg"><a id="public-open" href={url} target="_blank" rel="noopener">Ouvrir le faire-part</a></Button>
-              <Button asChild variant="ghost" size="lg"><a id="edit-again" href="creer.html">Modifier</a></Button>
+              <Button asChild variant="ghost" size="lg"><a id="edit-again" href="/creer/">Modifier</a></Button>
             </div>
           </motion.div>
           <div className="hidden w-[300px] lg:block">{phone(scroller, false)}</div>
@@ -402,7 +405,7 @@ export function Editor() {
               {restored && (
                 <p id="draft-note" className="flex flex-wrap items-center gap-x-2 rounded-2xl bg-muted/70 px-4 py-3 text-[14px] text-muted-foreground">
                   Votre brouillon a été restauré.
-                  <button type="button" id="reset-draft" className="font-medium text-foreground underline decoration-foreground/25 underline-offset-4" onClick={() => { storeDel(DRAFT_KEY); location.replace("creer.html"); }}>Recommencer à zéro</button>
+                  <button type="button" id="reset-draft" className="font-medium text-foreground underline decoration-foreground/25 underline-offset-4" onClick={() => { storeDel(DRAFT_KEY); location.replace("/creer/"); }}>Recommencer à zéro</button>
                 </p>
               )}
               {notice && <p id="notice" role="status" className="rounded-2xl bg-muted/70 px-4 py-3 text-[14px] text-muted-foreground">{notice}</p>}
@@ -492,7 +495,7 @@ function Header({ user, progress, saved, hideAccount, noBar }: { user: User | nu
   return (
     <header className="sticky top-0 z-20 bg-background/85 backdrop-blur-md">
       <div className="mx-auto flex h-16 w-full max-w-[560px] items-center justify-between gap-4 px-5 sm:px-8 lg:max-w-none">
-        <a href="./" className="font-serif text-[22px] font-medium tracking-[-0.01em]">Maison Meli</a>
+        <a href="/" className="font-serif text-[22px] font-medium tracking-[-0.01em]">Maison Meli</a>
         <div className="flex items-center gap-4 text-[14px]">
           <AnimatePresence>
             {saved && (
@@ -501,7 +504,7 @@ function Header({ user, progress, saved, hideAccount, noBar }: { user: User | nu
               </motion.span>
             )}
           </AnimatePresence>
-          {!hideAccount && <a id="mine-link" href="admin.html" className="font-medium text-foreground/80 hover:text-foreground">{user ? "Mon faire-part" : "Se connecter"}</a>}
+          {!hideAccount && <a id="mine-link" href="/mon-faire-part/" className="font-medium text-foreground/80 hover:text-foreground">{user ? "Mon faire-part" : "Se connecter"}</a>}
         </div>
       </div>
       {noBar ? <div className="h-px w-full bg-foreground/[0.06]" aria-hidden="true" /> : (

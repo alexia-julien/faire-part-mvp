@@ -1,4 +1,38 @@
-User-agent: *
+User-Agent: Googlebot
 Allow: /
 
+User-Agent: Google-Extended
+Allow: /
+
+User-Agent: Bingbot
+Allow: /
+
+User-Agent: OAI-SearchBot
+Allow: /
+
+User-Agent: ChatGPT-User
+Allow: /
+
+User-Agent: GPTBot
+Allow: /
+
+User-Agent: PerplexityBot
+Allow: /
+
+User-Agent: ClaudeBot
+Allow: /
+
+User-Agent: Claude-SearchBot
+Allow: /
+
+User-Agent: Applebot
+Allow: /
+
+User-Agent: Applebot-Extended
+Allow: /
+
+User-Agent: *
+Allow: /
+
+Host: https://maison-meli.com
 Sitemap: https://maison-meli.com/sitemap.xml

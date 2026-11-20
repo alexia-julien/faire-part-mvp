@@ -6,7 +6,7 @@ import { GuestInvitation } from "./guest-invitation";
 export const metadata: Metadata = {
   title: { absolute: "Vous êtes invités — Faire-part de mariage" },
   description: "Ouvrez le faire-part et répondez en un instant.",
-  robots: { index: false, follow: false },
+  robots: { index: false, follow: false, noarchive: true },
   referrer: "strict-origin-when-cross-origin",
   openGraph: {
     type: "website", siteName: "Maison Meli", locale: "fr_FR",

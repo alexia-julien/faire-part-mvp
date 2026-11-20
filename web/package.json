@@ -7,7 +7,9 @@
     "build": "next build && node scripts/postbuild.mjs out",
     "build:local": "NEXT_PUBLIC_FP_LOCAL=1 next build && NEXT_PUBLIC_FP_LOCAL=1 node scripts/postbuild.mjs out",
     "deploy": "npm run build && node scripts/publish.mjs",
-    "lint": "eslint"
+    "lint": "eslint",
+    "indexnow": "node scripts/indexnow.mjs",
+    "test:seo": "python3 ../tests/seo.py out"
   },
   "dependencies": {
     "@fontsource-variable/inter": "^5.3.0",

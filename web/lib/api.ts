@@ -138,7 +138,7 @@ export function slugFromUrl() {
   const slug = new URLSearchParams(location.search).get("f") || (/\/f\/([a-z0-9-]+)/.exec(location.pathname) || [])[1] || "";
   return /^[a-z0-9][a-z0-9-]{2,62}$/.test(slug) ? slug : "";
 }
-export function publicLink(slug: string) { const u = new URL("invitation.html", location.href); u.search = "?f=" + encodeURIComponent(slug); u.hash = ""; return u.href; }
+export function publicLink(slug: string) { const u = new URL("/invitation.html", location.href); u.search = "?f=" + encodeURIComponent(slug); u.hash = ""; return u.href; }
 
 // Messages d'erreur affichables : jamais le texte brut renvoyé par le serveur.
 export function userError(e: unknown) {

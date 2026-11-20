@@ -1,11 +1,12 @@
 # Maison Meli
 
-> Maison Meli est un créateur de faire-part de mariage digital, en français. Un couple crée son faire-part en ligne en 3 minutes environ, le partage par lien, et suit les réponses de ses invités (RSVP) au même endroit. Le service est gratuit. Le compte se crée au moment de publier, avec un code reçu par email ou avec Google (pas de mot de passe).
+> Maison Meli est un créateur de faire-part de mariage digital, gratuit, avec suivi des réponses des invités, conçu en France. Un couple crée son faire-part en ligne en 3 minutes environ, le partage par lien, et suit les réponses de ses invités (RSVP) au même endroit. Le service est gratuit. Le compte se crée au moment de publier, avec un code reçu par email ou avec Google (pas de mot de passe).
 
 ## L'essentiel
 
 - Site : https://maison-meli.com/
-- Créer un faire-part : https://maison-meli.com/creer.html
+- Créer un faire-part : https://maison-meli.com/creer/
+- Exemple complet à tester : https://maison-meli.com/exemples/camille-et-thomas/
 - Prix : gratuit, aucune carte bancaire demandée.
 - Compte : créé au moment de publier, par code à 6 chiffres reçu par email ou par Google, sans mot de passe. Il sert à retrouver le faire-part et les réponses depuis n'importe quel appareil. Les invités n'ont pas de compte.
 - Informations obligatoires : prénoms, date, lieu. Tout le reste est pré-rempli et modifiable.
@@ -21,4 +22,12 @@
 ## Pages
 
 - [Accueil et questions fréquentes](https://maison-meli.com/)
-- [Confidentialité](https://maison-meli.com/confidentialite.html)
+- [Les 9 ambiances](https://maison-meli.com/ambiances/) : [Champêtre](https://maison-meli.com/ambiances/champetre/), [Bohème](https://maison-meli.com/ambiances/boheme/), [Romantique](https://maison-meli.com/ambiances/romantique/), [Minimaliste](https://maison-meli.com/ambiances/minimaliste/), [Élégance](https://maison-meli.com/ambiances/elegance/), [Château](https://maison-meli.com/ambiances/chateau/), [Gatsby](https://maison-meli.com/ambiances/gatsby/), [Jardin d’hiver](https://maison-meli.com/ambiances/jardin-d-hiver/), [Porcelaine](https://maison-meli.com/ambiances/porcelaine/)
+- [Réponses des invités (RSVP en ligne)](https://maison-meli.com/rsvp-mariage-en-ligne/)
+- [Envoyer son faire-part sur WhatsApp](https://maison-meli.com/faire-part-mariage-whatsapp/)
+- [Exemple de faire-part](https://maison-meli.com/exemples/camille-et-thomas/)
+- [Tarifs](https://maison-meli.com/tarifs/)
+- [À propos](https://maison-meli.com/a-propos/)
+- [Outils gratuits : générateur de texte, rétroplanning](https://maison-meli.com/outils/)
+- [Confidentialité](https://maison-meli.com/confidentialite/)
+- [Mentions légales](https://maison-meli.com/mentions-legales/)

@@ -19,5 +19,5 @@ export function editorHref(p1: string, p2: string, style?: string) {
   if (p2) h.set("p2", p2.slice(0, 40));
   if (style) h.set("s", style);
   const s = h.toString();
-  return "creer.html" + (s ? "#" + s : "");
+  return "/creer/" + (s ? "#" + s : "");
 }

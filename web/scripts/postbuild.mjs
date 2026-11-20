@@ -3,13 +3,13 @@
 // Les seuls scripts en ligne sont ceux de Next.js (amorçage) : ils sont autorisés par leur empreinte SHA-256,
 // jamais par 'unsafe-inline'. Les données structurées (application/ld+json) ne s'exécutent pas et n'en ont pas besoin.
 import { createHash } from "node:crypto";
-import { readdirSync, readFileSync, writeFileSync, statSync } from "node:fs";
+import { cpSync, existsSync, readdirSync, readFileSync, rmSync, writeFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
 const OUT = process.argv[2] || "out";
 const LOCAL = process.env.NEXT_PUBLIC_FP_LOCAL === "1";
 const SUPA = "https://pmtwhrqfdvbxbgrzcytl.supabase.co";
-const GSI = new Set(["creer.html", "admin.html"]); // pages avec le bouton « Continuer avec Google »
+const GSI = new Set(["creer/index.html", "mon-faire-part/index.html"]); // pages avec le bouton « Continuer avec Google »
 
 function walk(dir) {
   return readdirSync(dir).flatMap((f) => { const p = join(dir, f); return statSync(p).isDirectory() ? walk(p) : p.endsWith(".html") ? [p] : []; });
@@ -45,5 +45,11 @@ for (const file of walk(OUT)) {
   html = html.slice(0, pos) + meta + html.slice(pos);
   writeFileSync(file, html); n++;
 }
+// invitation.html?f=… reste l'adresse des faire-part, pour toujours (liens déjà envoyés) : la page exportée en
+// invitation/index.html devient invitation.html, et le dossier disparaît (une seule adresse, pas de doublon).
+const inv = join(OUT, "invitation", "index.html");
+if (existsSync(inv)) { cpSync(inv, join(OUT, "invitation.html")); rmSync(join(OUT, "invitation"), { recursive: true, force: true }); }
+const invHtml = readFileSync(join(OUT, "invitation.html"), "utf8");
+if (!/<meta name="robots" content="noindex, nofollow, noarchive"/.test(invHtml)) throw new Error("invitation.html : noindex statique absent");
 writeFileSync(join(OUT, ".nojekyll"), ""); // GitHub Pages : servir le dossier _next tel quel
 console.log(`CSP posée sur ${n} pages.`);

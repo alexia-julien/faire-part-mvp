@@ -92,8 +92,8 @@ export function GuestInvitation() {
       <InvitationView
         cfg={cfg}
         previous={previous}
-        // US-14 : lien discret vers Maison Meli, uniquement après la réponse, avec la provenance « faire-part ».
-        madeWith={new URL("./?src=faire-part", location.href).href}
+        // US-14 : lien discret vers Maison Meli, uniquement après la réponse, avec la provenance « faire-part » (+ UTM, brief SEO/GEO).
+        madeWith={new URL("/?src=faire-part&utm_source=faire-part&utm_medium=referral&utm_campaign=cree-avec-maison-meli", location.href).href}
         onMadeWith={() => track("cta_create", {}, slug)}
         onSubmit={async (data) => {
           const payload = { ...data, rid, elapsed: Math.max(0, Math.min(86400, Math.round((Date.now() - openedAt.current) / 1000))) };

@@ -376,7 +376,7 @@ export function StepReview({ ed, titleRef, phone }: P & { phone: ReactNode }) {
         ))}
       </dl>
       <p className="legal-note mt-6 text-[13px] leading-relaxed text-muted-foreground">
-        {ed.editing ? "" : "Pour publier, vous vous connectez ou créez votre compte (email ou Google). "}Les informations saisies sont enregistrées pour afficher votre faire-part. <a href="confidentialite.html" target="_blank" rel="noopener" className="underline underline-offset-4">Confidentialité</a>
+        {ed.editing ? "" : "Pour publier, vous vous connectez ou créez votre compte (email ou Google). "}Les informations saisies sont enregistrées pour afficher votre faire-part. <a href="/confidentialite/" target="_blank" rel="noopener" className="underline underline-offset-4">Confidentialité</a>
       </p>
     </>
   );

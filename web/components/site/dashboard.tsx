@@ -121,7 +121,7 @@ export function Dashboard() {
       </Shell>
     );
   }
-  const signOut = () => auth.signOut().then(() => location.replace("./"));
+  const signOut = () => auth.signOut().then(() => location.replace("/"));
 
   if (err) return <Shell user={user} onSignOut={signOut}><p id="state" role="status" className="py-20 text-center text-muted-foreground">{err}</p></Shell>;
   if (data === undefined) return <Shell user={user} onSignOut={signOut}><Loading /></Shell>;
@@ -134,7 +134,7 @@ export function Dashboard() {
         {data && <TwoStep id="delete-invitation" label="Supprimer mon faire-part et ses réponses" confirmLabel="Confirmer : le lien envoyé aux invités ne fonctionnera plus" confirm={confirm} setConfirm={setConfirm}
           run={async () => { await api.deleteInvitation(); toast.success("Faire-part supprimé."); load(); }} onSignedOut={() => setUser(null)} />}
         <TwoStep id="delete-account" label="Supprimer mon compte" confirmLabel="Confirmer : compte, faire-part et réponses seront effacés" confirm={confirm} setConfirm={setConfirm}
-          run={async () => { await api.deleteAccount(); location.replace("./"); }} onSignedOut={() => setUser(null)} />
+          run={async () => { await api.deleteAccount(); location.replace("/"); }} onSignedOut={() => setUser(null)} />
       </div>
     </section>
   );
@@ -146,7 +146,7 @@ export function Dashboard() {
           <div className="w-40 rotate-[-4deg]"><MiniCard cfg={sanitizeConfig({ partner1: "Vous", partner2: "Moi", theme: "sauge", font: "classique", decor: "feuillage", intro: "enveloppe", texture: true })} className="rounded-[14px] shadow-lift" /></div>
           <h1 className="t-section">Aucun <span className="whitespace-nowrap">faire-part</span> pour l’instant</h1>
           <p className="t-lead">Créez-le en quelques minutes : les réponses de vos invités arriveront ensuite ici.</p>
-          <Button asChild size="lg"><a href="creer.html">Créer mon faire-part</a></Button>
+          <Button asChild size="lg"><a href="/creer/">Créer mon faire-part</a></Button>
         </div>
         {danger}
       </Shell>
@@ -218,7 +218,7 @@ export function Dashboard() {
       </div>
 
       <div className="mt-6 flex flex-wrap gap-2">
-        <Button asChild><a id="edit-link" href="creer.html"><PencilLine aria-hidden="true" /> Modifier mon faire-part</a></Button>
+        <Button asChild><a id="edit-link" href="/creer/"><PencilLine aria-hidden="true" /> Modifier mon faire-part</a></Button>
         <Button asChild variant="outline"><a id="open-public" href={url} target="_blank" rel="noopener"><ExternalLink aria-hidden="true" /> Voir le faire-part</a></Button>
         <Button id="csv" variant="outline" onClick={exportCsv} disabled={!rows.length}><Download aria-hidden="true" /> Exporter en CSV</Button>
         {emails.length > 0 && <Button id="copy-emails" variant="outline" onClick={copyEmails}><Mail aria-hidden="true" /> {emails.length > 1 ? `Copier les ${emails.length} emails` : "Copier l’email"}</Button>}
@@ -354,7 +354,7 @@ function Shell({ user, onSignOut, children }: { user: User | null; onSignOut?: (
     <div className="paper-grain min-h-dvh">
       <Toaster position="top-center" toastOptions={{ classNames: { toast: "!rounded-[20px] !shadow-lift !border-border !font-sans" } }} />
       <header className="glass sticky top-3 z-20 mx-auto mt-3 flex h-14 w-[calc(100%-24px)] max-w-6xl items-center justify-between rounded-full px-5">
-        <a href="./" className="font-serif text-[22px] font-medium">Maison Meli</a>
+        <a href="/" className="font-serif text-[22px] font-medium">Maison Meli</a>
         {user && (
           <div className="flex items-center gap-3 text-[14px]">
             <span id="account-email" className="hidden text-muted-foreground sm:inline">{user.email ? "Connecté : " + user.email : "Connecté"}</span>

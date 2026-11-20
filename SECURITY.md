@@ -28,7 +28,7 @@ Le repo est public et la clé Supabase `anon` est visible par tous : c'est voulu
 | Exfiltration de données | CSP `connect-src` limité à l'URL exacte du projet Supabase |
 
 ## Comptes (branche `comptes`)
-- Depuis la refonte Next.js (20/11/2026), la CSP est posée par `web/scripts/postbuild.mjs` dans chaque page exportée. Les scripts en ligne d'amorçage de Next.js sont autorisés **par empreinte SHA-256** (jamais `unsafe-inline` ni `unsafe-eval`) ; le script de Google n'est autorisé que sur `creer.html` et `admin.html`. Les styles en ligne restent autorisés (`style-src 'unsafe-inline'`) : le moteur d'animation et le bouton officiel de Google en ont besoin. Les polices sont servies par le site (`font-src 'self'`). Les confettis de publication tournent sans « worker » pour ne pas ouvrir `blob:` aux scripts.
+- Depuis la refonte Next.js (20/11/2026), la CSP est posée par `web/scripts/postbuild.mjs` dans chaque page exportée. Les scripts en ligne d'amorçage de Next.js sont autorisés **par empreinte SHA-256** (jamais `unsafe-inline` ni `unsafe-eval`) ; le script de Google n'est autorisé que sur `/creer/` et `/mon-faire-part/`. Les styles en ligne restent autorisés (`style-src 'unsafe-inline'`) : le moteur d'animation et le bouton officiel de Google en ont besoin. Les polices sont servies par le site (`font-src 'self'`). Les confettis de publication tournent sans « worker » pour ne pas ouvrir `blob:` aux scripts.
 - Aucune fonction de gestion n'est appelable sans session : les fonctions `account_*` sont réservées au rôle `authenticated` et agissent sur LE faire-part du compte, déduit du jeton vérifié par Supabase. Il n'y a plus d'identifiant ni de clé à fournir, donc rien à deviner ni à faire fuiter dans un lien.
 - Un compte ne peut ni lire ni modifier le faire-part d'un autre (testé dans `supabase/tests-comptes.sql`), et les tables restent inaccessibles en direct, connecté ou non.
 - La session (jeton d'accès et jeton de renouvellement) est gardée dans le stockage du navigateur, comme le fait la bibliothèque officielle. Un script malveillant exécuté sur la page pourrait la lire : la protection est la CSP stricte (aucun script externe ni en ligne) et l'échappement systématique des contenus.
@@ -39,7 +39,7 @@ Le repo est public et la clé Supabase `anon` est visible par tous : c'est voulu
 ## Page d'accueil et parcours grand public
 - `index.html` n'appelle jamais la base (`connect-src 'none'`) ; les pages de texte n'exécutent aucun script.
 - Prénoms et ambiance passent de l'accueil à l'éditeur dans le fragment d'URL : rien n'est envoyé au serveur, les valeurs sont tronquées (40 caractères), l'ambiance doit exister dans le catalogue, et tout est échappé à l'affichage (testé avec une charge XSS).
-- La redirection des anciens liens (`index.html?f=…`) ne vise que `creer.html` sur le même site, et seulement si l'identifiant a le bon format : pas de redirection ouverte.
+- La redirection des anciens liens (`index.html?f=…`) ne vise que l'éditeur (`/creer/`) sur le même site, et seulement si l'identifiant a le bon format : pas de redirection ouverte.
 - La limite « un faire-part par personne » est une règle d'usage côté navigateur, **pas** un contrôle de sécurité : elle se contourne en navigation privée. La vraie protection contre l'abus reste la limitation par IP côté base.
 - Le lien de gestion est affiché à l'écran et peut partir dans un email que l'utilisateur s'envoie : quiconque le lit peut modifier le faire-part et voir les réponses.
 

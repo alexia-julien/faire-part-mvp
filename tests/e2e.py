@@ -74,7 +74,7 @@ open(TMP + "/bad.jpg", "wb").write(b"not an image at all")
 
 if not os.path.exists(os.path.join(SITE, "index.html")):
     sys.exit("Export absent : lancez d'abord `cd web && npm run build:local`.")
-if "pmtwhrqfdvbxbgrzcytl" in open(os.path.join(SITE, "admin.html"), encoding="utf-8").read():
+if "pmtwhrqfdvbxbgrzcytl" in open(os.path.join(SITE, "mon-faire-part", "index.html"), encoding="utf-8").read():
     sys.exit("web/out est l'export de production : lancez `cd web && npm run build:local` pour les tests.")
 
 srv = subprocess.Popen(["python3", "-m", "http.server", "8099"], cwd=SITE, stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
@@ -95,11 +95,13 @@ try:
     check("URL canonique", pg.get_attribute("link[rel=canonical]", "href").rstrip("/") == "https://maison-meli.com")
     check("page indexable", "noindex" not in (pg.get_attribute('meta[name=robots]', 'content') or ""))
     check("image de partage (Open Graph)", pg.get_attribute('meta[property="og:image"]', 'content') == "https://maison-meli.com/img/og.png")
-    ld = json.loads(pg.inner_text('script[type="application/ld+json"]'))
+    lds = [json.loads(x) for x in pg.locator('script[type="application/ld+json"]').all_inner_texts()]
+    check("Organization sur toutes les pages (fondateur, logo)", any(isinstance(x, dict) and x.get("@type") == "Organization" and x.get("founder") for x in lds))
+    ld = next(x for x in lds if isinstance(x, list))
     check("données structurées : WebSite, WebApplication, HowTo, FAQPage", [x["@type"] for x in ld] == ["WebSite", "WebApplication", "HowTo", "FAQPage"])
     check("offre gratuite déclarée", ld[1]["offers"]["price"] == "0")
     faq_vis = pg.locator('#questions details summary').all_text_contents()
-    check("FAQ visible = FAQ structurée (10 questions)", len(faq_vis) == 10 and [q.strip() for q in faq_vis] == [q["name"] for q in ld[3]["mainEntity"]])
+    check("FAQ visible = FAQ structurée (15 questions)", len(faq_vis) == 15 and [q.strip() for q in faq_vis] == [q["name"] for q in ld[3]["mainEntity"]])
     check("FAQ présente dans le HTML statique (sans JavaScript)", "Est-ce vraiment gratuit" in html and "Comment envoyer le faire-part" in html)
     check("un seul titre principal", pg.locator('h1').count() == 1)
     check("titre principal pré-rendu (pas d'animation qui le masque)", 'id="h-hero"' in html and pg.evaluate("getComputedStyle(document.getElementById('h-hero')).opacity") == "1")
@@ -109,12 +111,12 @@ try:
     check("téléphone du héros : le vrai faire-part s'ouvre au chargement", wait_until(lambda: pg.locator('#demo-phone .fp-intro').count() == 0, 6) and pg.locator('#demo-phone .names').count() == 1)
     pg.fill('#p1', 'Alexia'); pg.fill('#p2', 'Julien'); pg.wait_for_timeout(300)
     check("prénoms écrits en direct sur le faire-part", "Alexia" in pg.inner_text('#demo-phone .names') and "Julien" in pg.inner_text('#demo-phone .names'))
-    check("bouton principal : prénoms transmis à l'éditeur (fragment)", pg.get_attribute('#cta-hero', 'href') == "creer.html#p1=Alexia&p2=Julien")
+    check("bouton principal : prénoms transmis à l'éditeur (fragment)", pg.get_attribute('#cta-hero', 'href') == "/creer/#p1=Alexia&p2=Julien")
     check("9 ambiances dans le sélecteur du héros", pg.locator('#demo-pills [role=radio]').count() == 9)
     pg.click('#demo-pills [aria-label="Gatsby"]'); pg.wait_for_timeout(300)
     check("une ambiance change l'aperçu du héros", pg.get_attribute('#demo-phone .fp-stage > div > .fp', 'data-theme') == 'noir' or pg.locator('#demo-phone .fp[data-theme=noir]').count() > 0)
     check("l'ambiance choisie part avec le lien", pg.get_attribute('#cta-hero', 'href').endswith("&s=gatsby"))
-    check("carrousel : 9 ambiances, chacune ouvre l'éditeur dans son style", pg.locator('#ambiances a.style-card').count() == 9 and pg.get_attribute('#ambiances a.style-card[data-style=chateau]', 'href') == "creer.html#p1=Alexia&p2=Julien&s=chateau")
+    check("carrousel : 9 ambiances, chacune ouvre l'éditeur dans son style", pg.locator('#ambiances a.style-card').count() == 9 and pg.get_attribute('#ambiances a.style-card[data-style=chateau]', 'href') == "/creer/#p1=Alexia&p2=Julien&s=chateau")
     check("carrousel : miniatures aux prénoms du couple", pg.locator('#ambiances .mini-names', has_text="Alexia").count() == 9)
     check("récit « Ce que vivent vos invités » en 3 temps", pg.locator('#invites h3').count() == 3)
     for w in [375, 390, 430, 1440]:
@@ -137,7 +139,7 @@ try:
 
     # ================================================================== Éditeur
     print("\n== Éditeur : une question par écran ==")
-    c = ctx(); pg = watch(c.new_page(), "editeur"); pg.goto(BASE + "/creer.html"); pg.wait_for_selector('#p1')
+    c = ctx(); pg = watch(c.new_page(), "editeur"); pg.goto(BASE + "/creer/"); pg.wait_for_selector('#p1')
     check("page éditeur non indexée", "noindex" in (pg.get_attribute('meta[name=robots]', 'content') or ""))
     check("8 étapes, compteur annoncé", "1 / 8" in pg.inner_text('#wizard'))
     pg.click('#next'); check("prénoms manquants refusés", pg.inner_text('#step-msg') == 'Indiquez les deux prénoms.')
@@ -276,20 +278,20 @@ try:
     pg.screenshot(path=OUT + "/publie.png", full_page=True)
 
     print("\n== Modification (un faire-part par compte) ==")
-    pg.goto(BASE + "/creer.html"); pg.wait_for_selector('#p1')
+    pg.goto(BASE + "/creer/"); pg.wait_for_selector('#p1')
     check("compte connecté : son faire-part s'ouvre en modification", pg.input_value('#p1').startswith('Alexia') and "modifier mon faire-part" in pg.inner_text('#wizard').lower())
     pg.fill('#p2', 'Julien M.')
     for _ in range(7): pg.click('#next'); pg.wait_for_timeout(250)
     check("bouton « Enregistrer les modifications »", "Enregistrer" in pg.inner_text('#publish'))
     pg.click('#publish'); pg.wait_for_selector('#done')
     check("modifications enregistrées sur le même lien", db_get(pg)["inv"][slug]["config"]["partner2"] == "Julien M." and len(db_get(pg)["inv"]) == 1 and "modifications" in pg.inner_text('#done-title'))
-    pg.goto(BASE + "/creer.html#p1=Zoé&p2=Léo&s=gatsby"); pg.reload(); pg.wait_for_selector('#p1')
+    pg.goto(BASE + "/creer/#p1=Zoé&p2=Léo&s=gatsby"); pg.reload(); pg.wait_for_selector('#p1')
     check("le compte garde son faire-part (pas de second)", pg.input_value('#p2') == 'Julien M.')
     c.close()
 
     print("\n== Arrivée depuis l'accueil, brouillon d'un nouveau compte ==")
     c = ctx(viewport={"width": 390, "height": 844}); pg = watch(c.new_page(), "mobile-editeur")
-    pg.goto(BASE + "/creer.html#p1=Zoé&p2=Léo&s=gatsby"); pg.wait_for_selector('#p1')
+    pg.goto(BASE + "/creer/#p1=Zoé&p2=Léo&s=gatsby"); pg.wait_for_selector('#p1')
     check("prénoms et ambiance repris de l'accueil", pg.input_value('#p1') == 'Zoé' and pg.input_value('#p2') == 'Léo')
     check("fragment nettoyé de l'adresse", "#" not in pg.url)
     check("mobile : bouton d'aperçu plein écran", pg.locator('#show-preview').count() == 1)
@@ -376,7 +378,7 @@ try:
     row = db_get(pg)["rsvps"]["camille-hugo-abcdefgh"][-1]["data"]
     check("réponse enregistrée (format inchangé pour le tableau)", row["name"] == "Sophie Martin" and row["attendance"] == "yes" and row["guests"] == 2 and row["children"] == 1 and row["companions"] == "Paul Martin" and row["diet"] == "Végétarien, Sans gluten, allergie aux noix" and row["brunch"] == "yes", row)
     check("identifiant anonyme et durée de réponse", re.fullmatch(r'[a-z2-9]{16}', row.get("rid", "")) and isinstance(row.get("elapsed"), int))
-    check("« Créez le vôtre » seulement après la réponse (US-14)", pg.get_attribute('[data-made-with]', 'href') == BASE + "/?src=faire-part")
+    check("« Créez le vôtre » seulement après la réponse (US-14)", pg.get_attribute('[data-made-with]', 'href') == BASE + "/?src=faire-part&utm_source=faire-part&utm_medium=referral&utm_campaign=cree-avec-maison-meli")
     pg.click('[data-made-with]'); pg.wait_for_timeout(500)
     pg.go_back(); pg.wait_for_selector('.fp-intro'); pg.click('.intro-skip')
     check("mesure : clic « Créez le vôtre » rattaché au faire-part", any(e["event"] == "cta_create" and e["slug"] == "camille-hugo-abcdefgh" for e in events(pg)))
@@ -424,10 +426,10 @@ try:
 
     # ================================================================== Tableau de suivi
     print("\n== Tableau de suivi du couple ==")
-    c = ctx(); pg = watch(c.new_page(), "suivi"); pg.goto(BASE + "/admin.html"); pg.wait_for_selector('#auth-email')
+    c = ctx(); pg = watch(c.new_page(), "suivi"); pg.goto(BASE + "/mon-faire-part/"); pg.wait_for_selector('#auth-email')
     check("non connecté : connexion demandée", pg.locator('#signin').count() == 1)
     pg.fill('#auth-email', 'camille@example.com'); pg.click('text=Recevoir mon code'); pg.wait_for_selector('[data-input-otp]'); pg.keyboard.type('123456')
-    pg.wait_for_selector('#none'); check("connecté sans faire-part : création proposée", pg.get_attribute('#none a', 'href') == 'creer.html')
+    pg.wait_for_selector('#none'); check("connecté sans faire-part : création proposée", pg.get_attribute('#none a', 'href') == '/creer/')
     rid = "aaaaaaaaaaaaaaaa"
     seed(pg, "camille-hugo-zzzzzzzz", invitation_cfg(), owner=uid('camille@example.com'), rsvps=[
         {"id": 1, "created_at": "2026-11-18T10:00:00Z", "data": {"name": "Sophie Martin", "attendance": "yes", "guests": 2, "children": 1, "diet": "Végétarien", "brunch": "yes", "email": "sophie@ex.fr", "rid": rid}},
@@ -460,7 +462,7 @@ try:
     pg.click('#table tbody tr:has-text("HYPERLINK") td.act button'); check("suppression en deux temps", pg.locator('button.confirm:has-text("Confirmer")').count() == 1)
     pg.click('button.confirm:has-text("Confirmer")'); pg.wait_for_timeout(400)
     check("réponse supprimée", len(db_get(pg)["rsvps"]["camille-hugo-zzzzzzzz"]) == 3)
-    check("lien de modification et de consultation", pg.get_attribute('#edit-link', 'href') == 'creer.html' and pg.get_attribute('#open-public', 'href').endswith('?f=camille-hugo-zzzzzzzz'))
+    check("lien de modification et de consultation", pg.get_attribute('#edit-link', 'href') == '/creer/' and pg.get_attribute('#open-public', 'href').endswith('?f=camille-hugo-zzzzzzzz'))
     check("partage aussi depuis le tableau", pg.locator('#detail .share-whatsapp').count() == 1 and pg.locator('#detail .qr-img').count() == 1)
     v = axe(pg); check("accessibilité du tableau (axe, aucune violation grave)", not v, v)
     pg.screenshot(path=OUT + "/tableau.png", full_page=True)
@@ -473,19 +475,72 @@ try:
     check("suppression du compte : déconnecté", pg.evaluate("localStorage.getItem('fp:session')") is None)
     c.close()
 
+    # ================================================================== Pages SEO/GEO (brief du 20/11/2026)
+    print("\n== Pages SEO/GEO : ambiances, produit, exemple, guides, outils ==")
+    seo_pages = ["/ambiances/", "/ambiances/champetre/", "/ambiances/gatsby/", "/rsvp-mariage-en-ligne/", "/faire-part-mariage-whatsapp/",
+                 "/exemples/camille-et-thomas/", "/tarifs/", "/a-propos/", "/mentions-legales/", "/guide/", "/guide/texte-faire-part-mariage/",
+                 "/guide/faire-part-mariage-digital/", "/guide/reponses-invites-mariage/", "/comparatif/faire-part-papier-ou-digital/",
+                 "/comparatif/alternative-canva-faire-part/", "/outils/", "/outils/generateur-texte-faire-part/", "/outils/retroplanning-faire-part/"]
+    for w in (375, 1440):
+        c = ctx(viewport={"width": w, "height": 860}); pg = watch(c.new_page(), "seo-%d" % w)
+        bad = []
+        for path in seo_pages:
+            pg.goto(BASE + path); pg.wait_for_timeout(250)
+            if overflow(pg) > 0: bad.append(path)
+        check(f"pages SEO : aucun débordement horizontal à {w} px", not bad, bad)
+        c.close()
+    c = ctx(); pg = watch(c.new_page(), "seo")
+    viol = {}
+    for path in ["/ambiances/champetre/", "/rsvp-mariage-en-ligne/", "/guide/texte-faire-part-mariage/", "/outils/generateur-texte-faire-part/", "/outils/retroplanning-faire-part/", "/tarifs/"]:
+        pg.goto(BASE + path); pg.wait_for_timeout(300)
+        v = axe(pg)
+        if v: viol[path] = v
+    check("accessibilité des pages SEO (axe, aucune violation grave)", not viol, viol)
+    # Ambiance : le bouton ouvre l'éditeur avec l'ambiance déjà choisie
+    pg.goto(BASE + "/ambiances/gatsby/"); pg.wait_for_timeout(300)
+    pg.click('a[data-style=gatsby] >> nth=0'); pg.wait_for_selector('#p1')
+    wait_until(lambda: pg.evaluate("localStorage.getItem('fp:draft')") is not None)
+    d = json.loads(pg.evaluate("localStorage.getItem('fp:draft')") or "{}")
+    check("ambiance Gatsby : l'éditeur s'ouvre avec l'ambiance (canonical sans paramètre)", (d.get("state") or {}).get("theme") == "noir" and pg.url.endswith("/creer/"), d.get("state", {}).get("theme"))
+    pg.evaluate("localStorage.removeItem('fp:draft')")
+    # Exemple : réponse possible, rien d'enregistré
+    pg.goto(BASE + "/exemples/camille-et-thomas/"); pg.wait_for_selector('.fp-intro', timeout=8000)
+    pg.click('.env', force=True); pg.wait_for_timeout(2600)
+    html_ex = open(os.path.join(SITE, "exemples", "camille-et-thomas", "index.html"), encoding="utf-8").read()
+    check("exemple : texte du faire-part dans le HTML statique", "Domaine des Tilleuls" in html_ex and "Le faire-part de Camille et Thomas (exemple)" in html_ex)
+    check("exemple : réponses non enregistrées (aucune écriture en base)", json.loads(pg.evaluate("localStorage.getItem('fp:db')") or '{"rsvps":{}}').get("rsvps", {}) == {})
+    # Générateur : le texte part dans l'éditeur en un clic
+    pg.goto(BASE + "/outils/generateur-texte-faire-part/"); pg.wait_for_selector('#g-p1')
+    pg.fill('#g-p1', "Inès"); pg.fill('#g-p2', "Malo"); pg.fill('#g-date', "2027-09-04"); pg.click('text=Très formel')
+    out = pg.inner_text('#g-out')
+    check("générateur : date en toutes lettres en ton formel", "le samedi quatre septembre deux mille vingt-sept" in out, out)
+    pg.click('text=Avec humour'); pg.click('#g-use'); pg.wait_for_selector('#p1')
+    wait_until(lambda: "Inès" in (pg.evaluate("localStorage.getItem('fp:draft')") or ""))
+    d = json.loads(pg.evaluate("localStorage.getItem('fp:draft')") or "{}").get("state") or {}
+    check("générateur : prénoms et texte insérés dans l'éditeur", pg.input_value('#p1') == "Inès" and "signé un accord" in (d.get("subtitle") or "") , d.get("subtitle"))
+    pg.evaluate("localStorage.removeItem('fp:draft')")
+    # Rétroplanning
+    pg.goto(BASE + "/outils/retroplanning-faire-part/"); pg.wait_for_selector('#r-date')
+    pg.fill('#r-date', "2027-09-04")
+    check("rétroplanning : date limite deux mois avant", pg.get_attribute('[data-step=dl] time', 'datetime') == "2027-07-04")
+    check("rétroplanning : faire-part 5 mois avant (standard)", pg.get_attribute('[data-step=fp] time', 'datetime') == "2027-04-04")
+    pg.click('text=À l’étranger, invités éloignés')
+    check("rétroplanning : 10 mois avant pour l'étranger", pg.get_attribute('[data-step=fp] time', 'datetime') == "2026-11-04")
+    c.close()
+
     # ================================================================== Pages, sécurité, CSP
     print("\n== Pages annexes et sécurité ==")
     c = ctx(); pg = watch(c.new_page(), "pages")
-    for path, needle in [("/confidentialite.html", "Confidentialité"), ("/conditions.html", "Conditions d’utilisation"), ("/404.html", "Cette page n’existe pas")]:
+    for path, needle in [("/confidentialite/", "Confidentialité"), ("/conditions/", "Conditions d’utilisation"), ("/404.html", "Cette page n’existe pas"), ("/mentions-legales/", "Mentions légales"), ("/tarifs/", "Ce qui est gratuit"), ("/a-propos/", "Pourquoi Maison Meli existe")]:
         pg.goto(BASE + path); pg.wait_for_timeout(200)
         check("page " + path, needle in pg.inner_text('h1'))
-    check("confidentialité : plus de Google Fonts", "Google Fonts" not in pg.goto(BASE + "/confidentialite.html").text())
-    pages = [f for f in os.listdir(SITE) if f.endswith(".html")]
+    check("confidentialité : plus de Google Fonts", "Google Fonts" not in pg.goto(BASE + "/confidentialite/").text())
+    pages = [os.path.relpath(os.path.join(d, f), SITE) for d, _, fs in os.walk(SITE) for f in fs if f.endswith(".html")]
     csp_ok = all('http-equiv="Content-Security-Policy"' in open(os.path.join(SITE, f), encoding="utf-8").read() for f in pages)
     check("CSP stricte sur toutes les pages", csp_ok and len(pages) >= 7)
     sdir = [re.search(r"script-src ([^;]*);", open(os.path.join(SITE, f), encoding="utf-8").read()).group(1) for f in pages]
     check("scripts autorisés par empreinte, jamais 'unsafe-inline' ni 'unsafe-eval'", all("'sha256-" in d and "unsafe" not in d for d in sdir), sdir[:1])
-    check("Google autorisé seulement là où il sert", "accounts.google.com" not in open(os.path.join(SITE, "invitation.html"), encoding="utf-8").read() and "accounts.google.com/gsi/client" in open(os.path.join(SITE, "creer.html"), encoding="utf-8").read())
+    check("Google autorisé seulement là où il sert", "accounts.google.com" not in open(os.path.join(SITE, "invitation.html"), encoding="utf-8").read() and "accounts.google.com/gsi/client" in open(os.path.join(SITE, "creer", "index.html"), encoding="utf-8").read())
     c.close()
     b.close()
 finally:

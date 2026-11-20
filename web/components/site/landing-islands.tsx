@@ -44,7 +44,7 @@ export function LinkSync() {
 
 export function NavAccount() {
   const on = useSignedIn();
-  return <a href="admin.html" id="nav-mine" className="rounded-full px-3 py-2 text-foreground/75 hover:text-foreground">{on ? "Mon faire-part" : "Se connecter"}</a>;
+  return <a href="/mon-faire-part/" id="nav-mine" className="rounded-full px-3 py-2 text-foreground/75 hover:text-foreground">{on ? "Mon faire-part" : "Se connecter"}</a>;
 }
 
 // Les polices des ambiances ne sont chargées qu'à l'approche de la section (une seule pour le haut de page).
@@ -93,7 +93,7 @@ export function Hero() {
         <p className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-[14px] text-muted-foreground">
           {["Gratuit, sans carte bancaire", "Prêt en 3 minutes", "Modifiable après l’envoi"].map((t) => <span key={t} className="inline-flex items-center gap-1.5"><Check className="size-3.5 text-gold-ink" aria-hidden="true" />{t}</span>)}
         </p>
-        {signedIn && <p className="mt-3 text-[14px]"><a href="admin.html" id="back-link" className="font-medium underline decoration-foreground/25 underline-offset-4">Retrouver mon faire-part et les réponses</a></p>}
+        {signedIn && <p className="mt-3 text-[14px]"><a href="/mon-faire-part/" id="back-link" className="font-medium underline decoration-foreground/25 underline-offset-4">Retrouver mon faire-part et les réponses</a></p>}
       </div>
 
       <div className="flex flex-col items-center gap-6">

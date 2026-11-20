@@ -1,10 +1,11 @@
 import type { NextConfig } from "next";
 
 // Export statique (GitHub Pages) : une page HTML par route, pré-rendue au build pour le SEO/GEO.
-// « creer » → creer.html, « invitation » → invitation.html… : les liens déjà envoyés restent valides.
+// Adresses propres avec barre finale (/creer/, /ambiances/champetre/). invitation.html est recréé par postbuild.mjs
+// (les liens déjà envoyés aux invités restent valides pour toujours) ; les anciennes adresses .html redirigent (public/_redirects).
 const nextConfig: NextConfig = {
   output: "export",
-  trailingSlash: false,
+  trailingSlash: true,
   images: { unoptimized: true },
   reactStrictMode: true,
   poweredByHeader: false,

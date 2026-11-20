@@ -8,6 +8,7 @@ import "./globals.css";
 import "@/styles/invitation.css";
 import { Providers } from "@/components/site/providers";
 import { SITE } from "@/lib/config";
+import { JsonLd, organization } from "@/lib/schema";
 
 export const metadata: Metadata = {
   metadataBase: new URL(SITE),
@@ -29,6 +30,7 @@ export default function RootLayout({ children }: Readonly<{ children: React.Reac
   return (
     <html lang="fr">
       <body>
+        <JsonLd data={organization()} />
         <Providers>{children}</Providers>
       </body>
     </html>

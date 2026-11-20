@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { ArrowRight, Check, Plus } from "lucide-react";
-import { DESC, FAQ, STORY, TITLE, jsonLd } from "@/lib/content";
+import { COMPARE, DEFINITION, DESC, FAQ, STORY, TITLE, jsonLd } from "@/lib/content";
 import { SITE } from "@/lib/config";
 import { PRESETS, sampleConfig } from "@/lib/invitation";
 import { Button } from "@/components/ui/button";
@@ -8,7 +8,11 @@ import { BlurFade } from "@/components/magic/blur-fade";
 import { NumberTicker } from "@/components/magic/number-ticker";
 import { CardsCarousel } from "@/components/aceternity/cards-carousel";
 import { MiniCard } from "@/components/invitation/mini-card";
-import { FloatingCta, FontWarmer, GuestsStory, Hero, LinkSync, NavAccount } from "@/components/site/landing-islands";
+import { FloatingCta, FontWarmer, GuestsStory, Hero, LinkSync } from "@/components/site/landing-islands";
+import { SiteFooter, SiteHeader, Table } from "@/components/site/chrome";
+import { AMBIANCES } from "@/lib/ambiances";
+import { GUIDES } from "@/lib/guides";
+import { PAGES } from "@/lib/site";
 
 export const metadata: Metadata = {
   title: { absolute: TITLE },
@@ -27,26 +31,23 @@ export const metadata: Metadata = {
 export default function Page() {
   return (
     <>
-      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd(SITE)).replace(/</g, "\\u003c") }} />
+      <script type="application/ld+json" dangerouslySetInnerHTML={{ __html: JSON.stringify(jsonLd()).replace(/</g, "\\u003c") }} />
       <LinkSync />
       <a href="#contenu" className="skip-link">Aller au contenu</a>
-      <header className="pointer-events-none fixed inset-x-0 top-3 z-40 px-3">
-        <nav aria-label="Navigation principale" className="glass pointer-events-auto mx-auto flex h-14 max-w-[1180px] items-center justify-between gap-3 rounded-full pl-5 pr-2">
-          <a href="./" className="font-serif text-[22px] font-medium tracking-[-0.01em]" aria-label="Maison Meli, accueil">Maison Meli</a>
-          <div className="flex items-center gap-1 text-[14px]">
-            <a href="#ambiances" className="hidden rounded-full px-3 py-2 text-foreground/75 hover:text-foreground md:block">Ambiances</a>
-            <a href="#invites" className="hidden rounded-full px-3 py-2 text-foreground/75 hover:text-foreground md:block">Vos invités</a>
-            <a href="#questions" className="hidden rounded-full px-3 py-2 text-foreground/75 hover:text-foreground md:block">Questions</a>
-            <NavAccount />
-            <Button asChild size="sm" className="hidden h-10 sm:inline-flex"><a href="creer.html" data-create>Créer mon faire-part</a></Button>
-          </div>
-        </nav>
-      </header>
+      <SiteHeader current="/" />
 
       <main id="contenu">
         <section aria-labelledby="h-hero" className="paper-grain relative overflow-hidden">
           <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(70%_55%_at_75%_35%,#F1E9DC,transparent_70%)]" />
           <Hero />
+        </section>
+
+        {/* Paragraphe-définition (GEO) : la réponse à « qu'est-ce que Maison Meli ? », citable telle quelle. */}
+        <section aria-labelledby="h-def" className="mx-auto max-w-[1180px] px-5 pt-10 sm:px-8">
+          <div className="grid gap-6 border-y border-border py-10 md:grid-cols-[0.8fr_1.2fr] md:items-baseline">
+            <h2 id="h-def" className="font-serif text-[30px] leading-tight">Maison Meli, en deux phrases</h2>
+            <p className="max-w-[62ch] text-[18px] leading-relaxed text-foreground/80">{DEFINITION}</p>
+          </div>
         </section>
 
         <section id="ambiances" aria-labelledby="h-styles" className="py-24 sm:py-32 [content-visibility:auto] [contain-intrinsic-size:auto_900px]">
@@ -57,7 +58,7 @@ export default function Page() {
           </div>
           <CardsCarousel label="Les neuf ambiances">
             {PRESETS.map((p) => (
-              <a key={p.id} href={"creer.html#s=" + p.id} data-style={p.id}
+              <a key={p.id} href={"/creer/#s=" + p.id} data-style={p.id}
                 className="style-card group relative flex w-[min(78vw,300px)] flex-col gap-4 rounded-[28px] bg-card p-3 shadow-soft transition-shadow duration-300 hover:shadow-lift">
                 <div className="overflow-hidden rounded-[20px]"><div className="transition-transform duration-500 ease-out group-hover:scale-[1.03]"><MiniCard cfg={sampleConfig({}, p)} /></div></div>
                 <div className="flex items-end justify-between gap-3 px-2 pb-1">
@@ -68,6 +69,11 @@ export default function Page() {
               </a>
             ))}
           </CardsCarousel>
+          <nav aria-label="Pages des ambiances" className="mx-auto mt-10 flex max-w-[1180px] flex-wrap items-center gap-x-1 gap-y-2 px-5 text-[15px] sm:px-8">
+            <span className="mr-2 text-muted-foreground">Découvrir chaque ambiance :</span>
+            {AMBIANCES.map((a) => <a key={a.slug} href={a.page.path} className="rounded-full border border-border px-3 py-1.5 hover:border-foreground/40">{a.label}</a>)}
+            <a href={PAGES.ambiances.path} className="ml-1 rounded-full px-3 py-1.5 font-medium underline decoration-foreground/25 underline-offset-4">Toutes les ambiances</a>
+          </nav>
         </section>
 
         <section id="invites" aria-labelledby="h-guests" className="bg-[linear-gradient(180deg,transparent,#F3EDE3_12%,#F3EDE3_88%,transparent)] py-24 sm:py-32">
@@ -119,6 +125,42 @@ export default function Page() {
           </div>
         </section>
 
+        <section aria-labelledby="h-compare" className="mx-auto max-w-[1180px] px-5 py-24 sm:px-8 sm:py-32 [content-visibility:auto] [contain-intrinsic-size:auto_900px]">
+          <div className="grid gap-6 md:grid-cols-2 md:items-end">
+            <div><p className="t-label mb-4">Comparer</p><h2 id="h-compare" className="t-section max-w-[16ch]">Maison Meli, le papier ou un modèle Canva ?</h2></div>
+            <p className="t-lead">Le papier reste le plus beau souvenir à tenir en main ; un modèle Canva est parfait pour une jolie image. Maison Meli ajoute ce qu’aucun des deux ne fait seul : l’enveloppe qui s’ouvre, la réponse des invités et le suivi, sur un seul lien.</p>
+          </div>
+          <Table caption="Relevé du 20 novembre 2026. Sources : Mariages.net (rapport 2025 sur le secteur nuptial), La Poste (tarifs 2026 et 2027)." head={COMPARE.head} rows={COMPARE.rows} className="mt-10" />
+          <p className="text-[15px] text-muted-foreground">Le détail, limites du digital comprises : <a href={GUIDES.papier.path} className="underline decoration-foreground/25 underline-offset-4">faire-part papier ou digital, le comparatif honnête</a>.</p>
+        </section>
+
+        <section aria-labelledby="h-origin" className="mx-auto max-w-[1180px] px-5 pb-24 sm:px-8 [content-visibility:auto] [contain-intrinsic-size:auto_600px]">
+          <div className="grid gap-8 rounded-[32px] bg-card p-8 shadow-soft sm:p-12 md:grid-cols-[auto_1fr] md:items-center">
+            <div aria-hidden="true" className="grid size-24 place-items-center rounded-full bg-[#F1E9DC] font-serif text-[34px] text-gold-ink">JM</div>
+            <div>
+              <h2 id="h-origin" className="font-serif text-[34px] leading-tight">Né d’un vrai mariage</h2>
+              <p className="mt-4 max-w-[64ch] text-[17px] leading-relaxed text-foreground/80">Maison Meli est né de la préparation du mariage de Julien, son fondateur : il a d’abord conçu le faire-part qu’il voulait envoyer à ses propres invités. Il l’a ensuite ouvert à tous les couples, gratuitement. Il le fait évoluer avec leurs retours.</p>
+              <p className="mt-4 text-[15px]"><a href={PAGES.apropos.path} className="font-medium underline decoration-foreground/25 underline-offset-4">Pourquoi Maison Meli existe</a></p>
+            </div>
+          </div>
+        </section>
+
+        <section aria-labelledby="h-more" className="mx-auto max-w-[1180px] px-5 pb-8 sm:px-8 [content-visibility:auto] [contain-intrinsic-size:auto_500px]">
+          <h2 id="h-more" className="font-serif text-[34px] leading-tight">Pour bien préparer votre faire-part</h2>
+          <ul className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {[
+              [PAGES.exemple.path, "Voir un exemple complet", "Ouvrez le faire-part fictif de Camille et Thomas et testez la réponse invité."],
+              [PAGES.rsvp.path, "Les réponses de vos invités", "Présence, accompagnants, enfants, régimes : comment fonctionne le RSVP en ligne."],
+              [PAGES.whatsapp.path, "Envoyer sur WhatsApp", "Le message, l’aperçu du lien, les groupes : envoyer son faire-part en un lien."],
+              [GUIDES.textes.path, "40 textes de faire-part", "Classiques, simples, originaux : des textes à copier dans votre faire-part."],
+              [GUIDES.digital.path, "Le guide du faire-part digital", "Avantages, limites, étiquette : tout savoir avant de choisir le digital."],
+              [GUIDES.reponses.path, "Organiser les réponses", "Date limite, relances, régimes : obtenir toutes les réponses à temps."],
+            ].map(([href, t, d]) => (
+              <li key={href}><a href={href} className="flex h-full flex-col gap-2 rounded-[24px] border border-border bg-background p-6 transition-colors hover:border-foreground/30"><span className="font-serif text-[24px] leading-tight">{t}</span><span className="text-[15px] text-muted-foreground">{d}</span></a></li>
+            ))}
+          </ul>
+        </section>
+
         {/* FAQ en accordéon natif (details/summary) : lisible sans JavaScript, indexable, accessible au clavier. */}
         <section id="questions" aria-labelledby="h-faq" className="mx-auto max-w-[1180px] px-5 py-24 sm:px-8 sm:py-32 [content-visibility:auto] [contain-intrinsic-size:auto_1000px]">
           <div className="grid gap-12 lg:grid-cols-[0.8fr_1.2fr]">
@@ -143,20 +185,12 @@ export default function Page() {
             <BlurFade className="relative">
               <h2 id="h-final" className="t-display !text-[clamp(40px,6vw,68px)]">Votre faire-part peut partir ce soir</h2>
               <p className="mx-auto mt-5 max-w-md text-[18px] text-[#FAF7F2]/70">Prénoms, date, lieu : le reste est déjà prêt.</p>
-              <Button asChild size="lg" className="mt-10 bg-[#FAF7F2] text-[#1C1A17] hover:bg-white"><a href="creer.html" data-create>Créer mon faire-part <ArrowRight /></a></Button>
+              <Button asChild size="lg" className="mt-10 bg-[#FAF7F2] text-[#1C1A17] hover:bg-white"><a href="/creer/" data-create>Créer mon faire-part <ArrowRight /></a></Button>
             </BlurFade>
           </div>
         </section>
       </main>
-      <footer className="mx-auto flex max-w-[1180px] flex-col gap-6 px-5 py-12 text-[14px] text-muted-foreground sm:flex-row sm:items-center sm:justify-between sm:px-8">
-        <p className="font-serif text-[22px] text-foreground">Maison Meli</p>
-        <nav aria-label="Pied de page" className="flex flex-wrap gap-x-6 gap-y-2">
-          <a href="creer.html" data-create className="hover:text-foreground">Créer mon faire-part</a>
-          <a href="admin.html" className="hover:text-foreground">Mon faire-part</a>
-          <a href="confidentialite.html" className="hover:text-foreground">Confidentialité</a>
-          <a href="conditions.html" className="hover:text-foreground">Conditions d’utilisation</a>
-        </nav>
-      </footer>
+      <SiteFooter />
       <FloatingCta />
     </>
   );
