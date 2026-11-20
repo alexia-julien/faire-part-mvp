@@ -40,7 +40,7 @@ export default function Page() {
         <li><strong>Supabase</strong> : base de données et comptes, hébergés dans l’Union européenne (Francfort).</li>
         <li><strong>Un service d’envoi d’emails</strong> : il reçoit votre adresse pour vous transmettre le code de connexion.</li>
         <li><strong>Google</strong>, si vous choisissez « Continuer avec Google » : la connexion passe par ses serveurs.</li>
-        <li><strong>GitHub Pages</strong> : hébergement des pages du site. Comme tout hébergeur, GitHub reçoit l’adresse IP des visiteurs.</li>
+        <li><strong>Cloudflare</strong> : hébergement et diffusion des pages du site. Comme tout hébergeur, Cloudflare reçoit l’adresse IP des visiteurs.</li>
       </ul>
       <p>Les polices de caractères sont hébergées avec le site : aucun service de polices tiers ne reçoit l’adresse IP des visiteurs. Aucune donnée n’est vendue ni utilisée à des fins publicitaires.</p>
 

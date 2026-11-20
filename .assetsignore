@@ -8,15 +8,9 @@ supabase
 tests
 README.md
 SECURITY.md
-CNAME
 wrangler.jsonc
 .assetsignore
 .deploy-manifest
 .gitignore
-.nojekyll
-# Pages de redirection réservées à GitHub Pages : sur Cloudflare, _redirects fait de vraies 301 (un fichier présent passerait avant).
-creer.html
-admin.html
-confidentialite.html
-conditions.html
 worker
+.wrangler

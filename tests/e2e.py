@@ -105,7 +105,7 @@ try:
     check("FAQ présente dans le HTML statique (sans JavaScript)", "Est-ce vraiment gratuit" in html and "Comment envoyer le faire-part" in html)
     check("un seul titre principal", pg.locator('h1').count() == 1)
     check("titre principal pré-rendu (pas d'animation qui le masque)", 'id="h-hero"' in html and pg.evaluate("getComputedStyle(document.getElementById('h-hero')).opacity") == "1")
-    check("llms.txt, robots.txt et sitemap publiés", all(os.path.exists(os.path.join(SITE, f)) for f in ["llms.txt", "robots.txt", "sitemap.xml", ".nojekyll"]))
+    check("llms.txt, robots.txt et sitemap publiés", all(os.path.exists(os.path.join(SITE, f)) for f in ["llms.txt", "robots.txt", "sitemap.xml"]))
     check("polices auto-hébergées (aucun appel à Google Fonts)", "fonts.googleapis" not in html and "fonts.gstatic" not in html)
     check("mesure : visite de l'accueil, provenance directe", any(e["event"] == "landing_view" and e["meta"].get("src") == "direct" for e in events(pg)))
     check("téléphone du héros : le vrai faire-part s'ouvre au chargement", wait_until(lambda: pg.locator('#demo-phone .fp-intro').count() == 0, 6) and pg.locator('#demo-phone .names').count() == 1)

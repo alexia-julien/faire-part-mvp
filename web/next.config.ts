@@ -1,6 +1,6 @@
 import type { NextConfig } from "next";
 
-// Export statique (GitHub Pages) : une page HTML par route, pré-rendue au build pour le SEO/GEO.
+// Export statique (servi par Cloudflare, voir wrangler.jsonc) : une page HTML par route, pré-rendue au build pour le SEO/GEO.
 // Adresses propres avec barre finale (/creer/, /ambiances/champetre/). invitation.html est recréé par postbuild.mjs
 // (les liens déjà envoyés aux invités restent valides pour toujours) ; les anciennes adresses .html redirigent (public/_redirects).
 const nextConfig: NextConfig = {

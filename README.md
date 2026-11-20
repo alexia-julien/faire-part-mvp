@@ -9,13 +9,13 @@ Références : [PRD](https://claude.ai/artifact/4SKbVCw7TaBdXzTuxMgASG) (prime e
 | Dossier | Contenu |
 | --- | --- |
 | `web/` | **Le code source** : Next.js (App Router) + TypeScript + Tailwind CSS v4 + shadcn/ui + Magic UI + composants façon Aceternity + Motion, en **export statique**. |
-| racine | **Le site publié** (généré par `npm run deploy`, ne pas modifier à la main) : `index.html`, `creer/`, `mon-faire-part/`, `invitation.html`, `_next/`… GitHub Pages sert la branche `dev` depuis la racine. La liste des fichiers publiés est dans `.deploy-manifest`. |
+| racine | **Le site publié** (généré par `npm run deploy`, ne pas modifier à la main) : `index.html`, `creer/`, `mon-faire-part/`, `invitation.html`, `_next/`… Le Worker Cloudflare la sert depuis la branche `dev`, redéployée à chaque push. La liste des fichiers publiés est dans `.deploy-manifest`. |
 | `supabase/` | `schema.sql` : toute la base telle qu'elle tourne en production (rejouable) ; `tests*.sql` : recettes SQL. |
 | `tests/e2e.py` | Recette de bout en bout (Playwright). |
 | `tests/seo.py` | Recette SEO/GEO de l'export (title, description, canonical, JSON-LD, liens, plan du site, noindex…). |
 
 ### Adresses (depuis le brief SEO/GEO du 20/11/2026)
-Adresses propres avec barre finale (`trailingSlash: true`). **`/invitation.html?f=<id>` ne change jamais** (liens déjà envoyés aux invités). Les anciennes adresses redirigent : `creer.html` → `/creer/`, `admin.html` → `/mon-faire-part/`, `confidentialite.html` → `/confidentialite/`, `conditions.html` → `/conditions/` (vraies 301 via `web/public/_redirects` sur Cloudflare Pages ou Netlify ; pages de redirection générées par `scripts/publish.mjs` tant que le site est sur GitHub Pages).
+Adresses propres avec barre finale (`trailingSlash: true`). **`/invitation.html?f=<id>` ne change jamais** (liens déjà envoyés aux invités). Les anciennes adresses redirigent : `creer.html` → `/creer/`, `admin.html` → `/mon-faire-part/`, `confidentialite.html` → `/confidentialite/`, `conditions.html` → `/conditions/` (vraies 301 via `web/public/_redirects`).
 
 Pages publiques ajoutées (registre unique : `web/lib/site.ts`, `lib/ambiances.ts`, `lib/guides.ts`) : `/ambiances/` et une page par ambiance, `/rsvp-mariage-en-ligne/`, `/faire-part-mariage-whatsapp/`, `/exemples/camille-et-thomas/` (faire-part fictif testable), `/tarifs/`, `/a-propos/`, `/mentions-legales/`, `/guide/` (3 piliers), `/comparatif/…` (2), `/outils/` (générateur de texte, rétroplanning). Plan du site, `robots.txt`, images Open Graph (`/og/*.png`) et logo (`/logo.png`) générés au build.
 
@@ -50,11 +50,11 @@ npm run deploy         # build de production puis copie de web/out à la racine 
 Mise en ligne : `cd web && npm run deploy`, puis commit et push sur `dev`. Après chaque mise en ligne : `npm run indexnow` (prévient Bing et Copilot).
 
 ### Hébergement Cloudflare (Worker avec fichiers statiques)
-Le Worker `faire-part-mvp` est relié au dépôt (branche `dev`) : chaque push redéploie le site. `wrangler.jsonc` (racine) sert le site déjà publié à la racine par `npm run deploy` ; `.assetsignore` exclut les sources ; `_redirects` fait les vraies 301 et `_headers` les en-têtes (X-Robots-Tag, cache). Tant que le domaine n'est pas basculé, GitHub Pages sert toujours maison-meli.com à partir des mêmes fichiers.
+Le Worker `faire-part-mvp` est relié au dépôt (branche `dev`) : chaque push redéploie le site. `wrangler.jsonc` (racine) sert le site déjà publié à la racine par `npm run deploy` ; `.assetsignore` exclut les sources ; `_redirects` fait les vraies 301 et `_headers` les en-têtes (X-Robots-Tag, cache).
 
 **Aperçu WhatsApp personnalisé** : `worker/index.js` ne tourne que pour `/invitation.html` ; pour les robots d'aperçu de lien seulement, il remplace le titre et l'image par « Prénom & Prénom se marient le … » et l'image de la palette (`/og/invitation-<palette>.png`). Lecture via la fonction SQL `get_invitation_preview` (prénoms, date, palette ; ne compte pas d'ouverture). Les invités reçoivent la page statique telle quelle.
 
-Bascule du domaine (tableau de bord Cloudflare) : ajouter la zone `maison-meli.com` et vérifier les enregistrements DNS importés ; Worker → Domaines → ajouter `maison-meli.com` et `www.maison-meli.com` ; chez OVH, remplacer les serveurs DNS par ceux de Cloudflare ; laisser les robots IA autorisés (pas de blocage, pas de robots.txt géré par Cloudflare) ; rediriger `www` vers la racine ; puis, une fois tout vérifié, désactiver GitHub Pages.
+Domaine : zone `maison-meli.com` sur Cloudflare (DNS chez Cloudflare, e-mails toujours chez OVH : MX, SPF, DMARC, DKIM Resend), `www` redirigé vers la racine, HTTPS forcé, robots IA autorisés. GitHub Pages n'est plus utilisé.
 
 ## Tests
 
@@ -69,7 +69,7 @@ pip install playwright pillow opencv-python && python3 tests/e2e.py
 La base se teste avec `supabase/tests.sql` (invités), `tests-comptes.sql` et `tests-mesure.sql` dans le SQL Editor (tout est annulé à la fin).
 
 ## Sécurité et performance
-- **CSP stricte** posée dans chaque page par `scripts/postbuild.mjs` (GitHub Pages n'envoie pas d'en-têtes) : scripts autorisés par empreinte SHA-256, jamais `unsafe-inline` ; Google Identity Services seulement sur `/creer/` et `/mon-faire-part/`. Polices auto-hébergées (plus aucun appel à Google Fonts).
+- **CSP stricte** posée dans chaque page par `scripts/postbuild.mjs` (ses empreintes dépendent de chaque page) : scripts autorisés par empreinte SHA-256, jamais `unsafe-inline` ; Google Identity Services seulement sur `/creer/` et `/mon-faire-part/`. Polices auto-hébergées (plus aucun appel à Google Fonts).
 - Toute donnée venant de la base est revalidée (`sanitizeConfig`) ; liens Maps et liens libres en liste blanche ; anti-clickjacking ; champ piège anti-robots. Voir [SECURITY.md](SECURITY.md).
 - Lighthouse mobile mesuré le 20/11/2026 : faire-part invité 97–98 (LCP 0,9 s), page d'accueil 91–95 (LCP 1,1 s, CLS 0) ; ouverture de l'enveloppe ≈ 57–59 images/s avec un processeur ralenti 4×. Animations chargées après l'affichage (`LazyMotion`), sections hors écran non calculées (`content-visibility`).
 

@@ -1,5 +1,6 @@
 // Après `next build` (export statique) : pose une CSP stricte dans chaque page HTML.
-// GitHub Pages ne permet pas d'envoyer d'en-têtes HTTP, donc la politique est une balise <meta> placée en tête de <head>.
+// La politique est une balise <meta> placée en tête de <head> : ses empreintes dépendent de chaque page, ce qu'un
+// fichier _headers commun ne sait pas exprimer.
 // Les seuls scripts en ligne sont ceux de Next.js (amorçage) : ils sont autorisés par leur empreinte SHA-256,
 // jamais par 'unsafe-inline'. Les données structurées (application/ld+json) ne s'exécutent pas et n'en ont pas besoin.
 import { createHash } from "node:crypto";
@@ -51,5 +52,4 @@ const inv = join(OUT, "invitation", "index.html");
 if (existsSync(inv)) { cpSync(inv, join(OUT, "invitation.html")); rmSync(join(OUT, "invitation"), { recursive: true, force: true }); }
 const invHtml = readFileSync(join(OUT, "invitation.html"), "utf8");
 if (!/<meta name="robots" content="noindex, nofollow, noarchive"/.test(invHtml)) throw new Error("invitation.html : noindex statique absent");
-writeFileSync(join(OUT, ".nojekyll"), ""); // GitHub Pages : servir le dossier _next tel quel
 console.log(`CSP posée sur ${n} pages.`);

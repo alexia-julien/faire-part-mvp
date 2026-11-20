@@ -16,7 +16,7 @@ export default function Page() {
       <h2>Directeur de la publication</h2>
       <p>Julien Meli</p>
       <h2>Hébergement</h2>
-      <p>GitHub Pages, service de GitHub, Inc.<br />88 Colin P. Kelly Jr. Street, San Francisco, CA 94107, États-Unis<br />Téléphone : +1 877 448 4820</p>
+      <p>Cloudflare, Inc.<br />101 Townsend St, San Francisco, CA 94107, États-Unis<br />Téléphone : +1 650 319 8930</p>
       <h2>Propriété intellectuelle</h2>
       <p>Le site, ses ambiances, illustrations, textes et éléments graphiques sont la propriété de Julien Meli. Toute reproduction sans autorisation écrite est interdite. Les textes et photos ajoutés par les utilisateurs dans leur faire-part restent leur propriété.</p>
       <h2>Données personnelles</h2>

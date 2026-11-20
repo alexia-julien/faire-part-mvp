@@ -29,7 +29,7 @@ export function GuestInvitation() {
   const openedAt = useRef(0);
 
   useEffect(() => {
-    // Anti-clickjacking (GitHub Pages ne permet pas d'envoyer X-Frame-Options / frame-ancestors).
+    // Anti-clickjacking, en plus de l'en-tête X-Frame-Options envoyé par Cloudflare (public/_headers).
     if (window.top !== window.self) { document.body.textContent = ""; return; }
     const slug = slugFromUrl();
     if (!slug) { setSt({ kind: "error", msg: "Lien incomplet : il manque l’identifiant du faire-part." }); return; }
