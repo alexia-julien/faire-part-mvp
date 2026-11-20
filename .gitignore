@@ -6,3 +6,8 @@
 node_modules/
 .DS_Store
 tests/out/
+
+# Refonte Next.js : sources dans web/ (node_modules, .next et out y sont ignorés)
+web/node_modules/
+web/.next/
+web/out/

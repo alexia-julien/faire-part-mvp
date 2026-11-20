@@ -1,117 +1,66 @@
-# Maison Meli — faire-part digital
+# Maison Meli — faire-part de mariage digital
 
-Générateur de faire-part digital avec RSVP intégré. Objectif : un couple publie un faire-part de qualité en moins de 3 minutes, **sans créer de compte**.
+Un couple compose son faire-part en quelques minutes, le partage par un lien, et suit les réponses de ses invités au même endroit. Gratuit. Le compte (code par email ou Google) n'est demandé qu'au moment de publier.
 
-## Branche `comptes` : comptes uniquement (pas encore en ligne)
+Références : [PRD](https://claude.ai/artifact/4SKbVCw7TaBdXzTuxMgASG) (prime en cas de conflit) et [brief design de la refonte](https://claude.ai/artifact/GEhfh15n2WDKyHyeHLBrc1).
 
-Cette branche remplace les liens privés et les espaces testeurs par des **comptes** (Supabase Auth). Les sections plus bas qui parlent de lien privé, de « Mes faire-part » sur l'appareil ou d'espaces testeurs décrivent l'ancien fonctionnement, encore en ligne sur `dev` jusqu'à la bascule.
+## Organisation du dépôt (depuis la refonte du 20/11/2026)
 
-- **Parcours** : le visiteur personnalise son faire-part librement (`creer.html`, brouillon gardé dans le navigateur). Au clic sur « Terminer », il se connecte ou crée son compte : code à 6 chiffres reçu par email, ou Google. Le faire-part est publié dans la foulée, y compris après une redirection (Google, lien de l'email).
-- **Un faire-part par compte**, vérifié par la base (index unique). Un compte qui en a déjà un le retrouve en modification dans l'éditeur.
-- **`admin.html` = « Mon faire-part »** : connexion si besoin, lien à envoyer, réponses, export, puis suppression du faire-part ou du compte. Plus de lien privé ni de clé nulle part.
-- **`js/auth.js`** : appels directs à Supabase Auth (pas de bibliothèque), session dans le stockage du navigateur, renouvellement du jeton. En mode local (sans config Supabase), un faux service accepte le code `123456` : c'est ce que les tests utilisent.
-- **Base** : `supabase/comptes.sql` (étape 1, n'enlève rien : colonne `owner`, fonctions `account_*` réservées aux connectés), `supabase/tests-comptes.sql` (30 vérifications, annulées à la fin), puis `supabase/bascule.sql` (étape 2, **destructive** : supprime les faire-part sans compte, les fonctions à clé et les espaces testeurs). `schema.sql` et `tests.sql` décrivent l'état d'avant la bascule.
-- **À configurer dans Supabase avant la mise en ligne** : service d'envoi d'emails (SMTP), code `{{ .Token }}` dans les modèles « Magic Link » et « Confirm signup », Site URL et redirections autorisées (`https://maison-meli.com/**`), fournisseur Google.
-- **Ordre de bascule** : 1) `comptes.sql`, 2) configuration et essai de connexion, 3) fusion de `comptes` dans `dev` et `bascule.sql` au même moment.
-- **État au 19/11/2026 : bascule faite.** `dev` (en ligne) = comptes uniquement ; `bascule.sql` appliqué (migration `comptes_bascule`). Supabase Auth : envoi via Resend (`no-reply@maison-meli.com`), modèles FR, code à 6 chiffres ; Google via le bouton officiel (projet Google Cloud « Maison Meli », en production).
-- **État au 12/11/2026** : étape 1 (`comptes.sql`) appliquée en production (migration `comptes_etape1`), `tests-comptes.sql` passé (30/30). Le Security Advisor signale les fonctions `account_*` appelables par les connectés : c'est voulu, chacune n'agit que sur le faire-part du compte. Les alertes « anon » sur les anciennes fonctions disparaissent avec `bascule.sql`.
+| Dossier | Contenu |
+| --- | --- |
+| `web/` | **Le code source** : Next.js (App Router) + TypeScript + Tailwind CSS v4 + shadcn/ui + Magic UI + composants façon Aceternity + Motion, en **export statique**. |
+| racine | **Le site publié** (généré par `npm run deploy`, ne pas modifier à la main) : `index.html`, `creer.html`, `admin.html`, `invitation.html`, `_next/`… GitHub Pages sert la branche `dev` depuis la racine. La liste des fichiers publiés est dans `.deploy-manifest`. |
+| `supabase/` | Schéma, migrations et tests SQL de la base (inchangés par la refonte). |
+| `tests/e2e.py` | Recette de bout en bout (Playwright). |
 
-Autres pages : `index.html` (page d'accueil : conversion, SEO, GEO ; prénoms et ambiance transmis à l'éditeur dans le fragment d'URL), `confidentialite.html`, `404.html`, `robots.txt`, `sitemap.xml`, `llms.txt`, `img/og.png`.
+### Pages (les adresses n'ont pas changé : les liens déjà envoyés fonctionnent)
+- `/` : page d'accueil (SEO/GEO : données structurées, FAQ, `llms.txt`, `sitemap.xml`), héros vivant (un vrai faire-part dans un téléphone, prénoms écrits en direct), carrousel des 9 ambiances, récit « Ce que vivent vos invités ».
+- `/creer.html` : éditeur en 8 écrans, une question par écran (prénoms → date → lieu → ambiance → photos et style → textes → réponses → aperçu), aperçu en direct (60 % de l'écran sur ordinateur, panneau plein écran sur mobile), sauvegarde automatique. À la publication : compte dans un panneau (code à 6 chiffres ou Google), puis rituel de mise sous pli (enveloppe, cachet de cire, confettis or et ivoire), lien, partage et QR code.
+- `/invitation.html?f=<id>` : le faire-part invité. Ouverture d'enveloppe en 3D (cachet qui se fend, rabat, carte qui devient la page), prénoms qui s'écrivent, dorure qui suit l'inclinaison du téléphone ; une mécanique, neuf matières (kraft, coton poudré, vergé ivoire, laque noire, velours…). Réponse une question à la fois, correction possible (US-13), « Créez le vôtre » après la réponse (US-14).
+- `/admin.html` : « Mon faire-part » (compteurs animés, réponses, recherche, filtres, tri, régimes pour le traiteur, CSV, emails, partage, suppressions).
+- `/confidentialite.html`, `/conditions.html`, `/404.html`, et `/composants` (référence des composants restylés, non indexée).
 
-La page d'accueil est **générée** : modifier les textes, la FAQ ou les étapes dans `tools/build_landing.py`, puis `python3 tools/build_landing.py index.html` (la FAQ visible et les données structurées JSON-LD viennent de la même liste, un test le vérifie).
+### Où est quoi dans `web/`
+- `lib/invitation.ts` : modèle d'un faire-part (catalogue de styles, validation stricte de la config, dates et fuseaux, agenda .ics). Port fidèle de l'ancien `js/render.js` : même format en base.
+- `lib/api.ts`, `lib/auth.ts`, `lib/track.ts`, `lib/share.ts`, `lib/qr.ts` : accès Supabase (RPC), comptes, mesure du funnel sans cookie, partage, encodeur de QR code.
+- `components/invitation/` : le faire-part (`invitation-body`), l'ouverture (`envelope`), la réponse (`rsvp-flow`), les ornements.
+- `components/editor/`, `components/site/` : éditeur, tableau de suivi, connexion, partage, îlots de la page d'accueil.
+- `components/ui/` (shadcn/ui), `components/magic/` (Magic UI), `components/aceternity/` (réécrits : le catalogue Aceternity n'est pas en code ouvert et son style par défaut est sombre).
+- `styles/invitation.css` : rendu des faire-part (palettes, polices, ornements, dorure, papier, matières d'enveloppe). `app/globals.css` : tokens de la direction artistique.
 
-Projet indépendant du site du mariage d'Alexia & Julien (aucun lien avec ce repo ni ses branches `main` / `test`).
-
-## Phase « Stabiliser » de la PRD (19/11/2026)
-Développements suivant la [PRD Maison Meli](https://claude.ai/artifact/4SKbVCw7TaBdXzTuxMgASG), roadmap phase 1 :
-
-- **Partage (US-09 à US-11)** : `js/share.js`, sur l'écran de fin et sur « Mon faire-part ». Partage natif du téléphone (si disponible), WhatsApp, SMS, email : le message contient prénoms, date et lien. QR code affiché et téléchargeable en PNG ≥ 1024 px (`js/qr.js`, encodeur autonome, niveau de correction M, sans bibliothèque).
-- **Aperçu du lien** : `invitation.html` a un aperçu Open Graph générique (`img/og-invitation.png`). Les prénoms et la date ne peuvent pas y figurer : le site est statique et les robots d'aperçu n'exécutent pas le JavaScript. Ils sont donc dans le texte du message de partage.
-- **« Créez le vôtre » (US-14)** : lien discret affiché seulement après la réponse de l'invité, vers `/?src=faire-part`.
-- **Correction par l'invité (US-13)** : la réponse envoyée reste sur l'appareil de l'invité. À son retour, il voit un rappel et le bouton « Modifier ma réponse », qui ouvre le formulaire pré-rempli. Côté couple, l'ancienne réponse n'est ni comptée, ni affichée, ni exportée (« Voir les anciennes réponses » pour les consulter).
-- **Mesure du funnel** : `js/track.js` (navigateur) + `supabase/mesure.sql` (fonction `track`, journalisation dans `submit_rsvp` et `account_create_invitation`, vues `private.funnel_semaine` et `private.kpis_30j`). Pas de cookie, provenance en catégories, Do Not Track et GPC respectés, rétention 13 mois. Tests de la base : `supabase/tests-mesure.sql` (13 vérifications, annulées). Lecture dans le SQL Editor : `select * from private.kpis_30j;` et `select * from private.funnel_semaine;`.
-- **Mentions légales** : `tools/build_mentions.py` génère `mentions-legales.html` à partir de `tools/editeur.json` (identité de l'éditeur, à fournir). La page n'est pas générée tant qu'un champ manque, et le lien en pied de page n'apparaît qu'une fois la page générée.
-
-## Parcours
-1. `creer.html` : onboarding en 5 étapes avec aperçu en direct. **Seules les étapes 1 et 2 sont obligatoires** (prénoms, date, lieu) : tout le reste a des réglages par défaut, on peut publier en cliquant « Continuer ».
-   - **Les mariés** (heure de la cérémonie facultative ; année plafonnée à 2050), **Le lieu**
-   - L'aperçu se bascule entre **Mobile** et **Ordinateur** (rendu réel en 1280 px, réduit pour tenir à l'écran). Sur téléphone, il reste toujours visible dans un bandeau fixé en haut de l'écran (« Plein écran » pour l'agrandir).
-   - **Photos et style** : 9 ambiances prêtes en un clic, chacune montrée en miniature avec les prénoms et la date du couple (Champêtre, Romantique, Château, Élégance, Gatsby, Jardin d'hiver, Bohème, Porcelaine, Minimaliste), puis, sous « Personnaliser le style », 5 onglets : 12 palettes, 8 polices, 5 ornements (épuré, couronne, botanique, cadre, art déco), finitions (encre, dorure, or rose, argent ; papier texturé), introduction (chaque choix montré par une petite animation). La forme de la photo se choisit sous les photos ; le compte à rebours s'active dans les sections. Les faire-part créés avant restent inchangés (épuré, encre, sans texture).
-   - **Textes et sections** : message d'accueil + sections facultatives pré-remplies (Notre histoire, Programme en frise, Dress code, Hébergement, Infos pratiques, Liste de mariage avec lien).
-   - **Réponses** : questions à poser (personnes, enfants, noms des accompagnants, régime, brunch, email, téléphone, adresse, message, question personnalisée) et date limite de réponse.
-2. À la fin (« Terminer ») : un **lien public** pour les invités (`invitation.html?f=<id>`) et un **lien de gestion privé** (`admin.html?f=<id>#k=<clé>`), affiché et à conserver, pour suivre les réponses, exporter en CSV et modifier le faire-part.
-3. Les invités ouvrent l'enveloppe (ou voient le monogramme), puis répondent via le formulaire intégré, limité aux questions activées par le couple.
-4. Le back-office (`admin.html`) ouvre sur **« Mes faire-part »** : la liste des faire-part créés ou ouverts depuis ce navigateur (prénoms, date, nombre de réponses) ; sur un autre appareil, ouvrir une fois le lien privé ajoute le faire-part à la liste. Chaque carte mène à la vue des réponses : totaux (adultes, enfants, absents, brunch), liste des régimes pour le traiteur, recherche, filtres présents/absents, tri, colonnes selon les questions posées, copie des emails (champ Cci), export CSV, suppression, affichage en cartes sur mobile.
-
-La clé privée est dans le fragment d'URL (`#k=…`), donc jamais envoyée au serveur. Elle est stockée hashée (bcrypt) côté base.
-
-## Espaces testeurs (wedding planners)
-Chaque testeur reçoit un **lien personnel** (`admin.html#t=<jeton>`) qui retrouve **tous** ses faire-part, sur n'importe quel appareil, sans compte :
-- à la première ouverture, le lien est mémorisé dans le navigateur ; tout faire-part **créé** ou **ouvert via son lien privé** ensuite est rattaché automatiquement à l'espace (ceux déjà présents dans « Mes faire-part » aussi) ;
-- à la fin (bouton « Terminer »), l'écran ne propose que : copier le lien des invités, ouvrir le faire-part, le modifier, revenir à l'espace. Le lien privé n'est plus affiché ;
-- tant que l'espace est vide, la page d'accueil n'affiche qu'une action : « Créer mon premier faire-part » (ni encart du lien, ni liste) ;
-- l'espace ne sert qu'à gérer les faire-part : voir les réponses, voir, modifier, **supprimer** (définitif, réponses comprises, en deux clics) et créer un nouveau faire-part. Le lien personnel n'y est pas réaffiché : c'est celui que le testeur a reçu.
-
-Créer un lien testeur (SQL Editor de Supabase) :
-
-```sql
-select private.create_tester('Nom de l''agence');  -- renvoie le jeton, affiché une seule fois
--- Lien à envoyer : https://<adresse du site>/admin.html#t=<jeton>
-```
-
-Suivre ou couper l'accès :
-
-```sql
-select t.name, t.created_at, t.last_seen_at, count(ti.slug) as faire_part
-  from private.testers t left join private.tester_invitations ti on ti.tester_id = t.id
- group by t.id order by t.created_at;
-update private.testers set disabled = true where name = 'Nom de l''agence';
-```
-
-Le jeton n'est stocké que hashé ; les clés privées des faire-part rattachés sont chiffrées avec ce jeton. Un lien perdu ne se retrouve donc pas : on en crée un nouveau (les faire-part restent accessibles par leurs liens privés).
-
-## Lancer en local
-Site 100 % statique :
+## Travailler
 
 ```bash
-python3 -m http.server 8080
-# puis ouvrir http://localhost:8080
+cd web
+npm ci
+npm run dev            # http://localhost:3000 (production Supabase : attention aux vraies données)
+npm run build:local    # export en mode local (données dans le navigateur, code de connexion 123456) pour les tests
+npm run build          # export de production + CSP stricte (scripts/postbuild.mjs)
+npm run deploy         # build de production puis copie de web/out à la racine du dépôt
 ```
 
-Sans configuration, l'app tourne en **mode local** (données dans le `localStorage` du navigateur) : pratique pour développer, mais un faire-part n'est visible que depuis le navigateur qui l'a créé.
-
-## Brancher Supabase (pour de vrais tests avec des amis)
-1. Créer un projet Supabase (plan gratuit).
-2. Exécuter `supabase/schema.sql` dans le SQL Editor.
-3. Renseigner `supabaseUrl` et `supabaseKey` (clé `anon`) dans `js/config.js`.
-4. Déployer le dossier tel quel sur GitHub Pages (ou n'importe quel hébergeur statique).
-
-`schema.sql` est idempotent et transactionnel : pour appliquer une mise à jour du schéma, rejouer le fichier en entier dans le SQL Editor.
-
-La liste « Mes faire-part » utilise `summarize_invitations` (un seul appel, chaque clé vérifiée côté serveur), indispensable pour un espace testeur qui contient beaucoup de faire-part. Si la fonction n'est pas déployée, le site se rabat sur `get_invitation` + `list_rsvps` faire-part par faire-part.
-
-Si l'URL du projet Supabase change, mettre à jour **aussi** la CSP (`connect-src`) dans `creer.html`, `invitation.html` et `admin.html`.
-
-Sécurité : voir [SECURITY.md](SECURITY.md) (modèle de menace, protections, limites connues).
+Mise en ligne : `cd web && npm run deploy`, puis commit et push sur `dev`.
 
 ## Tests
-`python3 tests/e2e.py` (prérequis : `pip install playwright pillow`) rejoue 240 vérifications dans un navigateur headless, en mode local : parcours complet, validations, brouillon, photos, ambiances et réglages de style, intros (enveloppe, monogramme, mouvement réduit), sections, RSVP enrichi, suivi (filtres, tri, recherche, régimes, copie des emails, CSV, cartes mobiles), modification, anciens faire-part, agenda (fuseaux horaires), sécurité (XSS, config forgée, clickjacking), espaces testeurs, page d'accueil et parcours grand public (un seul faire-part, lien de gestion, redirection des anciens liens), mobile et contrastes des 12 palettes. Captures dans `tests/out/`.
 
-`supabase/tests.sql` teste la base elle-même (66 vérifications, tout est annulé à la fin) : à coller dans le SQL Editor après chaque changement du schéma.
+```bash
+cd web && npm ci && npm run build:local && cd ..
+pip install playwright pillow opencv-python && python3 tests/e2e.py
+```
+203 vérifications au 20/11/2026 : page d'accueil (SEO, données structurées, accroche, mesure, Do Not Track), éditeur (validations, brouillon, photos, ambiances et réglages, ouverture dans l'aperçu, sections, réponses), publication (compte par code ou Google, rituel, lien, partage, QR relu par OpenCV), modification et règle « un faire-part par compte », faire-part invité (ouverture, mouvement réduit, monogramme, fuseau de l'agenda, liens filtrés), réponse pas à pas et correction, tableau de suivi (doublons, recherche, filtres, tri, CSV sans formule, emails, suppressions), accessibilité (axe-core, WCAG 2.2 AA), absence de débordement à 375/390/430/1440 px, CSP sans violation, aucune erreur JavaScript, XSS. Captures dans `tests/out/`.
 
-## Comportements à connaître
-- **Brouillon** : la saisie est sauvegardée dans le navigateur ; un rechargement ne fait rien perdre.
-- **Fuseau horaire** : la date/heure affichée est celle du lieu ; le compte à rebours et l'agenda sont justes pour un invité à l'étranger.
-- **Réponse modifiée** : si un invité répond deux fois (même navigateur ou même nom), seule la dernière compte ; l'ancienne apparaît barrée dans le suivi.
-- **Suppression** d'une réponse (test, spam) depuis la page de suivi, en deux clics.
+La base se teste avec `supabase/tests*.sql` dans le SQL Editor (tout est annulé à la fin).
 
-## Limites connues du MVP
-- Photos stockées en base (JPEG 1600 px, ~150–300 Ko chacune, 3 max). À migrer vers Supabase Storage si le volume grandit.
-- Pas d'aperçu riche (Open Graph) quand le lien est partagé sur WhatsApp : nécessite un rendu côté serveur.
-- Pas d'envoi d'email par le site : hors espace testeur, le couple doit conserver son lien de gestion (bouton « Me l'envoyer par email » à la publication, qui ouvre sa messagerie).
-- Pas de mesure d'audience sur la page d'accueil : le taux de conversion visite → création n'est pas mesuré.
-- `confidentialite.html` ne contient ni identité de l'éditeur ni adresse de contact : à compléter (mentions légales).
-- Polices Google chargées depuis les serveurs de Google (seule la police choisie sur la page publique).
-- Protection anti-spam minimale (champ piège + plafond de 1000 réponses par faire-part).
-- RGPD : le formulaire peut collecter email, téléphone et adresse. Une mention courte est affichée, mais avant d'ouvrir à des inconnus il faut une vraie politique de confidentialité et une durée de conservation (suppression automatique après le mariage).
-- `meta.durationSec` est enregistré dans la config de chaque faire-part : c'est le temps de création réel, utile pour mesurer l'objectif des 3 minutes.
+## Sécurité et performance
+- **CSP stricte** posée dans chaque page par `scripts/postbuild.mjs` (GitHub Pages n'envoie pas d'en-têtes) : scripts autorisés par empreinte SHA-256, jamais `unsafe-inline` ; Google Identity Services seulement sur `creer.html` et `admin.html`. Polices auto-hébergées (plus aucun appel à Google Fonts).
+- Toute donnée venant de la base est revalidée (`sanitizeConfig`) ; liens Maps et liens libres en liste blanche ; anti-clickjacking ; champ piège anti-robots. Voir [SECURITY.md](SECURITY.md).
+- Lighthouse mobile mesuré le 20/11/2026 : faire-part invité 97–98 (LCP 0,9 s), page d'accueil 91–95 (LCP 1,1 s, CLS 0) ; ouverture de l'enveloppe ≈ 57–59 images/s avec un processeur ralenti 4×. Animations chargées après l'affichage (`LazyMotion`), sections hors écran non calculées (`content-visibility`).
+
+## Supabase
+Projet `pmtwhrqfdvbxbgrzcytl` (Francfort). La refonte ne change rien côté base. Si l'URL du projet change : `web/lib/config.ts` et `SUPA` dans `web/scripts/postbuild.mjs`. Mesure : `select * from private.kpis_30j;` et `select * from private.funnel_semaine;`.
+
+## Limites connues
+- Aperçu WhatsApp générique (`/img/og-invitation.png`) : les prénoms et la date demanderaient un rendu côté serveur (fonction edge ou autre hébergement). Ils sont dans le texte du message de partage.
+- Photos stockées en base (JPEG 1600 px, 3 max).
+- Mentions légales : reportées (décision du 20/11/2026).
+- Email de notification des réponses (US-17) : phase « Acquérir » de la roadmap.
