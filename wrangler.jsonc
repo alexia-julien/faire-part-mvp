@@ -1,0 +1,12 @@
+// Hébergement Cloudflare (Worker avec fichiers statiques, déployé à chaque push sur `dev` par Workers Builds).
+// Sert le site déjà publié à la racine du dépôt par `cd web && npm run deploy` : aucune étape de build nécessaire.
+// _redirects (vraies 301) et _headers (X-Robots-Tag, cache) sont lus à la racine ; .assetsignore exclut les sources.
+{
+  "name": "faire-part-mvp",
+  "compatibility_date": "2026-11-20",
+  "assets": {
+    "directory": ".",
+    "not_found_handling": "404-page",
+    "html_handling": "auto-trailing-slash"
+  }
+}

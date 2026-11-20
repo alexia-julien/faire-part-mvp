@@ -1,0 +1,16 @@
+# Fichiers du dépôt qui ne doivent pas être publiés par Cloudflare (sources, tests, base, configuration).
+.git
+.github
+**/node_modules
+**/.DS_Store
+web
+supabase
+tests
+README.md
+SECURITY.md
+CNAME
+wrangler.jsonc
+.assetsignore
+.deploy-manifest
+.gitignore
+.nojekyll
