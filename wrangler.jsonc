@@ -1,12 +1,21 @@
-// Hébergement Cloudflare (Worker avec fichiers statiques, déployé à chaque push sur `dev` par Workers Builds).
+// Hébergement Cloudflare (Worker + fichiers statiques, déployé à chaque push sur `dev` par Workers Builds).
 // Sert le site déjà publié à la racine du dépôt par `cd web && npm run deploy` : aucune étape de build nécessaire.
 // _redirects (vraies 301) et _headers (X-Robots-Tag, cache) sont lus à la racine ; .assetsignore exclut les sources.
+// worker/index.js ne tourne que pour la page des faire-part (aperçu WhatsApp personnalisé, voir le fichier).
 {
   "name": "faire-part-mvp",
+  "main": "worker/index.js",
   "compatibility_date": "2026-11-20",
   "assets": {
     "directory": ".",
+    "binding": "ASSETS",
     "not_found_handling": "404-page",
-    "html_handling": "auto-trailing-slash"
+    "html_handling": "auto-trailing-slash",
+    "run_worker_first": ["/invitation.html", "/invitation"]
+  },
+  // Clé « anon » publique par conception (déjà présente dans le site) : l'accès est verrouillé par les fonctions SQL.
+  "vars": {
+    "SUPABASE_URL": "https://pmtwhrqfdvbxbgrzcytl.supabase.co",
+    "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtdHdocnFmZHZieGJncnpjeXRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1MjQ3MzEsImV4cCI6MjEwODEwMDczMX0.7jw9LLJC8dCBHe4fIPnLfgmIFVdbTC19oIR5ZytF-aw"
   }
 }

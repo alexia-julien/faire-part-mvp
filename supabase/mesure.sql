@@ -195,3 +195,18 @@ from v, c, r, a;
 revoke all on private.funnel_semaine, private.kpis_30j from public, anon, authenticated;
 
 commit;
+
+-- 20/11/2026 : aperçu de lien personnalisé (Worker Cloudflare). Prénoms, date et palette seulement ; ne journalise
+-- rien, pour ne pas compter les robots d'aperçu comme des ouvertures. Appliqué en production (migration
+-- get_invitation_preview).
+create or replace function public.get_invitation_preview(p_slug text)
+returns jsonb language sql stable security definer set search_path = public as $$
+  select jsonb_build_object(
+    'p1', left(coalesce(config->>'partner1', ''), 40),
+    'p2', left(coalesce(config->>'partner2', ''), 40),
+    'date', case when config->>'date' ~ '^\d{4}-\d{2}-\d{2}$' then config->>'date' else '' end,
+    'theme', left(coalesce(config->>'theme', ''), 20))
+  from invitations where slug = p_slug;
+$$;
+revoke execute on function public.get_invitation_preview(text) from public, authenticated;
+grant execute on function public.get_invitation_preview(text) to anon;

@@ -52,6 +52,8 @@ Mise en ligne : `cd web && npm run deploy`, puis commit et push sur `dev`. Aprè
 ### Hébergement Cloudflare (Worker avec fichiers statiques)
 Le Worker `faire-part-mvp` est relié au dépôt (branche `dev`) : chaque push redéploie le site. `wrangler.jsonc` (racine) sert le site déjà publié à la racine par `npm run deploy` ; `.assetsignore` exclut les sources ; `_redirects` fait les vraies 301 et `_headers` les en-têtes (X-Robots-Tag, cache). Tant que le domaine n'est pas basculé, GitHub Pages sert toujours maison-meli.com à partir des mêmes fichiers.
 
+**Aperçu WhatsApp personnalisé** : `worker/index.js` ne tourne que pour `/invitation.html` ; pour les robots d'aperçu de lien seulement, il remplace le titre et l'image par « Prénom & Prénom se marient le … » et l'image de la palette (`/og/invitation-<palette>.png`). Lecture via la fonction SQL `get_invitation_preview` (prénoms, date, palette ; ne compte pas d'ouverture). Les invités reçoivent la page statique telle quelle.
+
 Bascule du domaine (tableau de bord Cloudflare) : ajouter la zone `maison-meli.com` et vérifier les enregistrements DNS importés ; Worker → Domaines → ajouter `maison-meli.com` et `www.maison-meli.com` ; chez OVH, remplacer les serveurs DNS par ceux de Cloudflare ; laisser les robots IA autorisés (pas de blocage, pas de robots.txt géré par Cloudflare) ; rediriger `www` vers la racine ; puis, une fois tout vérifié, désactiver GitHub Pages.
 
 ## Tests
