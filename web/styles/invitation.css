@@ -43,7 +43,7 @@
 .fp .amp{font-style:italic;color:var(--blush)}
 .fp [hidden]{display:none!important}
 
-.fp .btn{display:inline-block;text-decoration:none;cursor:pointer;border:0;font-family:var(--body);font-weight:600;font-size:.8rem;letter-spacing:.12em;text-transform:uppercase;padding:.9rem 2.1rem;border-radius:999px;background:var(--btn-bg);color:var(--btn-fg);transition:filter .2s,transform .2s;box-shadow:0 6px 18px var(--shadow)}
+.fp .btn{display:inline-block;white-space:nowrap;text-decoration:none;cursor:pointer;border:0;font-family:var(--body);font-weight:600;font-size:.8rem;letter-spacing:.12em;text-transform:uppercase;padding:.9rem 2.1rem;border-radius:999px;background:var(--btn-bg);color:var(--btn-fg);transition:filter .2s,transform .2s;box-shadow:0 6px 18px var(--shadow)}
 .fp .btn:hover{filter:brightness(.92);transform:translateY(-1px)}
 .fp .btn:disabled{opacity:.6;cursor:default;transform:none}
 .fp[data-theme="nuit"] .form-msg,.fp[data-theme="noir"] .form-msg,.fp[data-theme="emeraude"] .form-msg{color:#F2A08F}
@@ -65,8 +65,8 @@
 .fp .rule{width:56px;height:1px;background:var(--accent);margin:1.2rem auto;opacity:.7}
 .fp .date{font-family:var(--display);font-size:clamp(1.6rem,6.5vw,2.8rem);font-size:clamp(1.6rem,9cqw,2.8rem);font-weight:500;letter-spacing:.04em;color:var(--accent-deep)}
 .fp .date-sub{font-size:.8rem;letter-spacing:.16em;text-transform:uppercase;color:var(--ink-soft);margin-top:.2rem}
-.fp .countdown{display:flex;gap:clamp(.7rem,4vw,1.5rem);justify-content:center;margin:1.8rem 0 1.6rem;flex-wrap:wrap}
-.fp .cd-num{font-family:var(--display);font-size:clamp(1.8rem,7vw,2.5rem);line-height:1;color:var(--ink);text-align:center}
+.fp .countdown{display:flex;gap:clamp(.7rem,4vw,1.5rem);gap:clamp(.55rem,4.2cqw,1.5rem);justify-content:center;margin:1.8rem 0 1.6rem;flex-wrap:nowrap}
+.fp .cd-num{font-family:var(--display);font-size:clamp(1.8rem,7vw,2.5rem);font-size:clamp(1.55rem,8.5cqw,2.5rem);line-height:1;color:var(--ink);text-align:center}
 .fp .cd-lab{font-size:.6rem;letter-spacing:.22em;text-transform:uppercase;color:var(--accent-deep);font-weight:600;margin-top:.35rem;text-align:center}
 .fp .hero-text .btn{margin-top:1.2rem}
 
@@ -237,7 +237,7 @@ html.fp-locked,html.fp-locked body{overflow:hidden}
 .fp[data-theme="noir"]{--env:#1E1E1E;--env-deep:#0E0E0E;--env-liner:#C9A86A;--seal:#B8923F;--env-grain:.05}                /* laque noire */
 .fp[data-theme="emeraude"]{--env:#1B4A3F;--env-deep:#0F3129;--env-liner:#C9A86A;--seal:#A9852F;--env-grain:.06}           /* velours */
 
-.fp-intro{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:1.6rem;padding:1.4rem;
+.fp-intro{position:fixed;inset:0;z-index:100;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;gap:1.6rem;padding:1.4rem;
   background-color:var(--paper);color:var(--ink);font-family:var(--body);overflow:hidden;-webkit-tap-highlight-color:transparent;
   padding-bottom:max(1.4rem,env(safe-area-inset-bottom))}
 .fp-intro::after{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(90% 60% at 50% 42%,rgba(255,255,255,.55),transparent 70%)}
@@ -352,13 +352,15 @@ html.fp-locked,html.fp-locked body{overflow:hidden}
 .fp .rq-stepper-c button:active{transform:scale(.92)}
 .fp .rq-stepper-c button:disabled{opacity:.35;cursor:default}
 .fp .rq-stepper-c svg{width:16px;height:16px}
-.fp .rq-stepper-c input{width:3.2rem;text-align:center;font:inherit;font-family:var(--display);font-size:1.6rem;color:var(--ink);background:none;border:0;-moz-appearance:textfield}
+.fp .rq-stepper-c input{width:3.2rem;text-align:center;font:inherit;font-family:var(--display);font-size:1.6rem;color:var(--ink);background:none;border:0;-moz-appearance:textfield;font-variant-numeric:lining-nums}
 .fp .rq-stepper-c input::-webkit-inner-spin-button{display:none}
 .fp .rq-recap{margin:0;display:grid;gap:.1rem}
 .fp .rq-recap div{display:flex;justify-content:space-between;gap:1rem;padding:.65rem 0;border-bottom:1px solid var(--line)}
 .fp .rq-recap dt{color:var(--ink-soft);font-size:.85rem}
-.fp .rq-recap dd{margin:0;font-weight:600;color:var(--ink);text-align:right}
-.fp .rq-nav{display:flex;align-items:center;justify-content:space-between;gap:1rem;margin-top:.4rem}
+.fp .rq-recap dd{margin:0;font-weight:600;color:var(--ink);text-align:right;overflow-wrap:anywhere;min-width:0}
+.fp .rq-recap dt{flex:none}
+.fp .rq-nav{display:flex;align-items:center;justify-content:space-between;gap:.75rem;margin-top:.4rem}
+.fp .rq-nav .btn{padding:.9rem 1.6rem;letter-spacing:.09em;margin-left:auto}
 .fp .rq-back{display:inline-flex;align-items:center;gap:.35rem;min-height:44px;background:none;border:0;color:var(--ink-soft);font:inherit;font-weight:600;font-size:.88rem;cursor:pointer;padding:0 .2rem}
 .fp .rq-back svg{width:16px;height:16px}
 .fp .form-msg{min-height:1.3em;font-size:.85rem;color:#A3402F;margin:.8rem 0 .2rem;text-align:center}
@@ -393,3 +395,21 @@ html.fp-locked,html.fp-locked body{overflow:hidden}
 .fp .rq-fields{display:flex;flex-direction:column}
 .fp.publish-ritual{position:fixed;inset:0;z-index:80;background-color:var(--paper)}
 .fp,.fp section,.fp footer{transition:background-color .35s ease,color .35s ease}
+
+/* Faire-part étroit (petits téléphones, maquettes) : libellés et boutons resserrés */
+@container (max-width:360px){
+  .fp .cd-lab{letter-spacing:.12em}
+  .fp .btn{padding:.85rem 1.35rem;letter-spacing:.08em}
+}
+@container (max-width:300px){
+  .fp .form-wrap{padding:1.1rem .85rem 1rem;border-radius:18px}
+  .fp .rq-title{font-size:1.25rem}
+  .fp .rq-card{padding:.75rem 2.6rem .75rem .9rem;border-radius:14px}
+  .fp .rq-card-t{font-size:1.08rem}
+  .fp .rq-card-dot{right:.75rem;width:22px;height:22px;margin-top:-11px}
+}
+/* « Répondre » flottant : au centre sur téléphone, dans le coin sur grand écran (il ne recouvre plus les boutons centrés) */
+@media (min-width:768px){.fp-float:not(.in-preview){justify-content:flex-end;padding-right:max(24px,env(safe-area-inset-right))}}
+/* « Revoir l'ouverture » : discret, il s'efface une fois le haut du faire-part dépassé */
+.fp-replay{transition:opacity .25s ease,transform .25s ease}
+.fp-replay.is-away{opacity:0;transform:translateY(-6px);pointer-events:none}

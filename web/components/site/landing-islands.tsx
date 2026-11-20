@@ -135,8 +135,14 @@ export function FloatingCta() {
   const [show, setShow] = useState(false);
   useEffect(() => {
     const el = document.querySelector("[data-hero-cta]"); if (!el || !("IntersectionObserver" in window)) return;
-    const io = new IntersectionObserver(([e]) => setShow(!e.isIntersecting && e.boundingClientRect.top < 0));
-    io.observe(el); return () => io.disconnect();
+    const end = document.querySelector("[data-final-cta]");
+    let past = false, atEnd = false;
+    const io = new IntersectionObserver((es) => {
+      es.forEach((e) => { if (e.target === el) past = !e.isIntersecting && e.boundingClientRect.top < 0; else atEnd = e.isIntersecting || e.boundingClientRect.top < 0; });
+      setShow(past && !atEnd);
+    });
+    io.observe(el); if (end) io.observe(end);
+    return () => io.disconnect();
   }, []);
   return (
     <AnimatePresence>
@@ -193,7 +199,7 @@ function StoryPhone({ cfg, step }: { cfg: ReturnType<typeof sampleConfig>; step:
           {step === 1 && <div className="h-full overflow-hidden"><InvitationBody cfg={cfg} preview namesTag="p" rsvp={null} /></div>}
           {step === 2 && (
             <div className="fp h-full" {...styleAttrs(cfg)}>
-              <section className="sec-rsvp alt flex h-full flex-col justify-center" style={{ padding: "2rem 1rem" }} aria-hidden="true">
+              <section className="sec-rsvp alt flex h-full flex-col justify-center" style={{ padding: "1.5rem .6rem" }} aria-hidden="true">
                 <div className="form-wrap">
                   <div className="rq-progress"><span style={{ width: "40%" }} /></div>
                   <p className="rq-count">Question 2 sur 5</p>

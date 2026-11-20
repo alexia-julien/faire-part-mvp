@@ -357,8 +357,8 @@ try:
     check("choisir « Oui » avance tout seul", pg.locator('#f-guests').count() == 1)
     pg.click('[aria-label^="Plus — Adultes"]'); pg.click('[aria-label^="Plus — Enfants"]')
     check("compteurs adultes / enfants", pg.input_value('#f-guests') == '2' and pg.input_value('#f-children') == '1')
-    pg.click('.rq-nav .btn'); pg.wait_for_timeout(400)
-    check("accompagnants demandés seulement si on vient à plusieurs", pg.locator('#f-companions').count() == 1)
+    check("total de questions stable (parcours « Oui » compté dès le début)", "sur 8" in pg.inner_text('.rq-count').lower(), pg.inner_text('.rq-count'))
+    check("accompagnants demandés seulement si on vient à plusieurs, sur le même écran", pg.locator('#f-companions').count() == 1)
     pg.fill('#f-companions', 'Paul Martin'); pg.click('.rq-nav .btn'); pg.wait_for_timeout(400)
     check("régimes en pastilles (8)", pg.locator('.rq-chip').count() == 8)
     pg.click('.rq-chip:has-text("Végétarien")'); pg.click('.rq-chip:has-text("Sans gluten")'); pg.fill('#f-diet', 'allergie aux noix')
@@ -370,6 +370,7 @@ try:
     pg.fill('#f-email', 'sophie@example.fr'); pg.click('.rq-nav .btn'); pg.wait_for_timeout(400)
     pg.fill('#f-msg', 'Hâte !'); pg.click('.rq-nav .btn'); pg.wait_for_timeout(400)
     check("récapitulatif avant envoi", "Sophie Martin" in pg.inner_text('.rq-recap') and "Végétarien, Sans gluten, allergie aux noix" in pg.inner_text('.rq-recap'))
+    check("récapitulatif complet : accompagnants, email et petit mot", all(t in pg.inner_text('.rq-recap') for t in ["Paul Martin", "sophie@example.fr", "Hâte !"]), pg.inner_text('.rq-recap'))
     pg.click('.rq-nav .btn:has-text("Envoyer")'); pg.wait_for_selector('.rsvp-thanks')
     check("remerciement personnalisé", "Merci Sophie" in pg.inner_text('.rsvp-thanks') and "ont bien reçu votre réponse" in pg.inner_text('.rsvp-thanks'))
     row = db_get(pg)["rsvps"]["camille-hugo-abcdefgh"][-1]["data"]

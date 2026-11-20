@@ -109,6 +109,20 @@ export function Editor() {
     return () => mq.removeEventListener("change", f);
   }, []);
 
+  // L'aperçu suit l'écran en cours : les textes montrent les sections, les réponses montrent le formulaire invité.
+  useEffect(() => {
+    if (!ready || published) return;
+    const id = STEPS[step]?.id;
+    const t = window.setTimeout(() => {
+      const el = scroller.current; if (!el || el.closest(".fp-locked") || el.classList.contains("fp-locked")) return;
+      const sel = id === "texts" ? ".fp section" : id === "rsvp" ? ".sec-rsvp" : null;
+      const target = sel ? el.querySelector<HTMLElement>(sel) : null;
+      const top = target ? Math.max(0, target.getBoundingClientRect().top - el.getBoundingClientRect().top + el.scrollTop - 8) : 0;
+      el.scrollTo({ top, behavior: reduce ? "auto" : "smooth" });
+    }, 380);
+    return () => clearTimeout(t);
+  }, [step, ready, published, reduce]);
+
   // ---------- Brouillon : sauvegarde automatique, restauré au rechargement ----------
   const dirty = useRef(false), timer = useRef<number>(0);
   const editingRef = useRef(editing); editingRef.current = editing;
@@ -347,7 +361,7 @@ export function Editor() {
       <div className="paper-grain min-h-dvh">
         <Toaster position="top-center" toastOptions={{ classNames: { toast: "!rounded-[20px] !shadow-lift !border-border !font-sans" } }} />
         <AnimatePresence>{ritual && <PublishRitual cfg={preview} onDone={() => setRitual(false)} />}</AnimatePresence>
-        <Header user={user} progress={1} hideAccount />
+        <Header user={user} progress={1} hideAccount noBar />
         <main id="done" className="mx-auto grid max-w-5xl gap-12 px-5 pb-24 pt-6 lg:grid-cols-[1fr_340px] lg:items-start lg:pt-14">
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: ritual ? 2.7 : 0, duration: 0.5 }} className="flex flex-col gap-8">
             <div>
@@ -474,7 +488,7 @@ export function Editor() {
   );
 }
 
-function Header({ user, progress, saved, hideAccount }: { user: User | null; progress: number; saved?: boolean; hideAccount?: boolean }) {
+function Header({ user, progress, saved, hideAccount, noBar }: { user: User | null; progress: number; saved?: boolean; hideAccount?: boolean; noBar?: boolean }) {
   return (
     <header className="sticky top-0 z-20 bg-background/85 backdrop-blur-md">
       <div className="mx-auto flex h-16 w-full max-w-[560px] items-center justify-between gap-4 px-5 sm:px-8 lg:max-w-none">
@@ -490,9 +504,11 @@ function Header({ user, progress, saved, hideAccount }: { user: User | null; pro
           {!hideAccount && <a id="mine-link" href="admin.html" className="font-medium text-foreground/80 hover:text-foreground">{user ? "Mon faire-part" : "Se connecter"}</a>}
         </div>
       </div>
-      <div className="h-[2px] w-full bg-foreground/[0.06]" aria-hidden="true">
-        <motion.div className="h-full bg-foreground" initial={false} animate={{ width: progress * 100 + "%" }} transition={{ type: "spring", stiffness: 200, damping: 30 }} />
-      </div>
+      {noBar ? <div className="h-px w-full bg-foreground/[0.06]" aria-hidden="true" /> : (
+        <div className="h-[2px] w-full bg-foreground/[0.06]" aria-hidden="true">
+          <motion.div className="h-full bg-foreground" initial={false} animate={{ width: progress * 100 + "%" }} transition={{ type: "spring", stiffness: 200, damping: 30 }} />
+        </div>
+      )}
     </header>
   );
 }

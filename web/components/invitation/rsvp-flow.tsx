@@ -45,7 +45,7 @@ function toData(x: Draft): RsvpData {
   };
 }
 
-type StepId = "name" | "attendance" | "count" | "companions" | "diet" | "brunch" | "contact" | "custom" | "message" | "recap";
+type StepId = "name" | "attendance" | "count" | "diet" | "brunch" | "contact" | "custom" | "message" | "recap";
 
 type Props = {
   cfg: Config;
@@ -72,18 +72,20 @@ export function RsvpFlow({ cfg, preview, previous, couple, madeWith, onMadeWith,
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => { setX((o) => ({ ...o, [k]: v })); setMsg(""); };
 
   const yes = x.attendance === "yes", plus = x.guests > 1 || x.children > 0;
+  // Tant que la présence n'est pas choisie, le parcours compté est celui du « Oui » : le total ne grimpe jamais en cours de route
+  // (il ne peut que baisser si l'invité répond « Non »). Les accompagnants sont demandés sur le même écran que le nombre de personnes.
+  const going = x.attendance !== "no";
   const steps = useMemo<StepId[]>(() => {
     const s: StepId[] = ["name", "attendance"];
-    if (yes && (r.guests || r.children)) s.push("count");
-    if (yes && r.companions && plus) s.push("companions");
-    if (yes && r.diet) s.push("diet");
-    if (yes && r.brunch) s.push("brunch");
+    if (going && (r.guests || r.children)) s.push("count");
+    if (going && r.diet) s.push("diet");
+    if (going && r.brunch) s.push("brunch");
     if (r.email || r.phone || r.address) s.push("contact");
     if (r.customLabel) s.push("custom");
     if (r.message) s.push("message");
     s.push("recap");
     return s;
-  }, [yes, plus, r]);
+  }, [going, r]);
   const step = steps[Math.min(i, steps.length - 1)];
 
   // Focus sur le premier champ de chaque nouvelle question (pas au premier affichage : le clavier ne doit pas s'ouvrir).
@@ -198,10 +200,12 @@ export function RsvpFlow({ cfg, preview, previous, couple, madeWith, onMadeWith,
               <p className="rq-title" tabIndex={-1}>Combien serez-vous ?</p>
               {r.guests && <Stepper id="f-guests" label={r.children ? "Adultes (vous inclus)" : "Personnes (vous inclus)"} min={1} value={x.guests} onChange={(v) => set("guests", v)} />}
               {r.children && <Stepper id="f-children" label="Enfants" min={0} value={x.children} onChange={(v) => set("children", v)} />}
-            </>)}
-            {step === "companions" && (<>
-              <label className="rq-title" htmlFor="f-companions">Qui vous accompagne ?</label>
-              <textarea id="f-companions" name="companions" className="rq-input" maxLength={300} rows={3} placeholder="Prénoms et noms" value={x.companions} onChange={(e) => set("companions", e.target.value)} data-autofocus />
+              {r.companions && plus && (
+                <motion.div initial={reduce ? false : { opacity: 0, y: 6 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.25 }}>
+                  <label className="rq-sub" htmlFor="f-companions">Qui vous accompagne ? <span>(prénoms et noms)</span></label>
+                  <textarea id="f-companions" name="companions" className="rq-input" maxLength={300} rows={2} placeholder="Paul Martin, Léa Martin…" value={x.companions} onChange={(e) => set("companions", e.target.value)} />
+                </motion.div>
+              )}
             </>)}
             {step === "diet" && (<>
               <p className="rq-title" id="lab-diet" tabIndex={-1}>Un régime ou une allergie ?</p>
@@ -245,8 +249,14 @@ export function RsvpFlow({ cfg, preview, previous, couple, madeWith, onMadeWith,
                 <div><dt>Nom</dt><dd>{x.name || "—"}</dd></div>
                 <div><dt>Présence</dt><dd>{yes ? "Oui, avec plaisir" : x.attendance === "no" ? "Je ne pourrai pas" : "—"}</dd></div>
                 {yes && (r.guests || r.children) && <div><dt>Personnes</dt><dd>{x.guests + (r.children ? ` adulte${x.guests > 1 ? "s" : ""}, ${x.children} enfant${x.children > 1 ? "s" : ""}` : "")}</dd></div>}
+                {yes && r.companions && plus && x.companions.trim() && <div><dt>Accompagnants</dt><dd>{x.companions.trim()}</dd></div>}
                 {yes && r.diet && (x.dietTags.length > 0 || x.dietNote) && <div><dt>Régime</dt><dd>{[...x.dietTags, x.dietNote].filter(Boolean).join(", ")}</dd></div>}
                 {yes && r.brunch && x.brunch && <div><dt>Brunch</dt><dd>{x.brunch === "yes" ? "Oui" : "Non"}</dd></div>}
+                {r.email && x.email.trim() && <div><dt>Email</dt><dd>{x.email.trim()}</dd></div>}
+                {r.phone && x.phone.trim() && <div><dt>Téléphone</dt><dd>{x.phone.trim()}</dd></div>}
+                {r.address && x.address.trim() && <div><dt>Adresse</dt><dd>{x.address.trim()}</dd></div>}
+                {r.customLabel && x.custom.trim() && <div><dt>{r.customLabel}</dt><dd>{x.custom.trim()}</dd></div>}
+                {r.message && x.message.trim() && <div><dt>Votre mot</dt><dd>{x.message.trim()}</dd></div>}
               </dl>
             </>)}
           </motion.div>

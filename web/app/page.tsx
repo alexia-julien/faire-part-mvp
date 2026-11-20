@@ -137,7 +137,7 @@ export default function Page() {
           </div>
         </section>
 
-        <section aria-labelledby="h-final" className="px-3 pb-3 [content-visibility:auto] [contain-intrinsic-size:auto_1000px]">
+        <section aria-labelledby="h-final" data-final-cta className="px-3 pb-3 [content-visibility:auto] [contain-intrinsic-size:auto_1000px]">
           <div className="paper-grain relative mx-auto max-w-[1240px] overflow-hidden rounded-[36px] bg-[#1C1A17] px-6 py-24 text-center text-[#FAF7F2] sm:py-32">
             <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-[radial-gradient(60%_70%_at_50%_0%,rgba(184,151,90,0.22),transparent_70%)]" />
             <BlurFade className="relative">

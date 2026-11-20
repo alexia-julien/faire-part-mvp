@@ -157,7 +157,7 @@ export function StepCustomize({ ed, titleRef }: P) {
             <div key={src.slice(-24) + i} className="thumb group relative aspect-square overflow-hidden rounded-[16px] bg-muted shadow-soft">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img src={src} alt={"Photo " + (i + 1)} className="size-full object-cover" />
-              {i === 0 ? <span className="absolute left-2 top-2 rounded-full bg-foreground/80 px-2 py-0.5 text-[11px] text-background">Principale</span>
+              {i === 0 ? <span className="absolute bottom-2 left-2 rounded-full bg-foreground/80 px-2 py-0.5 text-[11px] text-background">Principale</span>
                 : <button type="button" className="main-btn absolute left-2 top-2 grid size-8 place-items-center rounded-full bg-white/85 text-foreground shadow-soft" aria-label={"Mettre la photo " + (i + 1) + " en photo principale"}
                   onClick={() => ed.update((c) => { const p = [...c.photos]; p.unshift(p.splice(i, 1)[0]); return { ...c, photos: p }; })}><Star className="size-4" /></button>}
               <button type="button" className="absolute right-2 top-2 grid size-8 place-items-center rounded-full bg-white/85 text-foreground shadow-soft" aria-label={"Supprimer la photo " + (i + 1)}
@@ -191,10 +191,10 @@ export function StepCustomize({ ed, titleRef }: P) {
 
       <div className="mt-8">
         <p className="mb-3 text-[14px] font-medium">Affiner le style</p>
-        <Tabs defaultValue="colors">
-          <TabsList className="h-auto w-full flex-wrap justify-start gap-1 rounded-[16px] bg-muted p-1">
+        <Tabs defaultValue="colors" className="@container">
+          <TabsList className="grid h-auto w-full grid-cols-3 gap-1 rounded-[16px] bg-muted p-1 group-data-[orientation=horizontal]/tabs:h-auto @[31rem]:grid-cols-5">
             {[["colors", "Couleurs"], ["font", "Typographie"], ["decor", "Ornements"], ["finish", "Finitions"], ["intro", "Ouverture"]].map(([v, l]) => (
-              <TabsTrigger key={v} value={v} id={"tab-" + v} className="rounded-[12px] px-3 py-2 text-[14px] data-[state=active]:bg-card data-[state=active]:shadow-soft">{l}</TabsTrigger>
+              <TabsTrigger key={v} value={v} id={"tab-" + v} className="h-10 min-w-0 rounded-[12px] px-2 py-2 text-[14px] data-[state=active]:bg-card data-[state=active]:shadow-soft">{l}</TabsTrigger>
             ))}
           </TabsList>
           <TabsContent forceMount value="colors" className="mt-4 data-[state=inactive]:hidden">
@@ -211,7 +211,7 @@ export function StepCustomize({ ed, titleRef }: P) {
             <div id="pick-font" className="grid grid-cols-2 gap-2.5" role="radiogroup" aria-label="Typographie">
               {FONTS.map((x) => (
                 <Pick key={x.id} name="style-font" value={x.id} on={s.font === x.id} onPick={() => set("font", x.id)}>
-                  <span className="fp font-sample text-[22px] leading-tight !bg-transparent" data-font={x.id} style={{ fontFamily: "var(--names)" }}>{(s.partner1 || "Camille") + " & " + (s.partner2 || "Hugo")}</span>
+                  <span className="fp font-sample block w-full py-1 text-[22px] leading-tight !bg-transparent" data-font={x.id} style={{ fontFamily: "var(--names)", containerType: "normal" }}>{(s.partner1 || "Camille") + " & " + (s.partner2 || "Hugo")}</span>
                   <span>{x.label}</span>
                 </Pick>
               ))}
@@ -298,7 +298,7 @@ export function StepTexts({ ed, titleRef }: P) {
           <ToggleRow id="sw-program" label="Programme" checked={s.sections.program.on} onChange={(v) => toggle("program", v)}>
             <div data-program className="flex flex-col gap-2" id="program-items">
               {items.map((it, i) => (
-                <div key={i} className="prog-row grid grid-cols-[110px_1fr_auto] gap-2">
+                <div key={i} className="prog-row grid grid-cols-[minmax(112px,32%)_1fr_auto] gap-2">
                   <Input type="time" aria-label={"Heure de l’étape " + (i + 1)} value={it.time} onChange={(e) => sec("program", { items: items.map((x, j) => (j === i ? { ...x, time: e.target.value } : x)) })} />
                   <Input aria-label={"Libellé de l’étape " + (i + 1)} maxLength={60} placeholder="Ex. : Cérémonie" value={it.label} onChange={(e) => sec("program", { items: items.map((x, j) => (j === i ? { ...x, label: e.target.value } : x)) })} />
                   <Button type="button" variant="ghost" size="icon" aria-label={"Supprimer l’étape " + (i + 1)} onClick={() => sec("program", { items: items.filter((_, j) => j !== i) })}><X /></Button>

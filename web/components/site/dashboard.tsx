@@ -144,7 +144,7 @@ export function Dashboard() {
       <Shell user={user} onSignOut={signOut}>
         <div id="none" className="mx-auto flex max-w-md flex-col items-center gap-6 py-16 text-center">
           <div className="w-40 rotate-[-4deg]"><MiniCard cfg={sanitizeConfig({ partner1: "Vous", partner2: "Moi", theme: "sauge", font: "classique", decor: "feuillage", intro: "enveloppe", texture: true })} className="rounded-[14px] shadow-lift" /></div>
-          <h1 className="t-section">Aucun faire-part pour l’instant</h1>
+          <h1 className="t-section">Aucun <span className="whitespace-nowrap">faire-part</span> pour l’instant</h1>
           <p className="t-lead">Créez-le en quelques minutes : les réponses de vos invités arriveront ensuite ici.</p>
           <Button asChild size="lg"><a href="creer.html">Créer mon faire-part</a></Button>
         </div>
@@ -280,7 +280,7 @@ export function Dashboard() {
                             {cols.map((c) => {
                               const v = c.get(r);
                               return (
-                                <td key={c.id} data-label={c.label} data-empty={v ? undefined : ""} className={cn("px-4 py-3 align-top", c.wide && "min-w-[200px] max-w-[320px]", c.sticky && "sticky left-0 whitespace-nowrap bg-card font-medium")}>
+                                <td key={c.id} data-label={c.label} data-empty={v ? undefined : ""} className={cn("px-4 py-3 align-top", c.wide && "min-w-[240px] max-w-[340px]", (c.id === "email" || c.id === "phone" || c.id === "date") && "whitespace-nowrap", c.sticky && "sticky left-0 whitespace-nowrap bg-card font-medium")}>
                                   {c.id === "att" ? <Badge variant="outline" className={cn("rounded-full px-2.5", r.data.attendance === "yes" ? "pres-yes border-[#5F6E4E]/30 bg-[#5F6E4E]/10 text-[#46533A]" : "pres-no border-foreground/10 bg-muted text-muted-foreground")}>{v}</Badge> : v}
                                   {c.id === "name" && r.superseded && <Badge variant="outline" className="badge ml-2 rounded-full no-underline">remplacée</Badge>}
                                 </td>

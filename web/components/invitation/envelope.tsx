@@ -104,15 +104,17 @@ export function Envelope({ cfg, mode = "fixed", autoOpen, onOpen, onReveal, onDo
           <motion.span className="env-back" animate={leave} transition={leaveT} />
           <motion.span
             className="env-card"
-            animate={opening ? { y: ["0%", "0%", "-64%", "-46%"], scale: [1, 1, 1, 3.4], opacity: [1, 1, 1, 0] } : { y: "0%", scale: 1, opacity: 1 }}
-            transition={opening ? { duration: OPEN_MS / 1000, times: [0, 0.36, 0.66, 1], ease: EASE } : { duration: 0 }}
+            animate={opening ? { y: ["0%", "0%", "-64%", "-46%"], scale: [1, 1, 1, 3.4], opacity: 0 } : { y: "0%", scale: 1, opacity: 1 }}
+            // L'opacité a sa propre minuterie : en images clés partagées, elle partait dès 0,45 s et la carte disparaissait avant de sortir.
+            transition={opening ? { duration: OPEN_MS / 1000, times: [0, 0.36, 0.66, 1], ease: EASE, opacity: { delay: (OPEN_MS / 1000) * 0.66, duration: (OPEN_MS / 1000) * 0.34, ease: "easeIn" } } : { duration: 0 }}
           >
             <span className="env-card-names">{cfg.partner1 || "Prénom"} <span className="amp">&amp;</span> {cfg.partner2 || "Prénom"}</span>
             {date && <span className="env-card-date">{date}</span>}
           </motion.span>
           <motion.span className="env-front" animate={leave} transition={leaveT} />
           <motion.span className="env-flap" style={{ transformOrigin: "50% 0%" }}
-            animate={opening ? { rotateX: 180, ...leave } : { rotateX: 0 }}
+            // Le rabat (60 % de la hauteur) descend de la même distance que l'enveloppe : il ne s'en détache plus.
+            animate={opening ? { rotateX: 180, opacity: 0, y: "116.7%" } : { rotateX: 0 }}
             transition={opening ? { rotateX: { delay: 0.22, duration: 0.62, ease: EASE }, y: leaveT, opacity: leaveT } : { duration: 0 }}>
             <span className="env-flap-in" />
           </motion.span>

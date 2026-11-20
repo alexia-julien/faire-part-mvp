@@ -105,6 +105,15 @@ export function InvitationView({
     return () => io.disconnect();
   }, [showRespond, cfg]);
 
+  // « Revoir l'ouverture » (page invitée) : visible en haut du faire-part, effacé ensuite pour ne rien recouvrir.
+  const [away, setAway] = useState(false);
+  useEffect(() => {
+    if (mode !== "page" || !showReplay) return;
+    const f = () => setAway(window.scrollY > window.innerHeight * 0.5);
+    f(); window.addEventListener("scroll", f, { passive: true });
+    return () => window.removeEventListener("scroll", f);
+  }, [mode, showReplay]);
+
   const couple = (cfg.partner1 || "") + " & " + (cfg.partner2 || "");
   const reveal = revealKey > 0 || (!intro || !hasIntro);
   const respond = () => root.current?.querySelector(".sec-rsvp")?.scrollIntoView({ behavior: "smooth", block: "start" });
@@ -140,7 +149,7 @@ export function InvitationView({
         </div>
       )}
       {!introOn && showReplay && hasIntro && (
-        <button type="button" data-theme={cfg.theme} className={"fp-replay glass" + (mode === "preview" ? " in-preview" : "")} onClick={() => setIntroOn(true)} aria-label="Revoir l’ouverture">
+        <button type="button" data-theme={cfg.theme} className={"fp-replay glass" + (mode === "preview" ? " in-preview" : "") + (away ? " is-away" : "")} tabIndex={away ? -1 : undefined} onClick={() => setIntroOn(true)} aria-label="Revoir l’ouverture">
           <RotateCcw aria-hidden="true" /> <span>Revoir l’ouverture</span>
         </button>
       )}
