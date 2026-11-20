@@ -4,16 +4,15 @@ import { PAGES, fmtDate, meta } from "@/lib/site";
 
 export const metadata: Metadata = meta(PAGES.mentions);
 
-// Texte du brief SEO/GEO (section 5). À COMPLÉTER par Julien avant que la page soit conforme (LCEN, art. 6-III) :
-// statut (« entrepreneur individuel (EI) » + SIREN/RNE si immatriculé), téléphone, et adresse (non publiée en
-// attendant sa décision : domicile personnel, voir le risque « adresse personnelle publiée » du brief).
+// Texte du brief SEO/GEO (section 5). Statut : micro-entreprise (entrepreneur individuel, mention « EI » obligatoire).
+// Adresse volontairement non publiée (décision de Julien, 20/11/2026). Reste à ajouter : le numéro SIREN.
 export default function Page() {
   return (
     <DocPage trail={[PAGES.mentions]}>
       <h1>Mentions légales</h1>
       <p>Dernière mise à jour : {fmtDate(PAGES.mentions.updated)}.</p>
       <h2>Éditeur du site</h2>
-      <p>Le site maison-meli.com est édité par Julien Meli.<br />E-mail : <a href="mailto:julien.meli.jm@gmail.com">julien.meli.jm@gmail.com</a></p>
+      <p>Le site maison-meli.com est édité par Julien Meli EI, entrepreneur individuel (micro-entreprise).<br />E-mail : <a href="mailto:julien.meli.jm@gmail.com">julien.meli.jm@gmail.com</a><br />Téléphone : <a href="tel:+33688964968">06 88 96 49 68</a></p>
       <h2>Directeur de la publication</h2>
       <p>Julien Meli</p>
       <h2>Hébergement</h2>
