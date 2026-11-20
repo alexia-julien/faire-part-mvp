@@ -104,7 +104,7 @@ for slug in ["champetre", "boheme", "romantique", "minimaliste", "elegance", "ch
     check(f"ambiance {slug} : bouton qui présélectionne l'ambiance", any(l.startswith("/creer/#s=") for l in p.links))
 
 # Guides et comparatifs : en noindex jusqu'à relecture, absents du plan du site, gabarit complet
-for g in ["guide/faire-part-mariage-digital", "guide/texte-faire-part-mariage", "guide/reponses-invites-mariage", "comparatif/faire-part-papier-ou-digital", "comparatif/alternative-canva-faire-part"]:
+for g in ["guide/quand-envoyer-faire-part-mariage", "guide/faire-part-mariage-digital", "guide/texte-faire-part-mariage", "guide/reponses-invites-mariage", "comparatif/faire-part-papier-ou-digital", "comparatif/alternative-canva-faire-part"]:
     p = load(g + "/index.html")
     idx = SITE + "/" + g + "/" in sitemap
     check(g + " : noindex tant que non relu, ou dans le plan s'il est publié", ("noindex" in p.meta.get("robots", "")) != idx)
