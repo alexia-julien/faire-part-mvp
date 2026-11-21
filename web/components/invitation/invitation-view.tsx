@@ -1,13 +1,14 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
+import { lazy, Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { AnimatePresence, m as motion } from "motion/react";
 import { RotateCcw } from "lucide-react";
 import type { Config, RsvpData } from "@/lib/invitation";
 import { loadFont } from "@/lib/fonts";
 import { Envelope } from "./envelope";
 import { InvitationBody } from "./invitation-body";
-import { RsvpFlow } from "./rsvp-flow";
+// Formulaire de réponse chargé à part : l'aperçu de l'accueil (withRsvp=false) n'en télécharge pas le code.
+const RsvpFlow = lazy(() => import("./rsvp-flow").then((m) => ({ default: m.RsvpFlow })));
 
 type Props = {
   cfg: Config;
@@ -128,7 +129,7 @@ export function InvitationView({
           preview={preview}
           namesTag={namesTag}
           reveal={reveal && revealKey > 0}
-          rsvp={withRsvp ? <RsvpFlow cfg={cfg} preview={preview} previous={previous} couple={couple} madeWith={madeWith} onMadeWith={onMadeWith} onSubmit={onSubmit} /> : <p className="preview-note" style={{ margin: 0 }}>Vos invités répondent ici, une question à la fois.</p>}
+          rsvp={withRsvp ? <Suspense fallback={<div aria-busy="true" style={{ minHeight: 280 }} />}><RsvpFlow cfg={cfg} preview={preview} previous={previous} couple={couple} madeWith={madeWith} onMadeWith={onMadeWith} onSubmit={onSubmit} /></Suspense> : <p className="preview-note" style={{ margin: 0 }}>Vos invités répondent ici, une question à la fois.</p>}
         />
       </div>
 

@@ -94,7 +94,7 @@ try:
     check("meta description", "3 minutes" in (pg.get_attribute('meta[name=description]', 'content') or ""))
     check("URL canonique", pg.get_attribute("link[rel=canonical]", "href").rstrip("/") == "https://maison-meli.com")
     check("page indexable", "noindex" not in (pg.get_attribute('meta[name=robots]', 'content') or ""))
-    check("image de partage (Open Graph)", pg.get_attribute('meta[property="og:image"]', 'content') == "https://maison-meli.com/img/og.png")
+    check("image de partage (Open Graph)", pg.get_attribute('meta[property="og:image"]', 'content') == "https://maison-meli.com/img/og-accueil.png")
     lds = [json.loads(x) for x in pg.locator('script[type="application/ld+json"]').all_inner_texts()]
     check("Organization sur toutes les pages (fondateur, logo)", any(isinstance(x, dict) and x.get("@type") == "Organization" and x.get("founder") for x in lds))
     ld = next(x for x in lds if isinstance(x, list))

@@ -22,9 +22,9 @@ export const metadata: Metadata = {
   openGraph: {
     type: "website", siteName: "Maison Meli", locale: "fr_FR", url: SITE + "/",
     title: "Le faire-part de mariage digital qui fait dire « oh »", description: DESC,
-    images: [{ url: "/img/og.png", width: 1200, height: 630, alt: "Un faire-part de mariage Maison Meli affiché sur un téléphone" }],
+    images: [{ url: "/img/og-accueil.png", width: 1200, height: 630, alt: "Maison Meli : un faire-part de mariage digital affiché sur un téléphone" }],
   },
-  twitter: { card: "summary_large_image", title: "Faire-part de mariage digital gratuit avec RSVP", description: DESC, images: ["/img/og.png"] },
+  twitter: { card: "summary_large_image", title: "Faire-part de mariage digital gratuit avec RSVP", description: DESC, images: ["/img/og-accueil.png"] },
 };
 
 // Page d'accueil : rendue côté serveur (HTML statique), avec quelques îlots interactifs (héros, récit, liens).

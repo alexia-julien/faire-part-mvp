@@ -74,7 +74,7 @@ for url in sitemap:
     check(path + " : indexable", "noindex" not in p.meta.get("robots", ""), p.meta.get("robots", ""))
     check(path + " : un seul H1", p.h1 == 1, str(p.h1))
     og = p.og.get("og:image", "")
-    check(path + " : image Open Graph présente", (og.startswith(SITE + "/og/") or (path == "/" and og == SITE + "/img/og.png")) and os.path.exists(os.path.join(OUT, og[len(SITE) + 1:])), og)
+    check(path + " : image Open Graph présente", (og.startswith(SITE + "/og/") or (path == "/" and og == SITE + "/img/og-accueil.png")) and os.path.exists(os.path.join(OUT, og[len(SITE) + 1:])), og)
     check(path + " : og:locale fr_FR", p.og.get("og:locale") == "fr_FR")
     for raw in p.ld:
         try: json.loads(raw); ok = True
