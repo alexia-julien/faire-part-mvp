@@ -10,7 +10,7 @@ import { join } from "node:path";
 const OUT = process.argv[2] || "out";
 const LOCAL = process.env.NEXT_PUBLIC_FP_LOCAL === "1";
 const SUPA = "https://pmtwhrqfdvbxbgrzcytl.supabase.co";
-const GSI = new Set(["creer/index.html", "mon-faire-part/index.html"]); // pages avec le bouton « Continuer avec Google »
+const GSI = new Set(["creer/index.html", "mon-faire-part/index.html", "admin/index.html"]); // pages avec le bouton « Continuer avec Google »
 
 function walk(dir) {
   return readdirSync(dir).flatMap((f) => { const p = join(dir, f); return statSync(p).isDirectory() ? walk(p) : p.endsWith(".html") ? [p] : []; });

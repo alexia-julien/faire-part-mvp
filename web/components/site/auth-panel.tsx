@@ -11,7 +11,7 @@ import { Label } from "@/components/ui/label";
 
 // Connexion ou création du compte : code à 6 chiffres reçu par email, ou Google (bouton officiel).
 // Pas de mot de passe. Le compte est créé au premier code s'il n'existe pas.
-export function AuthPanel({ title, text, returnTo, onSignedIn }: { title: string; text?: string; returnTo?: string; onSignedIn: (u: User) => void }) {
+export function AuthPanel({ title, text, returnTo, onSignedIn, noSignup }: { title: string; text?: string; returnTo?: string; onSignedIn: (u: User) => void; noSignup?: boolean }) {
   const [step, setStep] = useState<"email" | "code">("email");
   const [email, setEmail] = useState("");
   const [code, setCode] = useState("");
@@ -33,7 +33,7 @@ export function AuthPanel({ title, text, returnTo, onSignedIn }: { title: string
   async function send(e?: React.FormEvent) {
     e?.preventDefault(); if (busy) return;
     setBusy(true); setMsg("");
-    try { await auth.sendCode(email, returnTo); setStep("code"); setCode(""); }
+    try { await auth.sendCode(email, returnTo, !noSignup); setStep("code"); setCode(""); }
     catch (err) { setMsg((err as Error).message); }
     finally { setBusy(false); }
   }

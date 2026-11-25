@@ -345,7 +345,7 @@ function TwoStep({ id, label, confirmLabel, confirm, setConfirm, run, onSignedOu
   );
 }
 
-function Loading() {
+export function Loading() {
   return (
     <div className="flex flex-col gap-6 py-6" role="status" aria-label="Chargement">
       <Skeleton className="h-4 w-40 rounded-full" /><Skeleton className="h-14 w-80 max-w-full rounded-2xl" />
@@ -355,7 +355,7 @@ function Loading() {
   );
 }
 
-function Shell({ user, onSignOut, children }: { user: User | null; onSignOut?: () => void; children: React.ReactNode }) {
+export function Shell({ user, onSignOut, children }: { user: User | null; onSignOut?: () => void; children: React.ReactNode }) {
   return (
     <div className="paper-grain min-h-dvh">
       <Toaster position="top-center" toastOptions={{ classNames: { toast: "!rounded-[20px] !shadow-lift !border-border !font-sans" } }} />

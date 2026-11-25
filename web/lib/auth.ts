@@ -108,11 +108,11 @@ export const auth = {
   subscribe(f: () => void) { listeners.add(f); return () => { listeners.delete(f); }; },
   validEmail: (v: string) => EMAIL_RE.test(String(v || "").trim()),
   // Envoie un code à 6 chiffres (l'email contient aussi un lien qui ramène sur returnTo). Crée le compte si besoin.
-  async sendCode(email: string, returnTo?: string) {
+  async sendCode(email: string, returnTo?: string, createUser = true) {
     email = String(email || "").trim();
     if (!EMAIL_RE.test(email)) throw new Error("Cette adresse email ne semble pas valide.");
     if (!IS_REMOTE) { localPending = email; return; }
-    try { await call("/otp?redirect_to=" + encodeURIComponent(returnTo || location.href.split("#")[0]), { email, create_user: true }); }
+    try { await call("/otp?redirect_to=" + encodeURIComponent(returnTo || location.href.split("#")[0]), { email, create_user: createUser }); }
     catch (e) { throw new Error(friendly(e as HttpError)); }
   },
   async verifyCode(email: string, code: string): Promise<User> {

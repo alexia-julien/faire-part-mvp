@@ -596,6 +596,96 @@ end $$;
 
 revoke all on function private.html(text), private.send_rsvp_digests() from public, anon, authenticated;
 
+-- ---------------------------------------------------------------- Tableau de bord admin (/admin/)
+-- Réservé aux comptes listés dans private.admins (ajoutés à la main). Toute autre session reçoit « not admin » (42501).
+create table if not exists private.admins (user_id uuid primary key references auth.users(id) on delete cascade, created_at timestamptz not null default now());
+revoke all on private.admins from public, anon, authenticated;
+
+create or replace function public.admin_dashboard(p_from date, p_to date) returns jsonb
+language plpgsql stable security definer set search_path = public, extensions as $$
+declare d0 timestamptz; d1 timestamptz; v jsonb;
+begin
+  if private.account_id() is null or not exists (select 1 from private.admins where user_id = private.account_id()) then
+    raise exception 'not admin' using errcode = '42501';
+  end if;
+  if p_from is null or p_to is null or p_from > p_to or p_to - p_from > 731 then
+    raise exception 'période invalide' using errcode = '22023';
+  end if;
+  d0 := p_from::timestamp at time zone 'Europe/Paris';
+  d1 := (p_to + 1)::timestamp at time zone 'Europe/Paris';
+
+  with p as (
+    select 'actuelle' as periode, d0 as a, d1 as b
+    union all select 'precedente', d0 - (d1 - d0), d0
+  ),
+  e as (select p.periode, ev.* from p join private.events ev on ev.created_at >= p.a and ev.created_at < p.b),
+  s as (select periode, visitor, (created_at at time zone 'Europe/Paris')::date as jour, max((meta->>'seconds')::int) as sec
+        from e where event = 'session_end' and meta ? 'seconds' group by 1, 2, 3),
+  m as (
+    select p.periode,
+      (select count(distinct visitor) from e where e.periode = p.periode and event = 'landing_view') as visiteurs,
+      (select count(*) from e where e.periode = p.periode and event = 'landing_view') as pages_accueil,
+      (select count(distinct visitor) from e where e.periode = p.periode and event = 'editor_start') as demarres,
+      (select count(distinct visitor) from e where e.periode = p.periode and event in ('auth_gate', 'invitation_created')) as termines,
+      (select count(*) from auth.users u where u.created_at >= p.a and u.created_at < p.b) as comptes,
+      (select count(*) from e where e.periode = p.periode and event = 'invitation_created') as faire_part,
+      (select count(*) from e where e.periode = p.periode and event = 'invitation_created' and meta->>'src' = 'faire-part') as faire_part_viraux,
+      (select count(distinct (slug, visitor)) from e where e.periode = p.periode and event = 'invitation_viewed') as ouvertures_invites,
+      (select count(*) from e where e.periode = p.periode and event = 'rsvp_submitted' and coalesce((meta->>'edit')::boolean, false) = false) as reponses_rsvp,
+      (select count(*) from s where s.periode = p.periode) as sessions_mesurees,
+      (select round(percentile_cont(0.5) within group (order by sec))::int from s where s.periode = p.periode) as duree_mediane_s,
+      (select round(avg(sec))::int from s where s.periode = p.periode) as duree_moyenne_s
+    from p
+  ),
+  k as (
+    select m.*,
+      round(100.0 * demarres / nullif(visiteurs, 0), 1) as taux_demarrage,
+      round(100.0 * termines / nullif(demarres, 0), 1) as taux_finalisation,
+      round(100.0 * comptes / nullif(termines, 0), 1) as taux_ouverture,
+      round(100.0 * faire_part / nullif(comptes, 0), 1) as taux_publication,
+      round(100.0 * comptes / nullif(visiteurs, 0), 1) as taux_transformation,
+      round(100.0 * reponses_rsvp / nullif(ouvertures_invites, 0), 1) as taux_reponse_invites
+    from m
+  ),
+  j as (select generate_series(p_from, p_to, interval '1 day')::date as jour),
+  ej as (select (created_at at time zone 'Europe/Paris')::date as jour, event, visitor from private.events
+         where created_at >= d0 and created_at < d1 and event in ('landing_view', 'editor_start', 'invitation_created')),
+  uj as (select (created_at at time zone 'Europe/Paris')::date as jour, count(*) as n from auth.users
+         where created_at >= d0 and created_at < d1 group by 1),
+  jr as (
+    select to_char(j.jour, 'YYYY-MM-DD') as jour,
+      (select count(distinct visitor) from ej where ej.jour = j.jour and event = 'landing_view') as visiteurs,
+      (select count(distinct visitor) from ej where ej.jour = j.jour and event = 'editor_start') as demarres,
+      coalesce((select n from uj where uj.jour = j.jour), 0) as comptes,
+      (select count(*) from ej where ej.jour = j.jour and event = 'invitation_created') as faire_part
+    from j
+  ),
+  ap as (select coalesce(meta->>'device', 'inconnu') as appareil, count(distinct visitor) as visiteurs
+         from private.events where event = 'landing_view' and created_at >= d0 and created_at < d1 group by 1),
+  es as (select event, visitor, coalesce(meta->>'src', 'direct') as src from private.events
+         where created_at >= d0 and created_at < d1 and event in ('landing_view', 'editor_start', 'invitation_created')),
+  so as (select src as source,
+           count(distinct visitor) filter (where event = 'landing_view') as visiteurs,
+           count(distinct visitor) filter (where event = 'editor_start') as demarres,
+           count(*) filter (where event = 'invitation_created') as faire_part
+         from es group by 1)
+  select jsonb_build_object(
+    'periode', jsonb_build_object('from', p_from, 'to', p_to),
+    'totaux', jsonb_build_object('comptes', (select count(*) from auth.users), 'faire_part', (select count(*) from invitations)),
+    'kpis', (select jsonb_object_agg(periode, to_jsonb(k) - 'periode') from k),
+    'jours', (select coalesce(jsonb_agg(to_jsonb(jr) order by jr.jour), '[]'::jsonb) from jr),
+    'appareils', (select coalesce(jsonb_agg(jsonb_build_object('appareil', appareil, 'visiteurs', visiteurs,
+                    'part_pct', round(100.0 * visiteurs / nullif((select sum(visiteurs) from ap), 0), 1)) order by visiteurs desc), '[]'::jsonb) from ap),
+    'sources', (select coalesce(jsonb_agg(jsonb_build_object('source', source, 'visiteurs', visiteurs, 'demarres', demarres, 'faire_part', faire_part,
+                    'part_pct', round(100.0 * visiteurs / nullif((select sum(visiteurs) from so), 0), 1)) order by visiteurs desc, faire_part desc), '[]'::jsonb)
+                  from so where visiteurs > 0 or faire_part > 0)
+  ) into v;
+  return v;
+end $$;
+
+revoke all on function public.admin_dashboard(date, date) from public, anon, authenticated;
+grant execute on function public.admin_dashboard(date, date) to authenticated;
+
 select cron.unschedule(jobid) from cron.job where jobname = 'rsvp-digest';
 select cron.schedule('rsvp-digest', '30 7 * * *', 'select private.send_rsvp_digests()');
 

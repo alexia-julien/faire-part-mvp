@@ -4,9 +4,18 @@
 import { CONFIG, IS_REMOTE } from "./config";
 import { auth } from "./auth";
 
-export type ApiError = Error & { conflict?: boolean; forbidden?: boolean; onePerAccount?: boolean; signedOut?: boolean };
+export type ApiError = Error & { conflict?: boolean; forbidden?: boolean; onePerAccount?: boolean; signedOut?: boolean; notAdmin?: boolean };
 export type MyInvitation = { slug: string; config: unknown; created_at?: string; updated_at?: string; responses?: number; last_response?: string | null };
 export type RsvpRow = { id: number; created_at: string; data: Record<string, unknown> };
+export type AdminKpis = Record<string, number | null>;
+export type AdminData = {
+  periode: { from: string; to: string };
+  totaux: { comptes: number; faire_part: number };
+  kpis: { actuelle: AdminKpis; precedente: AdminKpis };
+  jours: { jour: string; visiteurs: number; demarres: number; comptes: number; faire_part: number }[];
+  appareils: { appareil: string; visiteurs: number; part_pct: number | null }[];
+  sources: { source: string; visiteurs: number; demarres: number; faire_part: number; part_pct: number | null }[];
+};
 
 function signedOut(): ApiError { const e: ApiError = new Error("signed out"); e.signedOut = true; return e; }
 async function post(fn: string, args: unknown, token: string | null) {
@@ -22,6 +31,7 @@ async function post(fn: string, args: unknown, token: string | null) {
     err.conflict = r.status === 409 || body?.code === "23505";
     err.forbidden = r.status === 401 || r.status === 403 || body?.code === "42501";
     err.onePerAccount = /one per account/i.test(err.message);
+    err.notAdmin = /not admin/i.test(err.message);
     throw err;
   }
   return body as unknown;
@@ -35,7 +45,7 @@ async function arpc(fn: string, args: unknown) {
   try { return await post(fn, args, tok); }
   catch (e) {
     const err = e as ApiError;
-    if (err?.forbidden && !err.onePerAccount) { auth.drop(); throw signedOut(); }
+    if (err?.forbidden && !err.onePerAccount && !err.notAdmin) { auth.drop(); throw signedOut(); }
     throw e;
   }
 }
@@ -91,6 +101,8 @@ const local = {
     delete db.inv[slug]; delete db.rsvps[slug];
     return { save: true, value: true };
   }),
+  // Tableau de bord admin : jamais de données en mode local (le compte de test n'est pas admin).
+  adminDashboard: (_from: string, _to: string) => asAccount<AdminData>(() => { const e: ApiError = new Error("not admin"); e.notAdmin = true; throw e; }),
   listRsvps: () => asAccount<RsvpRow[] | null>((db, slug) => ({ value: slug ? db.rsvps[slug] || [] : null })),
   deleteRsvp: (id: number) => asAccount<void>((db, slug) => {
     if (!slug) throw new Error("aucun faire-part");
@@ -131,6 +143,7 @@ const supa = {
   updateInvitation: async (config: unknown) => { const ok = await arpc("account_update_invitation", { p_config: config }); if (!ok) throw new Error("aucun faire-part"); },
   deleteInvitation: async () => !!(await arpc("account_delete_invitation", {})),
   listRsvps: async () => (await arpc("account_rsvps", {})) as RsvpRow[] | null,
+  adminDashboard: async (from: string, to: string) => (await arpc("admin_dashboard", { p_from: from, p_to: to })) as AdminData,
   deleteRsvp: async (id: number) => { await arpc("account_delete_rsvp", { p_id: id }); },
   deleteAccount: async () => { await arpc("delete_account", {}); auth.drop(); },
   addRsvp: async (data: Record<string, unknown>) => Number(await arpc("account_add_rsvp", { p_data: data })),

@@ -1,6 +1,6 @@
-:HL["/_next/static/chunks/3bxmtk7442650.css","style"]
+:HL["/_next/static/chunks/3u0q3k9w7yrix.css","style"]
 :HL["/_next/static/chunks/2h0wbkh-9-7rn.css","style"]
 :HC["/",""]
 2:[["children",{"s":"__PAGE__","h":160}]]
 1:[["children",{"s":"tarifs","h":64,"c":"$Q2"}]]
-0:{"b":"pp2uo3lVrf4QlOYJdA6qb","t":{"t":{"s":"","h":16,"c":"$Q1"}}}
+0:{"b":"fBsi__igNMTRLHWsoZr7S","t":{"t":{"s":"","h":16,"c":"$Q1"}}}
