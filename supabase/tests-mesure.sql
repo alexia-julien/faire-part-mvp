@@ -33,7 +33,7 @@ begin
   perform public.track('editor_start', null, '[1,2]'::jsonb);
   perform public.track(null, null, null);
   reset role;
-  r := r || case when (select meta from private.events where id > n0 and event = 'landing_view') = '{"src":"seo"}'::jsonb
+  r := r || case when (select meta - 'device' from private.events where id > n0 and event = 'landing_view') = '{"src":"seo"}'::jsonb
     then E'PASS track : métadonnées filtrées (source gardée, le reste écarté)\n' else E'FAIL filtrage des métadonnées\n' end;
   r := r || case when not exists (select 1 from private.events where id > n0 and event = 'drop_table') and not exists (select 1 from private.events where id > n0 and event is null)
     then E'PASS track : événement hors liste blanche ignoré, sans erreur\n' else E'FAIL liste blanche\n' end;

@@ -15,7 +15,7 @@
 --   - Fonctions et tables internes dans le schéma « private », non exposé par l'API.
 --
 -- Mesure du funnel (PRD, section KPIs), sans cookie : private.events. Un visiteur = empreinte SHA-256 de son IP.
---   landing_view, editor_start, auth_gate, share, qr_download, cta_create, premium_click : navigateur (public.track)
+--   landing_view, editor_start, auth_gate, share, qr_download, cta_create, premium_click, session_end : navigateur (public.track)
 --   invitation_created / updated / deleted, invitation_viewed, rsvp_submitted, rsvp_added_manual, rsvps_listed,
 --   account_deleted, premium_interest, digest_sent : base
 -- Lecture : select * from private.kpis_30j;  select * from private.funnel_semaine;
@@ -146,9 +146,20 @@ $$;
 create or replace function private.log_event(p_event text, p_tester_id bigint default null, p_slug text default null,
                                              p_meta jsonb default '{}'::jsonb) returns void
 language plpgsql set search_path = public, extensions as $$
+declare ua text; dev text;
 begin
+  -- Catégorie d'appareil déduite du user-agent (le user-agent lui-même n'est jamais stocké).
+  begin
+    ua := nullif(current_setting('request.headers', true), '')::json->>'user-agent';
+  exception when others then ua := null; end;
+  dev := case
+    when ua is null or ua = '' then 'inconnu'
+    when ua ~* 'ipad|tablet|playbook|silk|kindle' or (ua ~* 'android' and ua !~* 'mobile') then 'tablette'
+    when ua ~* 'mobi|iphone|ipod|android|windows phone' then 'mobile'
+    else 'ordinateur' end;
   insert into private.events(event, tester_id, slug, visitor, meta)
-  values (p_event, p_tester_id, left(p_slug, 63), private.client_id(), coalesce(p_meta, '{}'::jsonb));
+  values (p_event, p_tester_id, left(p_slug, 63), private.client_id(),
+          jsonb_build_object('device', dev) || coalesce(p_meta, '{}'::jsonb));
   if random() < 0.01 then delete from private.events where created_at < now() - interval '13 months'; end if; -- durée de conservation
 exception when others then
   null; -- la mesure ne doit jamais casser l'app
@@ -241,7 +252,7 @@ create or replace function public.track(p_event text, p_slug text default null, 
 language plpgsql security definer set search_path = public, extensions as $$
 declare v_meta jsonb := '{}'::jsonb; v_slug text;
 begin
-  if p_event is null or p_event not in ('landing_view', 'editor_start', 'auth_gate', 'share', 'qr_download', 'cta_create', 'premium_click') then return; end if;
+  if p_event is null or p_event not in ('landing_view', 'editor_start', 'auth_gate', 'share', 'qr_download', 'cta_create', 'premium_click', 'session_end') then return; end if;
   begin
     perform private.rate_limit('track', 600);
   exception when others then return;
@@ -249,6 +260,9 @@ begin
   if jsonb_typeof(p_meta) = 'object' then
     if p_meta->>'src' in ('direct', 'seo', 'ia', 'faire-part', 'reseaux', 'email', 'autre') then v_meta := v_meta || jsonb_build_object('src', p_meta->>'src'); end if;
     if p_meta->>'channel' in ('natif', 'whatsapp', 'sms', 'email', 'copie') then v_meta := v_meta || jsonb_build_object('channel', p_meta->>'channel'); end if;
+    if jsonb_typeof(p_meta->'seconds') = 'number' and (p_meta->>'seconds')::numeric between 1 and 14400 then
+      v_meta := v_meta || jsonb_build_object('seconds', round((p_meta->>'seconds')::numeric)::int);
+    end if;
   end if;
   if p_slug ~ '^[a-z0-9][a-z0-9-]{2,62}$' and exists (select 1 from invitations where slug = p_slug) then v_slug := p_slug; end if;
   perform private.log_event(p_event, null, v_slug, v_meta);

@@ -5,7 +5,7 @@
 // Les événements serveur (faire-part créé, ouvert, réponse envoyée) sont journalisés par les fonctions SQL.
 import { CONFIG, IS_REMOTE } from "./config";
 
-const EVENTS = ["landing_view", "editor_start", "auth_gate", "share", "qr_download", "cta_create", "premium_click"];
+const EVENTS = ["landing_view", "editor_start", "auth_gate", "share", "qr_download", "cta_create", "premium_click", "session_end"];
 const SOURCES = ["direct", "seo", "ia", "faire-part", "reseaux", "email", "autre"];
 const CHANNELS = ["natif", "whatsapp", "sms", "email", "copie"];
 const SRC_KEY = "fp:src", SRC_DAYS = 30;
@@ -55,11 +55,12 @@ function currentSrc() {
 export function source() { const c = currentSrc(); return (c && c !== "direct" ? c : readSrc()) || "direct"; }
 
 const once: Record<string, boolean> = {};
-export function track(event: string, meta: { src?: string; channel?: string; once?: boolean } = {}, slug?: string) {
+export function track(event: string, meta: { src?: string; channel?: string; seconds?: number; once?: boolean } = {}, slug?: string) {
   if (typeof window === "undefined" || !EVENTS.includes(event) || optedOut()) return;
-  const m: Record<string, string> = {};
+  const m: Record<string, string | number> = {};
   if (meta.src && SOURCES.includes(meta.src)) m.src = meta.src;
   if (meta.channel && CHANNELS.includes(meta.channel)) m.channel = meta.channel;
+  if (typeof meta.seconds === "number" && meta.seconds >= 1) m.seconds = Math.min(Math.round(meta.seconds), 14400);
   if (meta.once) { // une seule fois par onglet pour cet événement
     const k = "fp:t:" + event;
     try { if (sessionStorage.getItem(k) || once[k]) return; sessionStorage.setItem(k, "1"); } catch { if (once[k]) return; }
@@ -81,4 +82,25 @@ export function track(event: string, meta: { src?: string; channel?: string; onc
       body: JSON.stringify({ p_event: event, p_slug: s, p_meta: m }),
     }).catch(() => {});
   } catch {}
+}
+
+// Durée de session : temps passé page visible dans l'onglet (cumulé d'une page à l'autre), envoyé quand l'onglet passe
+// en arrière-plan ou qu'on quitte la page. Aucun identifiant : côté serveur, on garde la plus longue durée par visiteur et par jour.
+const CLOCK_KEY = "fp:clock";
+let clockStarted = false;
+export function startSessionClock() {
+  if (typeof window === "undefined" || clockStarted) return;
+  clockStarted = true;
+  let acc = 0;
+  try { acc = Number(sessionStorage.getItem(CLOCK_KEY)) || 0; } catch {}
+  let since = document.visibilityState === "visible" ? Date.now() : 0;
+  const save = () => {
+    if (since) { acc += Date.now() - since; since = 0; }
+    try { sessionStorage.setItem(CLOCK_KEY, String(acc)); } catch {}
+  };
+  document.addEventListener("visibilitychange", () => {
+    if (document.visibilityState === "hidden") { save(); if (acc >= 1000) track("session_end", { seconds: acc / 1000 }); }
+    else since = Date.now();
+  });
+  window.addEventListener("pagehide", save);
 }
