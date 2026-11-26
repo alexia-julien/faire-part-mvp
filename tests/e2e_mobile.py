@@ -69,6 +69,10 @@ def invitation_cfg(**kw):
          "rsvp": {"guests": True, "children": True, "companions": True, "diet": True, "brunch": False, "message": True, "email": True, "deadline": "2027-05-01"}}
     c.update(kw); return c
 
+def settle(pg, timeout=4):
+    """Attend la fin des animations (glissement d'étape, panneau qui monte) : Safari les termine plus tard que Chrome."""
+    wait_until(lambda: pg.evaluate("document.getAnimations().filter(a=>a.playState==='running'&&a.effect&&a.effect.getComputedTiming().iterations!==Infinity).length===0"), timeout)
+    pg.wait_for_timeout(120)
 def overflow(pg): return pg.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth")
 CULPRITS = """(()=>{const W=document.documentElement.clientWidth;const over=e=>{const b=e.getBoundingClientRect();return b.width>0&&b.right>W+1};
  const clipped=e=>{for(let p=e.parentElement;p&&p!==document.body;p=p.parentElement){const o=getComputedStyle(p).overflowX;if(o!=='visible')return true}return false};
@@ -80,7 +84,7 @@ FORCERS = """(()=>{const out=[];for(const e of document.querySelectorAll('body *
  if(inner>0&&w>inner+1&&![...e.children].some(c=>c.getBoundingClientRect().width>w-1))out.push('<'+e.tagName.toLowerCase()+'.'+e.className.toString().slice(0,40)+'> w='+Math.round(w)+' parent='+Math.round(inner)+' «'+(e.innerText||'').slice(0,20).replace(/\\n/g,' ')+'»')}
  return out.slice(-4)})()"""
 def no_overflow(pg, label):
-    o = overflow(pg)
+    settle(pg); o = overflow(pg)
     check(label, o <= 0, "%s px : %s | forcé par : %s" % (o, pg.evaluate(CULPRITS), pg.evaluate(FORCERS)) if o > 0 else "")
 def shot(pg, name): pg.screenshot(path=os.path.join(OUT, "%s-%s.png" % (re.sub(r'\W+', '-', DEV).strip('-').lower(), name)))
 
@@ -89,9 +93,10 @@ def tappable(pg, sel, min_size=MIN_TAP):
     Renvoie (ok, détail)."""
     loc = pg.locator(sel).first
     if loc.count() == 0: return False, "absent"
+    settle(pg)
     try: loc.evaluate("e=>e.scrollIntoView({block:'center',inline:'nearest'})")
     except Exception: pass
-    pg.wait_for_timeout(150)
+    pg.wait_for_timeout(150); settle(pg)
     r = loc.evaluate("""e=>{const b=e.getBoundingClientRect();const x=b.left+b.width/2,y=b.top+b.height/2;
         const t=document.elementFromPoint(x,y);return {w:b.width,h:b.height,top:b.top,bottom:b.bottom,vh:innerHeight,
         covered:!(t&&(t===e||e.contains(t)||t.contains(e))),by:t?(t.id||t.className||t.tagName).toString().slice(0,60):null}}""")
