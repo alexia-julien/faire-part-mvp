@@ -6,7 +6,7 @@ import { ArrowLeft, ArrowRight, Check, Eye, RotateCcw, X } from "lucide-react";
 import { api, cleanupLegacy, publicLink, randomKey, slugify, userError, type ApiError, type MyInvitation } from "@/lib/api";
 import { auth, consumeRedirect, type User } from "@/lib/auth";
 import {
-  applyPreset, defaults, eventDate, isAllowedMapsUrl, isValidLink, matchingPreset, parseDate, PRESETS, sanitizeConfig,
+  applyPreset, defaults, eventDate, isAllowedMapsUrl, isValidLink, normalizeMapsInput, matchingPreset, parseDate, PRESETS, sanitizeConfig,
   today, type Config,
 } from "@/lib/invitation";
 import { loadAllFonts } from "@/lib/fonts";
@@ -226,7 +226,7 @@ export function Editor() {
     }
     if (id === "venue") {
       if (!s.venueName.trim()) return "Indiquez le nom du lieu.";
-      if (s.mapsUrl.trim() && !isAllowedMapsUrl(s.mapsUrl.trim())) return "Ce lien n’est pas reconnu. Collez un lien Google Maps, Apple Plans, OpenStreetMap ou Waze (commençant par https://), ou laissez le champ vide.";
+      if (s.mapsUrl.trim() && !isAllowedMapsUrl(normalizeMapsInput(s.mapsUrl))) return "Ce lien n’est pas reconnu. Collez un lien Google Maps, Apple Plans, OpenStreetMap ou Waze (commençant par https://), ou laissez le champ vide.";
     }
     if (id === "custom" && pendingPhotos > 0) return "Patientez quelques secondes, les photos sont en cours de préparation.";
     if (id === "texts") {
@@ -396,9 +396,12 @@ export function Editor() {
   const variants = { enter: (d: number) => ({ opacity: 0, x: reduce ? 0 : d * 28 }), center: { opacity: 1, x: 0 }, exit: (d: number) => ({ opacity: 0, x: reduce ? 0 : d * -28 }) };
 
   return (
+    // Le Toaster reste HORS de la grille : sonner rend une <section> qui occupait la 1re colonne et repoussait
+    // l'aperçu sous l'écran sur ordinateur (bug du 26/11/2026).
+    <>
+    <Toaster position="top-center" toastOptions={{ classNames: { toast: "!rounded-[20px] !shadow-lift !border-border !font-sans" } }} />
     <div className="min-h-dvh lg:grid lg:grid-cols-[minmax(440px,40%)_1fr]" onKeyDown={onKey}>
-      <Toaster position="top-center" toastOptions={{ classNames: { toast: "!rounded-[20px] !shadow-lift !border-border !font-sans" } }} />
-      <div className="relative flex min-h-dvh flex-col">
+      <div className="relative flex min-h-dvh min-w-0 flex-col">
         <Header user={user} progress={(step + 1) / TOTAL} saved={!editing && saved} />
         <main id="wizard" className="mx-auto flex w-full max-w-[560px] flex-1 flex-col px-5 pb-40 pt-4 sm:px-8 lg:pt-10">
           {(restored || notice || editing) && (
@@ -490,6 +493,7 @@ export function Editor() {
         </Drawer>
       )}
     </div>
+    </>
   );
 }
 
@@ -497,12 +501,12 @@ function Header({ user, progress, saved, hideAccount, noBar }: { user: User | nu
   return (
     <header className="sticky top-0 z-20 bg-background/85 backdrop-blur-md">
       <div className="mx-auto flex h-16 w-full max-w-[560px] items-center justify-between gap-4 px-5 sm:px-8 lg:max-w-none">
-        <a href="/" className="flex items-center gap-2 font-serif text-[22px] font-medium tracking-[-0.01em]"><BrandMark className="size-8" />Maison Meli</a>
-        <div className="flex items-center gap-4 text-[14px]">
+        <a href="/" className="flex shrink-0 items-center gap-2 whitespace-nowrap font-serif text-[20px] font-medium tracking-[-0.01em] sm:text-[22px]"><BrandMark className="size-8" />Maison Meli</a>
+        <div className="flex min-w-0 items-center gap-3 whitespace-nowrap text-[14px] sm:gap-4">
           <AnimatePresence>
             {saved && (
               <motion.span key="s" className="flex items-center gap-1 text-muted-foreground" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} aria-live="polite">
-                <Check className="size-3.5" aria-hidden="true" /> Enregistré
+                <Check className="size-3.5" aria-hidden="true" /><span className="max-[400px]:sr-only">Enregistré</span>
               </motion.span>
             )}
           </AnimatePresence>

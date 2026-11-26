@@ -108,9 +108,9 @@ const pad = (n: number) => (n < 10 ? "0" : "") + n;
 function safeHttps(u: string) { u = String(u || "").trim(); return /^https:\/\/[^\s"'<>]+$/i.test(u) ? u : ""; }
 export function safeImg(u: string) { return /^data:image\/(jpeg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(u || "") ? u : ""; }
 // Le lien « Ouvrir dans Maps » n'accepte que des services de cartographie connus (sinon : hameçonnage possible).
-const TLD = "(com|fr|de|es|it|pt|be|ch|ca|co\\.uk|com\\.br)";
+const TLD = "(com|fr|de|es|it|pt|be|ch|ca|lu|nl|at|ie|co\\.uk|com\\.br)";
 const MAPS_HOST = new RegExp("^(maps\\.app\\.goo\\.gl|goo\\.gl|maps\\.google\\." + TLD + "|(www\\.)?google\\." + TLD +
-  "|maps\\.apple\\.com|(www\\.)?openstreetmap\\.org|(www\\.)?waze\\.com|ul\\.waze\\.com)$", "i");
+  "|maps\\.apple\\.com|maps\\.apple|(www\\.)?openstreetmap\\.org|(www\\.)?waze\\.com|ul\\.waze\\.com)$", "i");
 function safeMapsUrl(u: string) {
   u = safeHttps(u);
   if (!u) return "";
@@ -123,6 +123,13 @@ function safeMapsUrl(u: string) {
   } catch { return ""; }
 }
 export const isAllowedMapsUrl = (u: string) => !!safeMapsUrl(u);
+// Lien collé sans « https:// » (« maps.app.goo.gl/… ») ou en http : complété, pour ne pas refuser un lien valable.
+export function normalizeMapsInput(u: string) {
+  const t = String(u || "").trim();
+  if (!t || /^https:\/\//i.test(t)) return t;
+  const fixed = /^http:\/\//i.test(t) ? "https://" + t.slice(7) : /^[a-z0-9.-]+\.[a-z]{2,}(\/|$)/i.test(t) ? "https://" + t : t;
+  return isAllowedMapsUrl(fixed) ? fixed : t;
+}
 // Liens libres (cagnotte, hébergements) : https uniquement ; le domaine est affiché à côté du bouton.
 export function safeLink(u: string): { href: string; host: string } | null {
   u = safeHttps(u);
@@ -200,7 +207,7 @@ export function sanitizeConfig(input: unknown): Config {
     partner1: str(c.partner1, 40), partner2: str(c.partner2, 40),
     date: DATE_RE.test(str(c.date, 10)) ? (c.date as string) : "",
     time: TIME_RE.test(str(c.time, 5)) ? (c.time as string) : "",
-    venueName: str(c.venueName, 80), venueAddress: str(c.venueAddress, 200), mapsUrl: str(c.mapsUrl, 300),
+    venueName: str(c.venueName, 80), venueAddress: str(c.venueAddress, 200), mapsUrl: normalizeMapsInput(str(c.mapsUrl, 300)),
     subtitle: str(c.subtitle, 100, d.subtitle), message: str(c.message, 600, d.message),
     photos: Array.isArray(c.photos) ? c.photos.filter((p): p is string => typeof p === "string" && !!safeImg(p)).slice(0, 3) : [],
     theme: pick(c.theme, ids(PALETTES), "sauge"),

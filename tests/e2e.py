@@ -47,6 +47,8 @@ def events(pg): return json.loads(pg.evaluate("localStorage.getItem('fp:events')
 def qr_text(png_bytes):
     if cv2 is None: return None
     img = cv2.imdecode(np.frombuffer(png_bytes, np.uint8), cv2.IMREAD_GRAYSCALE)
+    # OpenCV 5 : marge blanche ajoutée autour, sinon le détecteur rate parfois un QR pourtant valide.
+    img = cv2.copyMakeBorder(img, 40, 40, 40, 40, cv2.BORDER_CONSTANT, value=255)
     return cv2.QRCodeDetector().detectAndDecode(img)[0]
 def overflow(pg): return pg.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth")
 def axe(pg, ctx="document"):

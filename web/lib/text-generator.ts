@@ -45,12 +45,18 @@ export function timeText(t: string, letters: boolean) {
   return "à " + h + " h" + (mi ? " " + String(mi).padStart(2, "0") : "");
 }
 
+// « à Château de Vaux » → « au Château de Vaux » : article devant les noms de lieux courants.
+const MASC = /^(château|domaine|manoir|moulin|mas|clos|prieuré|relais|hôtel particulier|restaurant|jardin|parc|pavillon|cloître)\s/i;
+const FEM = /^(abbaye|orangerie|bastide|ferme|grange|salle|mairie|église|chapelle|villa|maison|longère|cathédrale|basilique|guinguette|péniche)\s/i;
+const NOUN = /^(hôtel|orangerie|auberge|église|abbaye)\s/i;
+const VOWEL = /^[aeiouyéèêâîôûh]/i;
 const pick = <T>(list: T[], v: number) => list[((v % list.length) + list.length) % list.length];
 
 export function generate(i: GenInput): GenOutput {
   const p1 = i.p1.trim() || "Camille", p2 = i.p2.trim() || "Thomas", names = `${p1} & ${p2}`;
   const letters = i.tone === "formel";
-  const when = [dateText(i.date, letters), timeText(i.time, letters)].filter(Boolean).join(" ");
+  const day = dateText(i.date, letters);
+  const when = day ? [day, timeText(i.time, letters)].filter(Boolean).join(" ") : ""; // l'heure seule, sans date, ne veut rien dire
   const place = i.place.trim();
   const cer = i.ceremony === "religieux" ? "la cérémonie religieuse de leur mariage" : i.ceremony === "laique" ? "la cérémonie laïque de leur mariage" : "leur mariage";
 
@@ -74,13 +80,15 @@ export function generate(i: GenInput): GenOutput {
   }
   const extras: string[] = [];
   if (i.small) extras.push(i.tone === "formel" ? "Le mariage sera célébré dans l’intimité de nos proches." : "Nous nous marions en petit comité, entourés de celles et ceux qui comptent le plus.");
-  if (i.noKids) extras.push("Nous avons choisi de célébrer ce jour entre adultes : merci de votre compréhension, et belle soirée en amoureux !");
-  if (i.kitty) extras.push("Votre présence est notre plus beau cadeau. Pour ceux qui le souhaitent, une cagnotte est à votre disposition.");
+  if (i.noKids) extras.push(i.tone === "formel" ? "Nous avons choisi de célébrer ce jour entre adultes et vous remercions de votre compréhension." : "Nous avons choisi de célébrer ce jour entre adultes : merci de votre compréhension, et belle soirée en amoureux !");
+  // Pas deux fois « votre présence… cadeau » quand le message choisi le dit déjà.
+  if (i.kitty) extras.push((/cadeau/i.test(message) ? "" : "Votre présence est notre plus beau cadeau. ") + "Pour ceux qui le souhaitent, une cagnotte est à votre disposition.");
   if (extras.length) message = [message, ...extras].join(" ");
   message = message.slice(0, 600);
   subtitle = subtitle.slice(0, 100);
 
-  const where = !place ? "" : /^(à|au|aux|en|chez)\s/i.test(place) ? place : /^le\s/i.test(place) ? "au " + place.slice(3) : /^les\s/i.test(place) ? "aux " + place.slice(4) : "à " + place;
+  const where = !place ? "" : /^(à|au|aux|en|chez|dans|sur)\s/i.test(place) ? place : /^le\s/i.test(place) ? "au " + place.slice(3) : /^les\s/i.test(place) ? "aux " + place.slice(4) : /^la\s/i.test(place) ? "à " + place : /^l[’']/i.test(place) ? "à " + place
+    : VOWEL.test(place) && (MASC.test(place) || FEM.test(place) || NOUN.test(place)) ? "à l’" + place : MASC.test(place) ? "au " + place : FEM.test(place) ? "à la " + place : "à " + place;
   const whenWhere = [when, where].filter(Boolean).join(", ");
   const lines = intro ? [intro, names, whenWhere, ...extras] : [names, subtitle, whenWhere, message];
   const full = lines.filter(Boolean).map((l) => l.trim()).join("\n");

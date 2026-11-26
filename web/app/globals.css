@@ -136,3 +136,23 @@
 @utility t-label { font-size: 13px; font-weight: 500; letter-spacing: 0.06em; text-transform: uppercase; color: var(--muted-foreground); }
 
 @utility t-lead { font-size: clamp(17px, 1.6vw, 20px); line-height: 1.55; color: var(--muted-foreground); }
+
+/* Tableau des réponses (« Mon faire-part ») — 26/11/2026.
+   Ordinateur : ombre au bord droit tant qu'il reste des colonnes à faire défiler (Message, date, suppression).
+   Téléphone : chaque réponse devient une fiche lisible (libellé : valeur), sans défilement horizontal. */
+.table-wrap {
+  background:
+    linear-gradient(to left, var(--card) 40%, transparent) right center / 48px 100% no-repeat local,
+    radial-gradient(farthest-side at 100% 50%, rgba(28, 26, 23, 0.14), transparent) right center / 16px 100% no-repeat scroll,
+    var(--card);
+}
+@media (max-width: 639px) {
+  .rsvp-table thead { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0 0 0 0); white-space: nowrap; }
+  .rsvp-table, .rsvp-table tbody, .rsvp-table tr, .rsvp-table td { display: block; }
+  .rsvp-table tr { position: relative; padding: 14px 16px; }
+  .rsvp-table td { min-width: 0; max-width: none; padding: 2px 0; white-space: normal; overflow-wrap: anywhere; background: none; position: static; }
+  .rsvp-table td[data-empty] { display: none; }
+  .rsvp-table td[data-label]:not(:first-child)::before { content: attr(data-label) " : "; color: var(--muted-foreground); }
+  .rsvp-table td:first-child { padding-right: 56px; font-size: 15px; }
+  .rsvp-table td.act { position: absolute; top: 8px; right: 8px; padding: 0; }
+}

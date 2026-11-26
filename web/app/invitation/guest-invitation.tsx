@@ -22,7 +22,7 @@ function clean(d: unknown): Partial<RsvpData> {
   return out as Partial<RsvpData>;
 }
 
-type State = { kind: "loading" } | { kind: "error"; msg: string } | { kind: "ok"; cfg: Config; slug: string; previous: Partial<RsvpData> | null; rid: string };
+type State = { kind: "loading" } | { kind: "error"; msg: string; retry?: boolean } | { kind: "ok"; cfg: Config; slug: string; previous: Partial<RsvpData> | null; rid: string };
 
 export function GuestInvitation() {
   const [st, setSt] = useState<State>({ kind: "loading" });
@@ -45,12 +45,12 @@ export function GuestInvitation() {
       if (!prevData.name) prevData = null;
     }
     api.getInvitation(slug).then((raw) => {
-      if (!raw) { setSt({ kind: "error", msg: "Ce faire-part est introuvable. Vérifiez le lien reçu." }); return; }
+      if (!raw) { setSt({ kind: "error", msg: "Vérifiez le lien reçu : il a peut-être été coupé en le copiant." }); return; }
       const cfg = sanitizeConfig(raw);
       document.title = cfg.partner1 + " & " + cfg.partner2 + " — Vous êtes invités";
       openedAt.current = Date.now();
       setSt({ kind: "ok", cfg, slug, previous: prevData, rid });
-    }).catch(() => setSt({ kind: "error", msg: "Impossible de charger le faire-part pour le moment. Merci de réessayer dans un instant." }));
+    }).catch(() => setSt({ kind: "error", retry: true, msg: "La connexion a échoué. Vérifiez votre réseau, puis réessayez." }));
   }, []);
 
   // Fond de page et barre du navigateur mobile assortis au papier du faire-part.
@@ -79,8 +79,11 @@ export function GuestInvitation() {
       <main className="min-h-dvh grid place-items-center px-6 text-center">
         <div className="measure">
           <p className="t-label mb-3">Maison Meli</p>
-          <h1 className="t-section mb-3">Oh, ce faire-part reste introuvable</h1>
+          <h1 className="t-section mb-3">{st.retry ? "Le faire-part n’a pas pu s’ouvrir" : "Oh, ce faire-part reste introuvable"}</h1>
           <p className="state t-lead" role="alert">{st.msg}</p>
+          {st.retry
+            ? <button type="button" className="mt-6 inline-flex h-11 items-center rounded-full bg-foreground px-6 text-[15px] font-medium text-background" onClick={() => location.reload()}>Réessayer</button>
+            : <a href="/" className="mt-6 inline-block text-[15px] font-medium underline decoration-foreground/25 underline-offset-4">Découvrir Maison Meli</a>}
         </div>
       </main>
     );

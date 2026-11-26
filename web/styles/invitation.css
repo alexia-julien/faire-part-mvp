@@ -197,6 +197,8 @@ html.fp-locked,html.fp-locked body{overflow:hidden}
 .fp .btn-quiet{background:transparent;color:var(--accent-deep);box-shadow:none;border:1px solid var(--line)}
 .fp .hero-venue{font-family:var(--display);font-style:italic;font-size:clamp(1.05rem,4.4cqw,1.35rem);color:var(--ink-soft);margin-top:.5rem}
 .fp .hero-text .btn{margin-top:.4rem}
+/* Jamais plus large que la carte (maquettes de téléphone étroites) : le libellé passe à la ligne plutôt que d'être coupé */
+.fp .hero-text .btn{max-width:100%;white-space:normal;text-wrap:balance}
 .fp .countdown{margin:1.6rem 0 1.4rem}
 
 /* Lieu : carte gravée, épingle, bouton vers le plan */
@@ -406,6 +408,8 @@ html.fp-locked,html.fp-locked body{overflow:hidden}
   .fp .btn{padding:.85rem 1.35rem;letter-spacing:.08em}
 }
 @container (max-width:300px){
+  .fp .hero-text{padding-left:.9rem;padding-right:.9rem}
+  .fp .btn{padding:.8rem 1.05rem;letter-spacing:.05em;font-size:.76rem}
   .fp .form-wrap{padding:1.1rem .85rem 1rem;border-radius:18px}
   .fp .rq-title{font-size:1.25rem}
   .fp .rq-card{padding:.75rem 2.6rem .75rem .9rem;border-radius:14px}

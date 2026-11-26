@@ -4,7 +4,7 @@ import { useRef, useState, type ReactNode, type RefObject } from "react";
 import { AnimatePresence, m as motion } from "motion/react";
 import { Check, ImagePlus, Star, Trash2, Plus, X } from "lucide-react";
 import {
-  applyPreset, DECORS, FOILS, FONTS, INTROS, PALETTES, PRESETS, resizeImage, sanitizeConfig, sectionDefaults, SHAPES, today,
+  applyPreset, DECORS, FOILS, FONTS, INTROS, normalizeMapsInput, PALETTES, PRESETS, resizeImage, sanitizeConfig, sectionDefaults, SHAPES, today,
   type Config, type Section,
 } from "@/lib/invitation";
 import { cn } from "@/lib/utils";
@@ -95,7 +95,8 @@ export function StepVenue({ ed, titleRef }: P) {
         <Field label="Nom du lieu" htmlFor="venue"><Input id="venue" data-bind="venueName" maxLength={80} placeholder="Domaine de l’Abbaye" value={s.venueName} onChange={(e) => ed.update((c) => ({ ...c, venueName: e.target.value }))} /></Field>
         <Field label="Adresse" htmlFor="address"><Textarea id="address" data-bind="venueAddress" maxLength={200} rows={2} placeholder={"Lieu-dit Vauluisant\n89190 Courgenay"} value={s.venueAddress} onChange={(e) => ed.update((c) => ({ ...c, venueAddress: e.target.value }))} /></Field>
         <Field label="Lien Google Maps" opt htmlFor="maps" hint="Google Maps, Apple Plans, OpenStreetMap ou Waze. Sans lien, nous le créons à partir du nom et de l’adresse.">
-          <Input id="maps" data-bind="mapsUrl" type="url" inputMode="url" maxLength={300} placeholder="https://maps.app.goo.gl/…" value={s.mapsUrl} onChange={(e) => ed.update((c) => ({ ...c, mapsUrl: e.target.value }))} />
+          <Input id="maps" data-bind="mapsUrl" type="url" inputMode="url" maxLength={300} placeholder="https://maps.app.goo.gl/…" value={s.mapsUrl} onChange={(e) => ed.update((c) => ({ ...c, mapsUrl: e.target.value }))}
+            onBlur={(e) => { const v = normalizeMapsInput(e.target.value); if (v !== e.target.value) ed.update((c) => ({ ...c, mapsUrl: v })); }} />
         </Field>
       </div>
     </>

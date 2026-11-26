@@ -66,7 +66,7 @@ export function AuthPanel({ title, text, returnTo, onSignedIn, noSignup }: { tit
               <Label htmlFor="auth-email" className="text-[14px] font-medium">Votre adresse email</Label>
               <Input id="auth-email" type="email" inputMode="email" autoComplete="email" maxLength={320} placeholder="prenom@exemple.fr" value={email} onChange={(e) => setEmail(e.target.value)} />
               <Button type="submit" disabled={busy} className="w-full"><Mail aria-hidden="true" /> Recevoir mon code</Button>
-              <p className="text-[13px] leading-snug text-muted-foreground">Pas de mot de passe : nous vous envoyons un code à 6 chiffres. Si vous n’avez pas encore de compte, il est créé à ce moment-là.</p>
+              <p className="text-[13px] leading-snug text-muted-foreground">Pas de mot de passe : nous vous envoyons un code à 6 chiffres.{!noSignup && " Si vous n’avez pas encore de compte, il est créé à ce moment-là."}</p>
             </form>
           </motion.div>
         ) : (
