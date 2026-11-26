@@ -63,7 +63,7 @@ export function ShareKit({ url, cfg, slug }: { url: string; cfg: Config; slug: s
           <div className="flex min-w-0 flex-col gap-1.5">
             <p className="font-medium">QR code du faire-part</p>
             <p className="text-[14px] leading-snug text-muted-foreground">À scanner avec l’appareil photo d’un téléphone. Pratique sur une affiche ou une table d’accueil.</p>
-            <Button type="button" variant="link" className="qr-download h-auto self-start p-0 text-[14px]" onClick={() => { downloadQr(url, cfg); track("qr_download", {}, slug); }}>
+            <Button type="button" variant="link" className="qr-download h-auto self-start whitespace-normal p-0 text-left text-[14px]" onClick={() => { downloadQr(url, cfg); track("qr_download", {}, slug); }}>
               <Download aria-hidden="true" className="size-4" /> Télécharger en PNG
             </Button>
           </div>

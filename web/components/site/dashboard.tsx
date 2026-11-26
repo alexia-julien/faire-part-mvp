@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { AnimatePresence, m as motion } from "motion/react";
-import { ArrowDown, ArrowUp, Download, ExternalLink, Mail, PencilLine, RefreshCw, Search, Trash2, Utensils } from "lucide-react";
+import { ArrowDown, ArrowUp, Download, ExternalLink, LogOut, Mail, PencilLine, RefreshCw, Search, Trash2, Utensils } from "lucide-react";
 import { toast } from "sonner";
 import { api, cleanupLegacy, publicLink, userError, type ApiError, type RsvpRow } from "@/lib/api";
 import { auth, consumeRedirect, type User } from "@/lib/auth";
@@ -347,7 +347,7 @@ function TwoStep({ id, label, confirmLabel, confirm, setConfirm, run, onSignedOu
   const [busy, setBusy] = useState(false);
   const on = confirm === id;
   return (
-    <Button id={id} variant={on ? "destructive" : "ghost"} size="sm" disabled={busy} className={cn(!on && "text-destructive hover:bg-destructive/10", on && "confirm")}
+    <Button id={id} variant={on ? "destructive" : "ghost"} size="sm" disabled={busy} className={cn("h-auto min-h-11 max-w-full whitespace-normal py-2 text-left sm:min-h-9", !on && "text-destructive hover:bg-destructive/10", on && "confirm")}
       onClick={async () => {
         if (!on) { setConfirm(id); return; }
         setBusy(true);
@@ -373,13 +373,13 @@ export function Shell({ user, onSignOut, children, report = true }: { user: User
   return (
     <div className="paper-grain min-h-dvh">
       <Toaster position="top-center" toastOptions={{ classNames: { toast: "!rounded-[20px] !shadow-lift !border-border !font-sans" } }} />
-      <header className="glass sticky top-3 z-20 mx-auto mt-3 flex h-14 w-[calc(100%-24px)] max-w-6xl items-center justify-between rounded-full px-5">
-        <a href="/" className="flex items-center gap-2 font-serif text-[22px] font-medium"><BrandMark className="size-8" />Maison Meli</a>
+      <header className="glass sticky top-3 z-20 mx-auto mt-3 flex h-14 w-[calc(100%-24px)] max-w-6xl items-center justify-between gap-2 rounded-full px-4 sm:px-5">
+        <a href="/" className="flex min-w-0 items-center gap-2 font-serif text-[22px] font-medium"><BrandMark className="size-8" />Maison Meli</a>
         {(user || report) && (
           <div className="flex items-center gap-1 text-[14px] sm:gap-3">
             {user && <span id="account-email" className="hidden text-muted-foreground lg:inline">{user.email ? "Connecté : " + user.email : "Connecté"}</span>}
             {report && <ReportButton />}
-            {user && <Button id="signout" variant="ghost" size="sm" onClick={onSignOut}>Se déconnecter</Button>}
+            {user && <Button id="signout" variant="ghost" size="sm" onClick={onSignOut} className="max-sm:size-11 max-sm:px-0" aria-label="Se déconnecter"><LogOut className="sm:hidden" aria-hidden="true" /><span className="max-sm:hidden">Se déconnecter</span></Button>}
           </div>
         )}
       </header>

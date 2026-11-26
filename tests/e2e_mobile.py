@@ -19,8 +19,8 @@ TMP = tempfile.mkdtemp()
 PORT = 8098
 BASE = "http://localhost:%d" % PORT
 
-# Appareils de référence : petit iPhone (320 px), iPhone récent, Android courant.
-DEVICES = ["iPhone SE", "iPhone 15", "Pixel 7"]
+# Appareils de référence : petit iPhone (320 px), iPhone récent, Android courant (412 px) et petit Android (360 px).
+DEVICES = ["iPhone SE", "iPhone 15", "Pixel 7", "Galaxy S24"]
 MIN_TAP = 44  # px CSS : recommandation Apple (44 pt) et WCAG 2.5.5
 
 ap = argparse.ArgumentParser()
@@ -70,6 +70,13 @@ def invitation_cfg(**kw):
     c.update(kw); return c
 
 def overflow(pg): return pg.evaluate("document.documentElement.scrollWidth - document.documentElement.clientWidth")
+CULPRITS = """(()=>{const W=document.documentElement.clientWidth;const over=e=>{const b=e.getBoundingClientRect();return b.width>0&&b.right>W+1};
+ const clipped=e=>{for(let p=e.parentElement;p&&p!==document.body;p=p.parentElement){const o=getComputedStyle(p).overflowX;if(o!=='visible')return true}return false};
+ return [...document.querySelectorAll('body *')].filter(e=>over(e)&&getComputedStyle(e).position!=='fixed'&&!clipped(e)&&![...e.children].some(over))
+  .slice(0,5).map(e=>(e.id?'#'+e.id:'')+'<'+e.tagName.toLowerCase()+'.'+e.className.toString().slice(0,50)+'> r='+Math.round(e.getBoundingClientRect().right)+' «'+(e.innerText||'').slice(0,25).replace(/\\n/g,' ')+'»')})()"""
+def no_overflow(pg, label):
+    o = overflow(pg)
+    check(label, o <= 0, "%s px : %s" % (o, pg.evaluate(CULPRITS)) if o > 0 else "")
 def shot(pg, name): pg.screenshot(path=os.path.join(OUT, "%s-%s.png" % (re.sub(r'\W+', '-', DEV).strip('-').lower(), name)))
 
 def tappable(pg, sel, min_size=MIN_TAP):
@@ -77,7 +84,7 @@ def tappable(pg, sel, min_size=MIN_TAP):
     Renvoie (ok, détail)."""
     loc = pg.locator(sel).first
     if loc.count() == 0: return False, "absent"
-    try: loc.scroll_into_view_if_needed(timeout=3000)
+    try: loc.evaluate("e=>e.scrollIntoView({block:'center',inline:'nearest'})")
     except Exception: pass
     pg.wait_for_timeout(150)
     r = loc.evaluate("""e=>{const b=e.getBoundingClientRect();const x=b.left+b.width/2,y=b.top+b.height/2;
@@ -136,7 +143,7 @@ def run_device(p, name, engine):
         c = ctx(); pg = watch(c.new_page(), "accueil"); pg.goto(BASE + "/"); pg.wait_for_timeout(800)
         vp = pg.get_attribute('meta[name=viewport]', 'content') or ""
         check("viewport mobile : largeur de l'appareil, zoom utilisateur autorisé", "width=device-width" in vp and "user-scalable=no" not in vp and "maximum-scale=1" not in vp, vp)
-        check("accueil : aucun débordement horizontal", overflow(pg) <= 0, overflow(pg))
+        no_overflow(pg, "accueil : aucun débordement horizontal")
         ok, d = tappable(pg, 'main a[href^="/creer"]'); check("accueil : « Créer mon faire-part » facile à toucher", ok, d)
         pg.evaluate("window.scrollTo(0, 1600)"); pg.wait_for_timeout(900)  # (molette indisponible en WebKit mobile)
         ok, d = tappable(pg, 'a.glass[data-create]'); check("accueil : bouton flottant visible, ≥ 44 px, non recouvert", ok, d)
@@ -152,7 +159,7 @@ def run_device(p, name, engine):
         zoom = set()
         hdr = pg.evaluate("(()=>{const h=document.querySelector('header > div');return [h.getBoundingClientRect().height,h.scrollWidth-h.clientWidth]})()")
         check("éditeur : en-tête sur une ligne, sans débordement", hdr[0] <= 64 and hdr[1] <= 0, hdr)
-        check("éditeur : aucun débordement horizontal", overflow(pg) <= 0, overflow(pg))
+        no_overflow(pg, "éditeur : aucun débordement horizontal")
         pg.tap('#p1'); pg.keyboard.type('Alexia'); pg.tap('#p2'); pg.keyboard.type('Julien')
         zoom.update(small_inputs(pg))
         ok, d = tappable(pg, '#next'); check("éditeur : bouton « Suivant » facile à toucher", ok, d)
@@ -186,7 +193,7 @@ def run_device(p, name, engine):
         pg.tap('#next'); pg.wait_for_selector('#thumbs')
         pg.set_input_files('#photo-input', TMP + "/photo-telephone.jpg")
         check("photo de téléphone (12 Mpx, portrait) acceptée", wait_until(lambda: pg.locator('#thumbs .thumb').count() == 1, 10), pg.inner_text('#photo-msg') if pg.locator('#photo-msg').count() else "")
-        check("éditeur (style) : aucun débordement horizontal", overflow(pg) <= 0, overflow(pg))
+        no_overflow(pg, "éditeur (style) : aucun débordement horizontal")
         pg.tap('#next'); pg.wait_for_selector('#sw-program')
         ok, d = tappable(pg, 'label[for=sw-program]'); check("sections : toute la ligne de l'interrupteur se touche (≥ 44 px)", ok, d)
         pg.tap('label[for=sw-program]'); pg.wait_for_timeout(300)
@@ -199,7 +206,7 @@ def run_device(p, name, engine):
             pg.tap('#next'); pg.wait_for_timeout(500)
         pg.wait_for_selector('#publish')
         ok, d = tappable(pg, '#publish'); check("récapitulatif : bouton « Publier » visible et non recouvert", ok, d)
-        check("récapitulatif : aucun débordement horizontal", overflow(pg) <= 0, overflow(pg))
+        no_overflow(pg, "récapitulatif : aucun débordement horizontal")
         shot(pg, "recapitulatif")
         # Connexion par code
         pg.tap('#publish'); pg.wait_for_selector('#auth-email')
@@ -216,7 +223,7 @@ def run_device(p, name, engine):
         check("publication terminée", wait_until(lambda: pg.locator('#done').count() == 1 and pg.locator('.publish-ritual').count() == 0, 12))
         db = db_get(pg); slug = next(iter(db["inv"]), None)
         check("faire-part publié", slug is not None and db["inv"][slug]["config"]["partner1"] == "Alexia")
-        check("succès : aucun débordement horizontal", overflow(pg) <= 0, overflow(pg))
+        no_overflow(pg, "succès : aucun débordement horizontal")
         ok, d = tappable(pg, '.share-whatsapp'); check("succès : bouton WhatsApp facile à toucher", ok, d)
         wa = pg.get_attribute('.share-whatsapp', 'href') or ""
         check("succès : lien WhatsApp compatible téléphone (wa.me)", wa.startswith("https://wa.me/") or "api.whatsapp.com" in wa, wa)
@@ -241,7 +248,7 @@ def run_device(p, name, engine):
         check("onglet fermé puis rouvert : brouillon restauré", wait_until(lambda: pg.input_value('#p1') == 'Zoé', 4))
         # Texte agrandi (réglage d'accessibilité du téléphone)
         pg.evaluate("document.documentElement.style.fontSize='125%'"); pg.wait_for_timeout(400)
-        check("texte agrandi (125 %) : éditeur sans débordement", overflow(pg) <= 0, overflow(pg))
+        no_overflow(pg, "texte agrandi (125 %) : éditeur sans débordement")
         c.close()
 
     with section('Faire-part invité'):
@@ -251,7 +258,7 @@ def run_device(p, name, engine):
         shot(pg, "invite-enveloppe")
         pg.tap('.env', force=True)
         check("invité : l'enveloppe s'ouvre au toucher", wait_until(lambda: pg.locator('.fp-intro').count() == 0, 5))
-        check("invité : aucun débordement horizontal", overflow(pg) <= 0, overflow(pg))
+        no_overflow(pg, "invité : aucun débordement horizontal")
         ok, d = tappable(pg, '.fp-respond'); check("invité : « Répondre » flottant visible, ≥ 44 px", ok, d)
         bad = fixed_bottom_unsafe(pg); check("invité : éléments fixés en bas au-dessus de la barre d'accueil (safe area)", not bad, bad)
         mp = pg.get_attribute('.sec-lieu .maps-btn', 'href') or ""
@@ -264,7 +271,7 @@ def run_device(p, name, engine):
         # Paysage
         lw, lh = desc["viewport"]["height"], desc["viewport"]["width"]
         pg.set_viewport_size({"width": lw, "height": lh}); pg.wait_for_timeout(500)
-        check("invité en paysage : aucun débordement horizontal", overflow(pg) <= 0, overflow(pg))
+        no_overflow(pg, "invité en paysage : aucun débordement horizontal")
         ok, d = tappable(pg, '.fp-respond'); check("invité en paysage : bouton flottant visible", ok, d)
         shot(pg, "invite-paysage")
         pg.set_viewport_size(desc["viewport"]); pg.wait_for_timeout(400)
@@ -329,7 +336,7 @@ def run_device(p, name, engine):
         seed(pg, "camille-hugo-suivixxx", invitation_cfg(), owner=uid("camille@example.com"), rsvps=rows)
         pg.goto(BASE + "/mon-faire-part/"); pg.wait_for_selector('#tiles'); pg.wait_for_timeout(1500)
         if pg.locator('#rating-later').count(): pg.tap('#rating-later'); pg.wait_for_timeout(300)
-        check("Mon faire-part : aucun débordement horizontal", overflow(pg) <= 0, overflow(pg))
+        no_overflow(pg, "Mon faire-part : aucun débordement horizontal")
         check("Mon faire-part : les 8 réponses sont affichées", pg.locator('#table tbody tr').count() == 8, pg.locator('#table tbody tr').count())
         hid = pg.evaluate("""(()=>{const w=document.querySelector('#table-wrap');const out=[];document.querySelectorAll('#table tbody tr:first-child td').forEach(td=>{const b=td.getBoundingClientRect();
             if(b.width>0&&(b.right>w.getBoundingClientRect().right+1||b.left<w.getBoundingClientRect().left-1))out.push(td.className||td.cellIndex)});return out})()""")

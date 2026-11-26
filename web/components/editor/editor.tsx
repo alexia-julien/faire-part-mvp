@@ -388,7 +388,7 @@ export function Editor() {
         <Toaster position="top-center" toastOptions={{ classNames: { toast: "!rounded-[20px] !shadow-lift !border-border !font-sans" } }} />
         <AnimatePresence>{ritual && <PublishRitual cfg={preview} onDone={() => setRitual(false)} />}</AnimatePresence>
         <Header user={user} progress={1} hideAccount noBar report={() => ({ step: "done", editing: !!editing })} />
-        <main id="done" className="mx-auto grid max-w-5xl gap-12 px-5 pb-24 pt-6 lg:grid-cols-[1fr_340px] lg:items-start lg:pt-14">
+        <main id="done" className="mx-auto grid max-w-5xl grid-cols-1 gap-12 px-5 pb-24 pt-6 lg:grid-cols-[1fr_340px] lg:items-start lg:pt-14">
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: ritual ? 2.7 : 0, duration: 0.5 }} className="flex flex-col gap-8">
             <div>
               <p className="t-label mb-3">{editing ? "C’est enregistré" : "C’est prêt"}</p>
@@ -404,7 +404,7 @@ export function Editor() {
             </div>
             {rating === null && <RatingCard origin="succes" onSignedOut={() => setUser(null)} />}
             <div className="flex flex-wrap gap-3">
-              <Button asChild size="lg"><a id="go-mine" href="/mon-faire-part/">Voir les réponses de mes invités</a></Button>
+              <Button asChild size="lg" className="h-auto min-h-12 max-w-full whitespace-normal py-3 text-center"><a id="go-mine" href="/mon-faire-part/">Voir les réponses de mes invités</a></Button>
               <Button asChild variant="outline" size="lg"><a id="public-open" href={url} target="_blank" rel="noopener">Ouvrir le faire-part</a></Button>
               <Button asChild variant="ghost" size="lg"><a id="edit-again" href="/creer/">Modifier</a></Button>
             </div>
