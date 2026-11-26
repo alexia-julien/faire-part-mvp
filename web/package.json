@@ -6,6 +6,7 @@
     "dev": "next dev",
     "build": "next build && node scripts/postbuild.mjs out",
     "build:local": "NEXT_PUBLIC_FP_LOCAL=1 next build && NEXT_PUBLIC_FP_LOCAL=1 node scripts/postbuild.mjs out",
+    "build:staging": "NEXT_PUBLIC_FP_ENV=staging next build && NEXT_PUBLIC_FP_ENV=staging node scripts/postbuild.mjs out",
     "deploy": "npm run build && node scripts/publish.mjs",
     "lint": "eslint",
     "indexnow": "node scripts/indexnow.mjs",

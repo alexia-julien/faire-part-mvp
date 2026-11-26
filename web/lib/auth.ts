@@ -6,7 +6,7 @@
 import { CONFIG, IS_REMOTE } from "./config";
 
 const BASE = IS_REMOTE ? CONFIG.supabaseUrl.replace(/\/$/, "") + "/auth/v1" : "";
-const KEY = "fp:session";
+const KEY = CONFIG.sessionKey;
 const EMAIL_RE = /^[^\s@]{1,64}@[^\s@]{1,255}\.[^\s@.]{2,24}$/;
 
 export type User = { id: string; email: string };

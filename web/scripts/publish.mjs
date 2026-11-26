@@ -15,7 +15,8 @@ const KEEP = new Set(["web", "supabase", "tests", "worker", ".git", ".github", "
 if (!existsSync(join(OUT, "index.html"))) throw new Error("Pas d'export : lancez d'abord `npm run build`.");
 const html = readFileSync(join(OUT, "index.html"), "utf8");
 if (html.includes("NEXT_PUBLIC_FP_LOCAL") || !html.includes("Content-Security-Policy")) throw new Error("Export incomplet (CSP absente).");
-if (!readFileSync(join(OUT, "mon-faire-part", "index.html"), "utf8").includes("pmtwhrqfdvbxbgrzcytl.supabase.co")) throw new Error("Cet export est en mode local : refaites `npm run build` (sans NEXT_PUBLIC_FP_LOCAL).");
+if (!readFileSync(join(OUT, "mon-faire-part", "index.html"), "utf8").includes("pmtwhrqfdvbxbgrzcytl.supabase.co")) throw new Error("Cet export n'est pas celui de production (mode local ou recette) : refaites `npm run build`.");
+if (existsSync(join(OUT, "admin"))) throw new Error("/admin/ ne doit pas être publiée en production.");
 
 function walk(dir) {
   return readdirSync(dir).flatMap((f) => { const p = join(dir, f); return statSync(p).isDirectory() ? walk(p) : [p]; });

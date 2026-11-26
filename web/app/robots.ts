@@ -1,5 +1,6 @@
 import type { MetadataRoute } from "next";
 import { SITE } from "@/lib/site";
+import { IS_STAGING } from "@/lib/config";
 
 export const dynamic = "force-static";
 
@@ -9,6 +10,8 @@ export const dynamic = "force-static";
 const BOTS = ["Googlebot", "Google-Extended", "Bingbot", "OAI-SearchBot", "ChatGPT-User", "GPTBot", "PerplexityBot", "ClaudeBot", "Claude-SearchBot", "Applebot", "Applebot-Extended"];
 
 export default function robots(): MetadataRoute.Robots {
+  // Recette (staging.maison-meli.com) : interdite à tous les robots, pour ne jamais concurrencer le vrai site.
+  if (IS_STAGING) return { rules: [{ userAgent: "*", disallow: "/" }] };
   return {
     rules: [...BOTS.map((userAgent) => ({ userAgent, allow: "/" })), { userAgent: "*", allow: "/" }],
     sitemap: SITE + "/sitemap.xml",

@@ -17,5 +17,27 @@
   "vars": {
     "SUPABASE_URL": "https://pmtwhrqfdvbxbgrzcytl.supabase.co",
     "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtdHdocnFmZHZieGJncnpjeXRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1MjQ3MzEsImV4cCI6MjEwODEwMDczMX0.7jw9LLJC8dCBHe4fIPnLfgmIFVdbTC19oIR5ZytF-aw"
+  },
+  // Recette (préproduction) : branche `staging` → Worker « maison-meli-staging » sur https://staging.maison-meli.com.
+  // Workers Builds construit le site (cd web && npm ci && npm run build:staging) puis lance `npx wrangler deploy --env staging`.
+  // Base Supabase de recette (projet pcppyluqhsbhkjzmjpzk) : aucune vraie donnée, aucune mesure comptée en production.
+  // Seule /admin/ lit la production (voir web/lib/config.ts).
+  "env": {
+    "staging": {
+      "name": "maison-meli-staging",
+      "workers_dev": false,
+      "routes": [{ "pattern": "staging.maison-meli.com", "custom_domain": true }],
+      "assets": {
+        "directory": "web/out",
+        "binding": "ASSETS",
+        "not_found_handling": "404-page",
+        "html_handling": "auto-trailing-slash",
+        "run_worker_first": ["/invitation.html", "/invitation"]
+      },
+      "vars": {
+        "SUPABASE_URL": "https://pcppyluqhsbhkjzmjpzk.supabase.co",
+        "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBjcHB5bHVxaHNiaGtqem1qcHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU3MTQ4MzUsImV4cCI6MjExMTI5MDgzNX0.3Za1JrUuf45PYMl2gor2QvoiRzdTnIIbQ8OoGmCvEd8"
+      }
+    }
   }
 }
