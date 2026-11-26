@@ -15,7 +15,18 @@ export type AdminData = {
   jours: { jour: string; visiteurs: number; demarres: number; comptes: number; faire_part: number }[];
   appareils: { appareil: string; visiteurs: number; part_pct: number | null }[];
   sources: { source: string; visiteurs: number; demarres: number; faire_part: number; part_pct: number | null }[];
+  exclusion?: { active: boolean; comptes: number; faire_part: number; visiteurs: number };
 };
+export type AdminAccount = {
+  id: string; email: string | null; created_at: string; last_sign_in_at: string | null; provider: string;
+  admin: boolean; excluded: boolean; faire_part: { slug: string; partner1: string | null; partner2: string | null }[] | null;
+};
+export type AdminInvitation = {
+  slug: string; created_at: string; online: boolean; partner1: string | null; partner2: string | null; wedding_date: string | null;
+  owner_email: string | null; ouvertures: number; reponses: number; excluded: boolean; excluded_by_account: boolean | null;
+};
+// Mode local : le compte de test n'est jamais administrateur.
+function notAdmin(): never { const e: ApiError = new Error("not admin"); e.notAdmin = true; throw e; }
 
 function signedOut(): ApiError { const e: ApiError = new Error("signed out"); e.signedOut = true; return e; }
 async function post(fn: string, args: unknown, token: string | null) {
@@ -102,7 +113,10 @@ const local = {
     return { save: true, value: true };
   }),
   // Tableau de bord admin : jamais de données en mode local (le compte de test n'est pas admin).
-  adminDashboard: (_from: string, _to: string) => asAccount<AdminData>(() => { const e: ApiError = new Error("not admin"); e.notAdmin = true; throw e; }),
+  adminDashboard: (_from: string, _to: string, _exclude = true) => asAccount<AdminData>(notAdmin),
+  adminAccounts: (_from: string, _to: string) => asAccount<AdminAccount[]>(notAdmin),
+  adminInvitations: (_from: string, _to: string) => asAccount<AdminInvitation[]>(notAdmin),
+  adminSetExclusion: (_kind: "account" | "slug", _id: string, _excluded: boolean) => asAccount<void>(notAdmin),
   listRsvps: () => asAccount<RsvpRow[] | null>((db, slug) => ({ value: slug ? db.rsvps[slug] || [] : null })),
   deleteRsvp: (id: number) => asAccount<void>((db, slug) => {
     if (!slug) throw new Error("aucun faire-part");
@@ -143,7 +157,10 @@ const supa = {
   updateInvitation: async (config: unknown) => { const ok = await arpc("account_update_invitation", { p_config: config }); if (!ok) throw new Error("aucun faire-part"); },
   deleteInvitation: async () => !!(await arpc("account_delete_invitation", {})),
   listRsvps: async () => (await arpc("account_rsvps", {})) as RsvpRow[] | null,
-  adminDashboard: async (from: string, to: string) => (await arpc("admin_dashboard", { p_from: from, p_to: to })) as AdminData,
+  adminDashboard: async (from: string, to: string, exclude = true) => (await arpc("admin_dashboard", { p_from: from, p_to: to, p_exclude: exclude })) as AdminData,
+  adminAccounts: async (from: string, to: string) => (await arpc("admin_accounts", { p_from: from, p_to: to })) as AdminAccount[],
+  adminInvitations: async (from: string, to: string) => (await arpc("admin_invitations", { p_from: from, p_to: to })) as AdminInvitation[],
+  adminSetExclusion: async (kind: "account" | "slug", id: string, excluded: boolean) => { await arpc("admin_set_exclusion", { p_kind: kind, p_id: id, p_excluded: excluded }); },
   deleteRsvp: async (id: number) => { await arpc("account_delete_rsvp", { p_id: id }); },
   deleteAccount: async () => { await arpc("delete_account", {}); auth.drop(); },
   addRsvp: async (data: Record<string, unknown>) => Number(await arpc("account_add_rsvp", { p_data: data })),

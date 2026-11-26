@@ -10,8 +10,12 @@ const SOURCES = ["direct", "seo", "ia", "faire-part", "reseaux", "email", "autre
 const CHANNELS = ["natif", "whatsapp", "sms", "email", "copie"];
 const SRC_KEY = "fp:src", SRC_DAYS = 30;
 
+// Navigateur de l'administrateur (marqué en ouvrant /admin/) : jamais mesuré.
+const ADMIN_KEY = "fp:admin";
+export function markAdminDevice() { try { localStorage.setItem(ADMIN_KEY, "1"); } catch {} }
 function optedOut() {
   try {
+    if (localStorage.getItem(ADMIN_KEY) === "1") return true;
     const n = navigator as Navigator & { globalPrivacyControl?: boolean };
     return n.globalPrivacyControl === true || n.doNotTrack === "1" || (window as unknown as { doNotTrack?: string }).doNotTrack === "1";
   } catch { return false; }

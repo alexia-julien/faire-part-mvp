@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
-import { api, type AdminData, type AdminKpis, type ApiError } from "@/lib/api";
+import { api, type AdminAccount, type AdminData, type AdminInvitation, type AdminKpis, type ApiError } from "@/lib/api";
+import { markAdminDevice } from "@/lib/track";
+import { Switch } from "@/components/ui/switch";
 import { auth, consumeRedirect, type User } from "@/lib/auth";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -52,12 +54,96 @@ function Evo({ k, a, b }: { k: string; a: AdminKpis; b: AdminKpis }) {
   );
 }
 
-function Card({ id, label, value, children, big }: { id: string; label: string; value: string; children?: React.ReactNode; big?: boolean }) {
-  return (
-    <div id={id} className={cn("flex min-w-0 flex-col gap-1.5 rounded-[20px] border border-border bg-card shadow-soft", big ? "p-7" : "p-5")}>
+function Card({ id, label, value, children, big, onClick, active }: { id: string; label: string; value: string; children?: React.ReactNode; big?: boolean; onClick?: () => void; active?: boolean }) {
+  const body = (
+    <>
       <span className="text-[12px] uppercase tracking-[0.08em] text-muted-foreground">{label}</span>
       <span className={cn("font-serif leading-none tabular-nums", big ? "text-[56px]" : "text-[36px]")}>{value}</span>
       {children && <span className="text-[13px] text-muted-foreground tabular-nums">{children}</span>}
+      {onClick && <span className="mt-1 text-[13px] font-medium text-foreground underline underline-offset-4">{active ? "Masquer le détail" : "Voir le détail"}</span>}
+    </>
+  );
+  const cls = cn("flex min-w-0 flex-col gap-1.5 rounded-[20px] border bg-card text-left shadow-soft", big ? "p-7" : "p-5", active ? "border-foreground" : "border-border");
+  if (onClick) return <button id={id} type="button" aria-expanded={active} onClick={onClick} className={cn(cls, "cursor-pointer transition-colors hover:border-foreground/50")}>{body}</button>;
+  return <div id={id} className={cls}>{body}</div>;
+}
+
+const when = (s: string | null) => (s ? new Date(s).toLocaleString("fr-FR", { day: "2-digit", month: "2-digit", year: "numeric", hour: "2-digit", minute: "2-digit" }) : "—");
+const names = (a: string | null, b: string | null) => (a || b ? [a, b].filter(Boolean).join(" & ") : "Prénoms inconnus (supprimé)");
+
+function StatusBadge({ excluded, admin }: { excluded: boolean; admin?: boolean }) {
+  return (
+    <span className={cn("inline-block rounded-full px-2 py-0.5 text-[12px]", excluded ? "bg-muted text-muted-foreground" : "bg-emerald-50 text-emerald-800")}>
+      {admin ? "Vous (admin)" : excluded ? "Exclu" : "Compté"}
+    </span>
+  );
+}
+
+// Détail cliquable des comptes ou des faire-part de la période, avec exclusion à la ligne.
+function Detail({ kind, period, onChanged }: { kind: "comptes" | "faire_part"; period: { from: string; to: string }; onChanged: () => void }) {
+  const [rows, setRows] = useState<AdminAccount[] | AdminInvitation[] | null>(null);
+  const [err, setErr] = useState(false);
+  const [busy, setBusy] = useState("");
+  const fetchRows = useCallback(async () => {
+    try { setErr(false); setRows(kind === "comptes" ? await api.adminAccounts(period.from, period.to) : await api.adminInvitations(period.from, period.to)); }
+    catch { setErr(true); }
+  }, [kind, period]);
+  useEffect(() => { fetchRows(); }, [fetchRows]);
+  const toggle = async (k: "account" | "slug", id: string, excluded: boolean) => {
+    setBusy(id);
+    try { await api.adminSetExclusion(k, id, excluded); await fetchRows(); onChanged(); } catch { setErr(true); }
+    setBusy("");
+  };
+  const btn = (k: "account" | "slug", id: string, excluded: boolean) => (
+    <Button size="sm" variant="outline" disabled={busy === id} onClick={() => toggle(k, id, !excluded)}>{excluded ? "Réintégrer" : "Exclure"}</Button>
+  );
+  return (
+    <div id={kind === "comptes" ? "detail-comptes" : "detail-faire-part"} className="rounded-[20px] border border-border bg-card p-5 shadow-soft">
+      <p className="mb-3 text-[12px] uppercase tracking-[0.08em] text-muted-foreground">{kind === "comptes" ? "Comptes créés sur la période" : "Faire-part créés sur la période"}</p>
+      {err && <p className="text-[14px] text-muted-foreground">Le détail n’a pas pu se charger.</p>}
+      {!rows && !err && <p className="text-[14px] text-muted-foreground">Chargement…</p>}
+      {rows && rows.length === 0 && <p className="text-[14px] text-muted-foreground">Rien sur la période.</p>}
+      {rows && rows.length > 0 && (
+        <div className="overflow-x-auto">
+          <table className="w-full whitespace-nowrap text-[14px] tabular-nums [&_td]:px-2 [&_td]:py-2.5 [&_th]:px-2 [&_th]:pb-2">
+            {kind === "comptes" ? (
+              <>
+                <thead><tr className="text-left text-[12px] text-muted-foreground">
+                  <th className="font-medium">E-mail</th><th className="font-medium">Créé le</th><th className="font-medium">Connexion</th>
+                  <th className="font-medium">Dernière connexion</th><th className="font-medium">Faire-part</th><th className="font-medium">Statut</th><th></th>
+                </tr></thead>
+                <tbody>
+                  {(rows as AdminAccount[]).map((r) => (
+                    <tr key={r.id} className={cn("border-t border-border", r.excluded && "text-muted-foreground")}>
+                      <td className="font-medium">{r.email || "—"}</td><td>{when(r.created_at)}</td><td>{r.provider === "google" ? "Google" : "Code e-mail"}</td>
+                      <td>{when(r.last_sign_in_at)}</td><td>{r.faire_part?.length ? r.faire_part.map((f) => names(f.partner1, f.partner2)).join(", ") : "—"}</td>
+                      <td><StatusBadge excluded={r.excluded} admin={r.admin} /></td><td className="text-right">{!r.admin && btn("account", r.id, r.excluded)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </>
+            ) : (
+              <>
+                <thead><tr className="text-left text-[12px] text-muted-foreground">
+                  <th className="font-medium">Faire-part</th><th className="font-medium">Mariage</th><th className="font-medium">Créé le</th><th className="font-medium">Compte</th>
+                  <th className="text-right font-medium">Ouvertures</th><th className="text-right font-medium">Réponses</th><th className="font-medium">Statut</th><th></th>
+                </tr></thead>
+                <tbody>
+                  {(rows as AdminInvitation[]).map((r) => (
+                    <tr key={r.slug} className={cn("border-t border-border", r.excluded && "text-muted-foreground")}>
+                      <td className="font-medium">{names(r.partner1, r.partner2)}<span className="block text-[12px] font-normal text-muted-foreground">{r.online ? "En ligne" : "Supprimé"} · {r.slug}</span></td>
+                      <td>{r.wedding_date ? parse(r.wedding_date).toLocaleDateString("fr-FR") : "—"}</td><td>{when(r.created_at)}</td><td>{r.owner_email || "—"}</td>
+                      <td className="text-right">{nf(r.ouvertures)}</td><td className="text-right">{nf(r.reponses)}</td>
+                      <td><StatusBadge excluded={r.excluded} /></td>
+                      <td className="text-right">{r.excluded_by_account ? <span className="text-[12px]">Exclu avec le compte</span> : btn("slug", r.slug, r.excluded)}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </>
+            )}
+          </table>
+        </div>
+      )}
     </div>
   );
 }
@@ -154,7 +240,7 @@ function Funnel({ k }: { k: AdminKpis }) {
   );
 }
 
-function Board({ d }: { d: AdminData }) {
+function Board({ d, period, open, setOpen, onChanged }: { d: AdminData; period: { from: string; to: string }; open: "comptes" | "faire_part" | null; setOpen: (k: "comptes" | "faire_part" | null) => void; onChanged: () => void }) {
   const a = d.kpis.actuelle, b = d.kpis.precedente;
   const n = dayCount(d.periode.from, d.periode.to);
   const prevFrom = iso(addDays(parse(d.periode.from), -n)), prevTo = iso(addDays(parse(d.periode.from), -1));
@@ -164,18 +250,20 @@ function Board({ d }: { d: AdminData }) {
       <p id="resume" className="t-lead max-w-[62ch]">
         <b className="text-foreground">{nf(a.visiteurs)}</b> visiteurs uniques, <b className="text-foreground">{nf(a.comptes)}</b> comptes et{" "}
         <b className="text-foreground">{nf(a.faire_part)}</b> faire-part créés sur la période, soit <b className="text-foreground">{pct(a.taux_transformation)}</b> de visiteurs transformés en compte.
-        <span className="block text-[13px] text-muted-foreground">Comparaison avec les {n} jours précédents ({short(prevFrom)} – {short(prevTo)}).</span>
+        <span className="block text-[13px] text-muted-foreground">Comparaison avec les {n} jours précédents ({short(prevFrom)} – {short(prevTo)}).
+          {d.exclusion?.active ? ` Hors votre activité : ${d.exclusion.comptes} compte(s), ${d.exclusion.faire_part} faire-part et ${d.exclusion.visiteurs} réseau(x) exclus.` : " Votre propre activité est incluse."}</span>
       </p>
 
       <Section id="key-metrics" title="Key metrics">
         <div className="grid gap-4 sm:grid-cols-2">
-          <Card id="km-comptes" big label="Comptes créés" value={nf(a.comptes)}>
+          <Card id="km-comptes" big label="Comptes créés" value={nf(a.comptes)} active={open === "comptes"} onClick={() => setOpen(open === "comptes" ? null : "comptes")}>
             <Evo k="comptes" a={a} b={b} /> · avant : {nf(b.comptes)} · total : {nf(d.totaux.comptes)}
           </Card>
-          <Card id="km-faire-part" big label="Faire-part créés" value={nf(a.faire_part)}>
+          <Card id="km-faire-part" big label="Faire-part créés" value={nf(a.faire_part)} active={open === "faire_part"} onClick={() => setOpen(open === "faire_part" ? null : "faire_part")}>
             <Evo k="faire_part" a={a} b={b} /> · avant : {nf(b.faire_part)} · en ligne : {nf(d.totaux.faire_part)}
           </Card>
         </div>
+        {open && <Detail key={open} kind={open} period={period} onChanged={onChanged} />}
         <div id="ch-creations" className="rounded-[20px] border border-border bg-card p-6 shadow-soft">
           <p className="mb-3 text-[12px] uppercase tracking-[0.08em] text-muted-foreground">Comptes et faire-part créés par jour</p>
           <DailyBars rows={d.jours} label="Comptes et faire-part créés par jour" series={[
@@ -273,10 +361,12 @@ export function AdminDashboard() {
   const [period, setPeriod] = useState(() => range("30"));
   const [data, setData] = useState<AdminData | null>(null);
   const [state, setState] = useState<"idle" | "loading" | "denied" | "error">("idle");
+  const [exclude, setExclude] = useState(true);
+  const [open, setOpen] = useState<"comptes" | "faire_part" | null>(null);
 
-  const load = useCallback(async (p: { from: string; to: string }) => {
+  const load = useCallback(async (p: { from: string; to: string }, ex: boolean) => {
     setState("loading");
-    try { setData(await api.adminDashboard(p.from, p.to)); setState("idle"); }
+    try { setData(await api.adminDashboard(p.from, p.to, ex)); setState("idle"); markAdminDevice(); }
     catch (e) {
       const err = e as ApiError;
       if (err?.signedOut) { setUser(null); return; }
@@ -289,7 +379,7 @@ export function AdminDashboard() {
     consumeRedirect();
     setUser(auth.user());
   }, []);
-  useEffect(() => { if (user) load(period); }, [user, period, load]);
+  useEffect(() => { if (user) load(period, exclude); }, [user, period, exclude, load]);
 
   const valid = useMemo(() => /^\d{4}-\d{2}-\d{2}$/.test(period.from) && /^\d{4}-\d{2}-\d{2}$/.test(period.to) && period.from <= period.to, [period]);
   const signOut = async () => { await auth.signOut(); setUser(null); setData(null); };
@@ -341,14 +431,17 @@ export function AdminDashboard() {
               <input id="d-to" type="date" min={period.from} max={iso(new Date())} value={period.to} className="h-10 rounded-xl border border-border bg-card px-3 text-[15px] text-foreground"
                 onChange={(e) => { if (e.target.value && e.target.validity.valid) { setPreset("perso"); setPeriod((p) => ({ ...p, to: e.target.value })); } }} />
             </label>
-            <Button id="refresh" variant="outline" size="icon" aria-label="Actualiser" disabled={!valid || state === "loading"} onClick={() => load(period)}>
+            <label className="flex h-10 items-center gap-2 text-[14px] text-foreground">
+              <Switch id="exclude" checked={exclude} onCheckedChange={setExclude} aria-label="Exclure mon activité" />Exclure mon activité
+            </label>
+            <Button id="refresh" variant="outline" size="icon" aria-label="Actualiser" disabled={!valid || state === "loading"} onClick={() => load(period, exclude)}>
               <RefreshCw className={cn("size-4", state === "loading" && "animate-spin")} />
             </Button>
           </div>
         </header>
         {state === "error" && <p id="admin-error" className="rounded-2xl border border-border bg-card p-4 text-[15px]">Les chiffres n’ont pas pu se charger. Réessayez avec le bouton Actualiser.</p>}
         {!data && state === "loading" && <Loading />}
-        {data && <div className={cn("transition-opacity", state === "loading" && "opacity-50")}><Board d={data} /></div>}
+        {data && <div className={cn("transition-opacity", state === "loading" && "opacity-50")}><Board d={data} period={period} open={open} setOpen={setOpen} onChanged={() => load(period, exclude)} /></div>}
       </div>
     </Shell>
   );

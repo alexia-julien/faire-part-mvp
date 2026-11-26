@@ -601,12 +601,53 @@ revoke all on function private.html(text), private.send_rsvp_digests() from publ
 create table if not exists private.admins (user_id uuid primary key references auth.users(id) on delete cascade, created_at timestamptz not null default now());
 revoke all on private.admins from public, anon, authenticated;
 
-create or replace function public.admin_dashboard(p_from date, p_to date) returns jsonb
-language plpgsql stable security definer set search_path = public, extensions as $$
-declare d0 timestamptz; d1 timestamptz; v jsonb;
+create table if not exists private.exclusions (
+  kind text not null check (kind in ('account', 'slug', 'visitor')),
+  id text not null,
+  created_at timestamptz not null default now(),
+  primary key (kind, id)
+);
+revoke all on private.exclusions from public, anon, authenticated;
+
+create or replace function private.is_admin() returns boolean
+language sql stable security definer set search_path = public, extensions as $$
+  select private.account_id() is not null and exists (select 1 from private.admins where user_id = private.account_id());
+$$;
+
+-- Activité exclue des indicateurs : comptes admin ou exclus, leurs faire-part (ou ceux exclus un par un),
+-- et les visiteurs qui ont créé ou géré ces faire-part, ou ouvert le tableau de bord.
+create or replace function private.excluded_accounts() returns setof uuid
+language sql stable security definer set search_path = public, extensions as $$
+  select user_id from private.admins
+  union select u.id from auth.users u join private.exclusions x on x.kind = 'account' and x.id = u.id::text;
+$$;
+create or replace function private.excluded_slugs() returns setof text
+language sql stable security definer set search_path = public, extensions as $$
+  select slug from invitations where owner in (select private.excluded_accounts())
+  union select id from private.exclusions where kind = 'slug';
+$$;
+create or replace function private.excluded_visitors() returns setof text
+language sql stable security definer set search_path = public, extensions as $$
+  select id from private.exclusions where kind = 'visitor'
+  union select distinct visitor from private.events
+   where visitor is not null and slug in (select private.excluded_slugs())
+     and event in ('invitation_created', 'invitation_updated', 'invitation_attached', 'rsvps_listed', 'share', 'qr_download');
+$$;
+revoke all on function private.excluded_accounts(), private.excluded_slugs(), private.excluded_visitors(), private.is_admin() from public, anon, authenticated;
+
+drop function if exists public.admin_dashboard(date, date);
+create or replace function public.admin_dashboard(p_from date, p_to date, p_exclude boolean default true) returns jsonb
+language plpgsql volatile security definer set search_path = public, extensions as $$
+declare d0 timestamptz; d1 timestamptz; v jsonb; xa uuid[] := '{}'; xs text[] := '{}'; xv text[] := '{}'; me text;
 begin
-  if private.account_id() is null or not exists (select 1 from private.admins where user_id = private.account_id()) then
-    raise exception 'not admin' using errcode = '42501';
+  if not private.is_admin() then raise exception 'not admin' using errcode = '42501'; end if;
+  -- Le réseau depuis lequel l'admin consulte le tableau de bord est le sien : on l'exclut aussi.
+  me := private.client_id();
+  if me is not null then insert into private.exclusions(kind, id) values ('visitor', me) on conflict do nothing; end if;
+  if p_exclude then
+    xa := array(select private.excluded_accounts());
+    xs := array(select private.excluded_slugs());
+    xv := array(select private.excluded_visitors());
   end if;
   if p_from is null or p_to is null or p_from > p_to or p_to - p_from > 731 then
     raise exception 'période invalide' using errcode = '22023';
@@ -618,7 +659,9 @@ begin
     select 'actuelle' as periode, d0 as a, d1 as b
     union all select 'precedente', d0 - (d1 - d0), d0
   ),
-  e as (select p.periode, ev.* from p join private.events ev on ev.created_at >= p.a and ev.created_at < p.b),
+  ev as (select * from private.events where not (coalesce(visitor, '') = any(xv)) and not (coalesce(slug, '') = any(xs))),
+  us as (select * from auth.users where not (id = any(xa))),
+  e as (select p.periode, ev.* from p join ev on ev.created_at >= p.a and ev.created_at < p.b),
   s as (select periode, visitor, (created_at at time zone 'Europe/Paris')::date as jour, max((meta->>'seconds')::int) as sec
         from e where event = 'session_end' and meta ? 'seconds' group by 1, 2, 3),
   m as (
@@ -627,7 +670,7 @@ begin
       (select count(*) from e where e.periode = p.periode and event = 'landing_view') as pages_accueil,
       (select count(distinct visitor) from e where e.periode = p.periode and event = 'editor_start') as demarres,
       (select count(distinct visitor) from e where e.periode = p.periode and event in ('auth_gate', 'invitation_created')) as termines,
-      (select count(*) from auth.users u where u.created_at >= p.a and u.created_at < p.b) as comptes,
+      (select count(*) from us u where u.created_at >= p.a and u.created_at < p.b) as comptes,
       (select count(*) from e where e.periode = p.periode and event = 'invitation_created') as faire_part,
       (select count(*) from e where e.periode = p.periode and event = 'invitation_created' and meta->>'src' = 'faire-part') as faire_part_viraux,
       (select count(distinct (slug, visitor)) from e where e.periode = p.periode and event = 'invitation_viewed') as ouvertures_invites,
@@ -648,9 +691,9 @@ begin
     from m
   ),
   j as (select generate_series(p_from, p_to, interval '1 day')::date as jour),
-  ej as (select (created_at at time zone 'Europe/Paris')::date as jour, event, visitor from private.events
+  ej as (select (created_at at time zone 'Europe/Paris')::date as jour, event, visitor from ev
          where created_at >= d0 and created_at < d1 and event in ('landing_view', 'editor_start', 'invitation_created')),
-  uj as (select (created_at at time zone 'Europe/Paris')::date as jour, count(*) as n from auth.users
+  uj as (select (created_at at time zone 'Europe/Paris')::date as jour, count(*) as n from us
          where created_at >= d0 and created_at < d1 group by 1),
   jr as (
     select to_char(j.jour, 'YYYY-MM-DD') as jour,
@@ -661,8 +704,8 @@ begin
     from j
   ),
   ap as (select coalesce(meta->>'device', 'inconnu') as appareil, count(distinct visitor) as visiteurs
-         from private.events where event = 'landing_view' and created_at >= d0 and created_at < d1 group by 1),
-  es as (select event, visitor, coalesce(meta->>'src', 'direct') as src from private.events
+         from ev where event = 'landing_view' and created_at >= d0 and created_at < d1 group by 1),
+  es as (select event, visitor, coalesce(meta->>'src', 'direct') as src from ev
          where created_at >= d0 and created_at < d1 and event in ('landing_view', 'editor_start', 'invitation_created')),
   so as (select src as source,
            count(distinct visitor) filter (where event = 'landing_view') as visiteurs,
@@ -671,7 +714,8 @@ begin
          from es group by 1)
   select jsonb_build_object(
     'periode', jsonb_build_object('from', p_from, 'to', p_to),
-    'totaux', jsonb_build_object('comptes', (select count(*) from auth.users), 'faire_part', (select count(*) from invitations)),
+    'totaux', jsonb_build_object('comptes', (select count(*) from us), 'faire_part', (select count(*) from invitations where not (slug = any(xs)))),
+    'exclusion', jsonb_build_object('active', p_exclude, 'comptes', cardinality(xa), 'faire_part', cardinality(xs), 'visiteurs', cardinality(xv)),
     'kpis', (select jsonb_object_agg(periode, to_jsonb(k) - 'periode') from k),
     'jours', (select coalesce(jsonb_agg(to_jsonb(jr) order by jr.jour), '[]'::jsonb) from jr),
     'appareils', (select coalesce(jsonb_agg(jsonb_build_object('appareil', appareil, 'visiteurs', visiteurs,
@@ -683,8 +727,66 @@ begin
   return v;
 end $$;
 
-revoke all on function public.admin_dashboard(date, date) from public, anon, authenticated;
-grant execute on function public.admin_dashboard(date, date) to authenticated;
+revoke all on function public.admin_dashboard(date, date, boolean) from public, anon, authenticated;
+grant execute on function public.admin_dashboard(date, date, boolean) to authenticated;
+
+-- Détail des comptes créés sur la période (e-mail compris : réservé à l'admin).
+create or replace function public.admin_accounts(p_from date, p_to date) returns jsonb
+language plpgsql stable security definer set search_path = public, extensions as $$
+begin
+  if not private.is_admin() then raise exception 'not admin' using errcode = '42501'; end if;
+  return coalesce((
+    select jsonb_agg(jsonb_build_object(
+      'id', u.id, 'email', u.email, 'created_at', u.created_at, 'last_sign_in_at', u.last_sign_in_at,
+      'provider', coalesce(u.raw_app_meta_data->>'provider', 'email'),
+      'admin', exists (select 1 from private.admins a where a.user_id = u.id),
+      'excluded', u.id in (select private.excluded_accounts()),
+      'faire_part', (select jsonb_agg(jsonb_build_object('slug', i.slug, 'partner1', i.config->>'partner1', 'partner2', i.config->>'partner2'))
+                     from invitations i where i.owner = u.id)
+    ) order by u.created_at desc)
+    from auth.users u
+    where u.created_at >= p_from::timestamp at time zone 'Europe/Paris' and u.created_at < (p_to + 1)::timestamp at time zone 'Europe/Paris'
+  ), '[]'::jsonb);
+end $$;
+
+-- Détail des faire-part créés sur la période, y compris ceux supprimés depuis (prénoms alors inconnus).
+create or replace function public.admin_invitations(p_from date, p_to date) returns jsonb
+language plpgsql stable security definer set search_path = public, extensions as $$
+declare d0 timestamptz := p_from::timestamp at time zone 'Europe/Paris'; d1 timestamptz := (p_to + 1)::timestamp at time zone 'Europe/Paris';
+begin
+  if not private.is_admin() then raise exception 'not admin' using errcode = '42501'; end if;
+  return coalesce((
+    with c as (
+      select slug, created_at from invitations where created_at >= d0 and created_at < d1
+      union
+      select slug, min(created_at) from private.events where event = 'invitation_created' and created_at >= d0 and created_at < d1
+        and slug is not null and slug not in (select slug from invitations) group by slug
+    )
+    select jsonb_agg(jsonb_build_object(
+      'slug', c.slug, 'created_at', c.created_at, 'online', i.slug is not null,
+      'partner1', i.config->>'partner1', 'partner2', i.config->>'partner2', 'wedding_date', i.config->>'date',
+      'owner_email', u.email,
+      'ouvertures', (select count(distinct visitor) from private.events v where v.event = 'invitation_viewed' and v.slug = c.slug),
+      'reponses', (select count(*) from rsvps r where r.slug = c.slug and coalesce((r.data->>'manual')::boolean, false) = false),
+      'excluded', c.slug in (select private.excluded_slugs()),
+      'excluded_by_account', i.owner in (select private.excluded_accounts())
+    ) order by c.created_at desc)
+    from c left join invitations i on i.slug = c.slug left join auth.users u on u.id = i.owner
+  ), '[]'::jsonb);
+end $$;
+
+-- Exclure ou réintégrer un compte ou un faire-part (un compte admin reste toujours exclu).
+create or replace function public.admin_set_exclusion(p_kind text, p_id text, p_excluded boolean) returns void
+language plpgsql security definer set search_path = public, extensions as $$
+begin
+  if not private.is_admin() then raise exception 'not admin' using errcode = '42501'; end if;
+  if p_kind not in ('account', 'slug') or p_id is null or length(p_id) > 100 then raise exception 'exclusion invalide' using errcode = '22023'; end if;
+  if p_excluded then insert into private.exclusions(kind, id) values (p_kind, p_id) on conflict do nothing;
+  else delete from private.exclusions where kind = p_kind and id = p_id; end if;
+end $$;
+
+revoke all on function public.admin_accounts(date, date), public.admin_invitations(date, date), public.admin_set_exclusion(text, text, boolean) from public, anon, authenticated;
+grant execute on function public.admin_accounts(date, date), public.admin_invitations(date, date), public.admin_set_exclusion(text, text, boolean) to authenticated;
 
 select cron.unschedule(jobid) from cron.job where jobname = 'rsvp-digest';
 select cron.schedule('rsvp-digest', '30 7 * * *', 'select private.send_rsvp_digests()');

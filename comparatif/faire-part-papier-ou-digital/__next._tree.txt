@@ -1,7 +1,7 @@
-:HL["/_next/static/chunks/3u0q3k9w7yrix.css","style"]
+:HL["/_next/static/chunks/30f2zlj9sq297.css","style"]
 :HL["/_next/static/chunks/2h0wbkh-9-7rn.css","style"]
 :HC["/",""]
 3:[["children",{"s":"__PAGE__","h":160}]]
 2:[["children",{"s":"faire-part-papier-ou-digital","h":96,"c":"$Q3"}]]
 1:[["children",{"s":"comparatif","h":64,"c":"$Q2"}]]
-0:{"b":"fBsi__igNMTRLHWsoZr7S","t":{"t":{"s":"","h":16,"c":"$Q1"}}}
+0:{"b":"r_UP7vu_wnmWUZLNgZIzT","t":{"t":{"s":"","h":16,"c":"$Q1"}}}
