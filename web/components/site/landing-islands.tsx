@@ -42,9 +42,17 @@ export function LinkSync() {
   return null;
 }
 
-export function NavAccount() {
+// En-tête : visiteur → « Se connecter » + bouton « Créer mon faire-part » ; compte connecté → bouton « Mon faire-part »
+// (un seul faire-part par compte : « Créer » ne ferait que rouvrir le sien, c'est donc le retour qu'on met en avant).
+export function NavAccount({ createHref }: { createHref: string }) {
   const on = useSignedIn();
-  return <a href="/mon-faire-part/" id="nav-mine" className="rounded-full px-3 py-2 text-foreground/75 hover:text-foreground">{on ? "Mon faire-part" : "Se connecter"}</a>;
+  if (on) return <Button asChild size="sm" className="h-10"><a href="/mon-faire-part/" id="nav-mine">Mon faire-part</a></Button>;
+  return (
+    <>
+      <a href="/mon-faire-part/" id="nav-mine" className="rounded-full px-3 py-2 text-foreground/75 hover:text-foreground">Se connecter</a>
+      <Button asChild size="sm" className="hidden h-10 sm:inline-flex"><a href={createHref} data-create>Créer mon faire-part</a></Button>
+    </>
+  );
 }
 
 // Les polices des ambiances ne sont chargées qu'à l'approche de la section (une seule pour le haut de page).
@@ -91,12 +99,14 @@ export function Hero() {
             <input id="p2" value={p2} onChange={(e) => landing.set({ p2: e.target.value })} onKeyDown={go} maxLength={40} autoComplete="off" autoCapitalize="words" placeholder="Hugo"
               className="h-12 w-full min-w-0 flex-1 rounded-full bg-transparent px-4 font-serif text-[22px] outline-none placeholder:text-foreground/30 focus-visible:bg-muted/50" />
           </div>
-          <Button asChild size="lg" className="h-12"><a href={href} data-create id="cta-hero">Créer mon faire-part <ArrowRight /></a></Button>
+          <Button asChild size="lg" variant={signedIn ? "outline" : "default"} className="h-12"><a href={href} data-create id="cta-hero">Créer mon faire-part <ArrowRight /></a></Button>
         </div>
         <p className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-[14px] text-muted-foreground">
           {["Gratuit, sans carte bancaire", "Prêt en 3 minutes", "Modifiable après l’envoi"].map((t) => <span key={t} className="inline-flex items-center gap-1.5"><Check className="size-3.5 text-gold-ink" aria-hidden="true" />{t}</span>)}
         </p>
-        {signedIn && <p className="mt-3 text-[14px]"><a href="/mon-faire-part/" id="back-link" className="font-medium underline decoration-foreground/25 underline-offset-4">Retrouver mon faire-part et les réponses</a></p>}
+        {signedIn && (
+          <Button asChild size="lg" className="mt-5 h-auto min-h-12 max-w-full whitespace-normal py-3 text-left"><a href="/mon-faire-part/" id="back-link">Voir mon faire-part et les réponses <ArrowRight /></a></Button>
+        )}
       </div>
 
       <div className="flex flex-col items-center gap-6">
@@ -136,6 +146,7 @@ export function Hero() {
 export function FloatingCta() {
   const { p1, p2, style } = useLanding();
   const [show, setShow] = useState(false);
+  const signedIn = useSignedIn();
   useEffect(() => {
     const el = document.querySelector("[data-hero-cta]"); if (!el || !("IntersectionObserver" in window)) return;
     const end = document.querySelector("[data-final-cta]");
@@ -151,7 +162,9 @@ export function FloatingCta() {
     <AnimatePresence>
       {show && (
         <motion.div className="fixed inset-x-0 bottom-0 z-40 flex justify-center px-4 pb-safe md:hidden" initial={{ y: 90, opacity: 0 }} animate={{ y: 0, opacity: 1 }} exit={{ y: 90, opacity: 0 }}>
-          <a href={editorHref(p1.trim(), p2.trim(), style || undefined)} data-create className="glass mb-1 inline-flex h-14 items-center gap-2 rounded-full px-7 text-[16px] font-medium">Créer mon faire-part <ArrowRight className="size-[18px]" /></a>
+          {signedIn
+            ? <a href="/mon-faire-part/" id="float-mine" className="glass mb-1 inline-flex h-14 items-center gap-2 rounded-full px-7 text-[16px] font-medium">Mon faire-part <ArrowRight className="size-[18px]" /></a>
+            : <a href={editorHref(p1.trim(), p2.trim(), style || undefined)} data-create className="glass mb-1 inline-flex h-14 items-center gap-2 rounded-full px-7 text-[16px] font-medium">Créer mon faire-part <ArrowRight className="size-[18px]" /></a>}
         </motion.div>
       )}
     </AnimatePresence>

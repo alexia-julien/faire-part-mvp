@@ -5,6 +5,7 @@ import { ArrowRight, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NavAccount } from "@/components/site/landing-islands";
 import { BrandMark } from "@/components/site/brand-mark";
+import { ReportButton } from "@/components/site/feedback";
 import { AMBIANCES } from "@/lib/ambiances";
 import { ENTITY, PAGES, type Page } from "@/lib/site";
 import { GUIDE_LINKS } from "@/lib/guides";
@@ -24,8 +25,7 @@ export function SiteHeader({ current }: { current?: string }) {
             <a key={p.path} href={p.path} aria-current={current === p.path ? "page" : undefined}
               className="hidden rounded-full px-3 py-2 text-foreground/75 hover:text-foreground aria-[current=page]:text-foreground md:block">{p === PAGES.exemple ? "Exemple" : p.crumb}</a>
           ))}
-          <NavAccount />
-          <Button asChild size="sm" className="hidden h-10 sm:inline-flex"><a href={CREATE} data-create>Créer mon faire-part</a></Button>
+          <NavAccount createHref={CREATE} />
         </div>
       </nav>
     </header>
@@ -67,6 +67,7 @@ export function SiteFooter() {
           <a href={PAGES.confidentialite.path} className={link}>Confidentialité</a>
           <a href={PAGES.conditions.path} className={link}>Conditions d’utilisation</a>
           <a href="mailto:contact@maison-meli.com" className={link}>Contact</a>
+          <ReportButton variant="link" />
         </nav>
       </div>
     </footer>

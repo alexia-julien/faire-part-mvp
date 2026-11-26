@@ -23,6 +23,9 @@ import { ShareKit } from "@/components/site/share-kit";
 import { StepCustomize, StepDate, StepNames, StepReview, StepRsvp, StepStyle, StepTexts, StepVenue } from "./steps";
 import { PublishRitual } from "./publish-ritual";
 import { BrandMark } from "@/components/site/brand-mark";
+import { RatingCard, ReportButton } from "@/components/site/feedback";
+import { markRatingSeen } from "@/lib/feedback";
+import type { MyRating } from "@/lib/api";
 
 export const STEPS = [
   { id: "names", label: "Les mariés" },
@@ -79,6 +82,8 @@ export function Editor() {
   const [gate, setGate] = useState(false);
   const [published, setPublished] = useState<{ slug: string; seconds: number | null } | null>(null);
   const [ritual, setRitual] = useState(false);
+  // Note de la création (26/11/2026) : proposée sur l'écran de succès si le compte n'a pas encore noté.
+  const [rating, setRating] = useState<MyRating | undefined>(undefined);
   const [previewOpen, setPreviewOpen] = useState(false);
   const [replayKey, setReplayKey] = useState(0);
   const [pendingPhotos, setPendingPhotos] = useState(0);
@@ -277,6 +282,7 @@ export function Editor() {
     setPublished({ slug, seconds }); setRitual(!editingRef.current); setGate(false);
     clearTimeout(timer.current); storeDel(DRAFT_KEY); pendingDel();
     window.scrollTo({ top: 0 });
+    api.myRating().then((r) => { setRating(r); if (!r) markRatingSeen(); }).catch(() => setRating(undefined));
   }, []);
 
   const openAuth = useCallback(() => {
@@ -365,7 +371,7 @@ export function Editor() {
       <div className="paper-grain min-h-dvh">
         <Toaster position="top-center" toastOptions={{ classNames: { toast: "!rounded-[20px] !shadow-lift !border-border !font-sans" } }} />
         <AnimatePresence>{ritual && <PublishRitual cfg={preview} onDone={() => setRitual(false)} />}</AnimatePresence>
-        <Header user={user} progress={1} hideAccount noBar />
+        <Header user={user} progress={1} hideAccount noBar report={() => ({ step: "done", editing: !!editing })} />
         <main id="done" className="mx-auto grid max-w-5xl gap-12 px-5 pb-24 pt-6 lg:grid-cols-[1fr_340px] lg:items-start lg:pt-14">
           <motion.div initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: ritual ? 2.7 : 0, duration: 0.5 }} className="flex flex-col gap-8">
             <div>
@@ -380,6 +386,7 @@ export function Editor() {
               <ShareKit url={url} cfg={preview} slug={published.slug} />
               <p className="done-note text-[14px] text-muted-foreground">Collez-le dans un message, un email ou un groupe WhatsApp : vos invités répondent directement dessus.{user?.email ? ` Vous retrouverez ce faire-part et les réponses en vous connectant avec ${user.email}, depuis n’importe quel appareil.` : ""}</p>
             </div>
+            {rating === null && <RatingCard origin="succes" onSignedOut={() => setUser(null)} />}
             <div className="flex flex-wrap gap-3">
               <Button asChild size="lg"><a id="go-mine" href="/mon-faire-part/">Voir les réponses de mes invités</a></Button>
               <Button asChild variant="outline" size="lg"><a id="public-open" href={url} target="_blank" rel="noopener">Ouvrir le faire-part</a></Button>
@@ -402,7 +409,7 @@ export function Editor() {
     <Toaster position="top-center" toastOptions={{ classNames: { toast: "!rounded-[20px] !shadow-lift !border-border !font-sans" } }} />
     <div className="min-h-dvh lg:grid lg:grid-cols-[minmax(440px,40%)_1fr]" onKeyDown={onKey}>
       <div className="relative flex min-h-dvh min-w-0 flex-col">
-        <Header user={user} progress={(step + 1) / TOTAL} saved={!editing && saved} />
+        <Header user={user} progress={(step + 1) / TOTAL} saved={!editing && saved} report={() => ({ step: STEPS[stepRef.current]?.id, editing: !!editingRef.current })} />
         <main id="wizard" className="mx-auto flex w-full max-w-[560px] flex-1 flex-col px-5 pb-40 pt-4 sm:px-8 lg:pt-10">
           {(restored || notice || editing) && (
             <div className="mb-6 flex flex-col gap-2">
@@ -497,12 +504,12 @@ export function Editor() {
   );
 }
 
-function Header({ user, progress, saved, hideAccount, noBar }: { user: User | null; progress: number; saved?: boolean; hideAccount?: boolean; noBar?: boolean }) {
+function Header({ user, progress, saved, hideAccount, noBar, report }: { user: User | null; progress: number; saved?: boolean; hideAccount?: boolean; noBar?: boolean; report?: () => { step?: string; editing?: boolean } }) {
   return (
     <header className="sticky top-0 z-20 bg-background/85 backdrop-blur-md">
-      <div className="mx-auto flex h-16 w-full max-w-[560px] items-center justify-between gap-4 px-5 sm:px-8 lg:max-w-none">
-        <a href="/" className="flex shrink-0 items-center gap-2 whitespace-nowrap font-serif text-[20px] font-medium tracking-[-0.01em] sm:text-[22px]"><BrandMark className="size-8" />Maison Meli</a>
-        <div className="flex min-w-0 items-center gap-3 whitespace-nowrap text-[14px] sm:gap-4">
+      <div className="mx-auto flex h-16 w-full max-w-[560px] items-center justify-between gap-2 px-5 sm:gap-4 sm:px-8 lg:max-w-none">
+        <a href="/" className="flex shrink-0 items-center gap-2 whitespace-nowrap font-serif text-[20px] font-medium tracking-[-0.01em] max-[359px]:gap-1.5 max-[359px]:text-[18px] sm:text-[22px]"><BrandMark className="size-8 max-[359px]:size-7" />Maison Meli</a>
+        <div className="flex min-w-0 items-center gap-1.5 whitespace-nowrap text-[14px] sm:gap-4">
           <AnimatePresence>
             {saved && (
               <motion.span key="s" className="flex items-center gap-1 text-muted-foreground" initial={{ opacity: 0, y: 4 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0 }} aria-live="polite">
@@ -510,6 +517,7 @@ function Header({ user, progress, saved, hideAccount, noBar }: { user: User | nu
               </motion.span>
             )}
           </AnimatePresence>
+          <ReportButton context={report} />
           {!hideAccount && <a id="mine-link" href="/mon-faire-part/" className="font-medium text-foreground/80 hover:text-foreground">{user ? "Mon faire-part" : "Se connecter"}</a>}
         </div>
       </div>

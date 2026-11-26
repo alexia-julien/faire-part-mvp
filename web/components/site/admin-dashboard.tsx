@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { RefreshCw } from "lucide-react";
-import { api, type AdminAccount, type AdminData, type AdminInvitation, type AdminKpis, type ApiError } from "@/lib/api";
+import { api, type AdminAccount, type AdminData, type AdminFeedback, type AdminFeedbackItem, type AdminInvitation, type AdminKpis, type ApiError, type FeedbackStatus } from "@/lib/api";
 import { markAdminDevice } from "@/lib/track";
 import { Switch } from "@/components/ui/switch";
 import { auth, consumeRedirect, type User } from "@/lib/auth";
@@ -80,14 +80,14 @@ function StatusBadge({ excluded, admin }: { excluded: boolean; admin?: boolean }
 }
 
 // Détail cliquable des comptes ou des faire-part de la période, avec exclusion à la ligne.
-function Detail({ kind, period, onChanged }: { kind: "comptes" | "faire_part"; period: { from: string; to: string }; onChanged: () => void }) {
+function Detail({ kind, period, exclude, onChanged }: { kind: "comptes" | "faire_part"; period: { from: string; to: string }; exclude: boolean; onChanged: () => void }) {
   const [rows, setRows] = useState<AdminAccount[] | AdminInvitation[] | null>(null);
   const [err, setErr] = useState(false);
   const [busy, setBusy] = useState("");
   const fetchRows = useCallback(async () => {
-    try { setErr(false); setRows(kind === "comptes" ? await api.adminAccounts(period.from, period.to) : await api.adminInvitations(period.from, period.to)); }
+    try { setErr(false); setRows(kind === "comptes" ? await api.adminAccounts(period.from, period.to) : await api.adminInvitations(period.from, period.to, exclude)); }
     catch { setErr(true); }
-  }, [kind, period]);
+  }, [kind, period, exclude]);
   useEffect(() => { fetchRows(); }, [fetchRows]);
   const toggle = async (k: "account" | "slug", id: string, excluded: boolean) => {
     setBusy(id);
@@ -126,7 +126,7 @@ function Detail({ kind, period, onChanged }: { kind: "comptes" | "faire_part"; p
               <>
                 <thead><tr className="text-left text-[12px] text-muted-foreground">
                   <th className="font-medium">Faire-part</th><th className="font-medium">Mariage</th><th className="font-medium">Créé le</th><th className="font-medium">Compte</th>
-                  <th className="text-right font-medium">Ouvertures</th><th className="text-right font-medium">Réponses</th><th className="font-medium">Statut</th><th></th>
+                  <th className="text-right font-medium" title="Invités distincts sur la période, hors créateur du faire-part">Ouvertures invités</th><th className="text-right font-medium">Réponses</th><th className="font-medium">Statut</th><th></th>
                 </tr></thead>
                 <tbody>
                   {(rows as AdminInvitation[]).map((r) => (
@@ -263,7 +263,7 @@ function Board({ d, period, open, setOpen, onChanged }: { d: AdminData; period: 
             <Evo k="faire_part" a={a} b={b} /> · avant : {nf(b.faire_part)} · en ligne : {nf(d.totaux.faire_part)}
           </Card>
         </div>
-        {open && <Detail key={open} kind={open} period={period} onChanged={onChanged} />}
+        {open && <Detail key={open} kind={open} period={period} exclude={d.exclusion?.active ?? true} onChanged={onChanged} />}
         <div id="ch-creations" className="rounded-[20px] border border-border bg-card p-6 shadow-soft">
           <p className="mb-3 text-[12px] uppercase tracking-[0.08em] text-muted-foreground">Comptes et faire-part créés par jour</p>
           <DailyBars rows={d.jours} label="Comptes et faire-part créés par jour" series={[
@@ -335,7 +335,7 @@ function Board({ d, period, open, setOpen, onChanged }: { d: AdminData; period: 
 
       <Section id="apres-publication" title="Après publication">
         <div className="grid gap-4 sm:grid-cols-3">
-          <Card id="a-ouvertures" label="Ouvertures de faire-part" value={nf(a.ouvertures_invites)}>Invités distincts · <Evo k="ouvertures_invites" a={a} b={b} /></Card>
+          <Card id="a-ouvertures" label="Ouvertures de faire-part" value={nf(a.ouvertures_invites)}>Invités distincts, hors créateurs · <Evo k="ouvertures_invites" a={a} b={b} /></Card>
           <Card id="a-rsvp" label="Réponses RSVP" value={nf(a.reponses_rsvp)}>Taux de réponse {pct(a.taux_reponse_invites)}</Card>
           <Card id="a-viral" label="Faire-part venus d’un faire-part" value={nf(a.faire_part_viraux)}>Créés via « Créez le vôtre »</Card>
         </div>
@@ -346,12 +346,112 @@ function Board({ d, period, open, setOpen, onChanged }: { d: AdminData; period: 
         <dl className="mt-2 flex flex-col gap-2">
           <div><dt className="text-foreground">Visiteur unique</dt><dd>Personne distincte (empreinte de son adresse IP) ayant ouvert l’accueil. Mesure interne, sans cookie ; « Do Not Track » non compté.</dd></div>
           <div><dt className="text-foreground">Durée de session</dt><dd>Temps passé page visible, plus longue valeur par visiteur et par jour. Mesurée depuis le 25/11/2026.</dd></div>
+          <div><dt className="text-foreground">Ouverture de faire-part</dt><dd>Invité distinct (réseau) ayant ouvert un faire-part sur la période. Les ouvertures du créateur du faire-part (même réseau que sa création ou sa gestion) ne comptent pas, ni, si l’exclusion est active, les vôtres.</dd></div>
           <div><dt className="text-foreground">Démarré · Terminé</dt><dd>A saisi les prénoms dans l’éditeur · est arrivé au moment de publier (écran de connexion ou publication directe).</dd></div>
           <div><dt className="text-foreground">Comptes, faire-part créés</dt><dd>Inscriptions et publications de la période, y compris celles supprimées depuis.</dd></div>
           <div><dt className="text-foreground">Évolution</dt><dd>Écart avec la période de même durée juste avant : % pour les volumes, points pour les taux. Jours de minuit à minuit, heure de Paris.</dd></div>
         </dl>
       </details>
     </div>
+  );
+}
+
+// ---------------------------------------------------------------- Retours utilisateurs (26/11/2026)
+const KIND_LABEL: Record<string, string> = { rating: "Note", bug: "Bug", unhappy: "Mécontentement", idea: "Idée" };
+const STATUS_LABEL: Record<FeedbackStatus, string> = { new: "Nouveau", in_progress: "En cours", done: "Réglé" };
+function ctxLine(c: Record<string, unknown>) {
+  const s = (k: string) => (typeof c[k] === "string" || typeof c[k] === "number" ? String(c[k]) : "");
+  return [s("page"), DEV[s("device")] || s("device"), s("vw") && s("vh") ? s("vw") + "×" + s("vh") + " px" : "", s("step") ? "étape « " + s("step") + " »" : "", c.editing === true ? "modification" : ""].filter(Boolean).join(" · ");
+}
+
+function FeedbackSection({ period, exclude }: { period: { from: string; to: string }; exclude: boolean }) {
+  const [d, setD] = useState<AdminFeedback | null>(null);
+  const [err, setErr] = useState(false);
+  const [filter, setFilter] = useState<"tout" | "notes" | "signalements" | "a_traiter">("tout");
+  const [busy, setBusy] = useState<number | null>(null);
+  const fetchIt = useCallback(async () => {
+    try { setErr(false); setD(await api.adminFeedback(period.from, period.to, exclude)); } catch { setErr(true); }
+  }, [period, exclude]);
+  useEffect(() => { fetchIt(); }, [fetchIt]);
+  const setStatus = async (it: AdminFeedbackItem, st: FeedbackStatus) => {
+    setBusy(it.id);
+    try { await api.adminSetFeedbackStatus(it.id, st); await fetchIt(); } catch { setErr(true); }
+    setBusy(null);
+  };
+  const items = (d?.items || []).filter((it) =>
+    filter === "notes" ? it.kind === "rating" : filter === "signalements" ? it.kind !== "rating" : filter === "a_traiter" ? it.kind !== "rating" && it.status !== "done" : true);
+  const maxN = Math.max(1, ...(d?.notes.repartition || [0]));
+  return (
+    <Section id="retours" title="Retours">
+      {err && <p className="text-[14px] text-muted-foreground">Les retours n’ont pas pu se charger.</p>}
+      {!d && !err && <p className="text-[14px] text-muted-foreground">Chargement…</p>}
+      {d && (
+        <>
+          <div className="grid gap-4 sm:grid-cols-3">
+            <Card id="f-note" label="Note moyenne de la création" value={d.notes.moyenne == null ? "—" : nf(d.notes.moyenne, 1) + " /10"}>
+              {nf(d.notes.nombre)} note{d.notes.nombre > 1 ? "s" : ""} sur la période
+            </Card>
+            <Card id="f-signalements" label="Signalements" value={nf(d.signalements)}>Bugs, mécontentements et idées</Card>
+            <Card id="f-a-traiter" label="À traiter" value={nf(d.a_traiter)}>Signalements pas encore réglés</Card>
+          </div>
+          {d.notes.nombre > 0 && (
+            <div id="f-repartition" className="rounded-[20px] border border-border bg-card p-6 shadow-soft">
+              <p className="mb-4 text-[12px] uppercase tracking-[0.08em] text-muted-foreground">Répartition des notes</p>
+              <div className="grid grid-cols-11 items-end gap-1.5" style={{ height: 120 }}>
+                {d.notes.repartition.map((n, i) => (
+                  <div key={i} className="flex h-full flex-col items-center justify-end gap-1" title={`${i}/10 : ${n}`}>
+                    <span className="text-[11px] tabular-nums text-muted-foreground">{n || ""}</span>
+                    <div className={cn("w-full rounded-t-md", i <= 6 ? "bg-red-300" : i <= 8 ? "bg-amber-300" : "bg-emerald-400")} style={{ height: `${(n / maxN) * 80}px`, minHeight: n ? 4 : 1 }} />
+                  </div>
+                ))}
+              </div>
+              <div className="mt-1 grid grid-cols-11 gap-1.5 text-center text-[11px] tabular-nums text-muted-foreground">{d.notes.repartition.map((_, i) => <span key={i}>{i}</span>)}</div>
+            </div>
+          )}
+          <div className="flex flex-wrap gap-2" role="group" aria-label="Filtrer les retours">
+            {([["tout", "Tout"], ["a_traiter", "À traiter"], ["signalements", "Signalements"], ["notes", "Notes"]] as const).map(([v, l]) => (
+              <Button key={v} size="sm" variant={filter === v ? "default" : "outline"} aria-pressed={filter === v} data-filter={v} onClick={() => setFilter(v)}>{l}</Button>
+            ))}
+          </div>
+          <div id="f-liste" className="flex flex-col gap-3">
+            {items.length === 0 && <p className="text-[14px] text-muted-foreground">Aucun retour sur la période.</p>}
+            {items.map((it) => {
+              const errs = Array.isArray(it.context?.errors) ? (it.context.errors as unknown[]).map(String) : [];
+              return (
+                <article key={it.id} data-feedback={it.kind} className={cn("rounded-[20px] border border-border bg-card p-5 shadow-soft", it.excluded && "opacity-60")}>
+                  <div className="flex flex-wrap items-center gap-2 text-[13px]">
+                    <span className={cn("rounded-full px-2.5 py-0.5 font-medium",
+                      it.kind === "rating" ? (it.score! <= 6 ? "bg-red-50 text-red-800" : it.score! <= 8 ? "bg-amber-50 text-amber-800" : "bg-emerald-50 text-emerald-800")
+                        : it.kind === "bug" ? "bg-red-50 text-red-800" : it.kind === "unhappy" ? "bg-amber-50 text-amber-800" : "bg-sky-50 text-sky-800")}>
+                      {it.kind === "rating" ? `Note ${it.score}/10` : KIND_LABEL[it.kind]}
+                    </span>
+                    <span className="text-muted-foreground">{when(it.updated_at)}</span>
+                    {it.email ? <a href={"mailto:" + it.email} className="font-medium underline underline-offset-4">{it.email}</a> : <span className="text-muted-foreground">Sans e-mail</span>}
+                    <span className="text-muted-foreground">{it.account ? "· avec compte" : "· sans compte"}</span>
+                    {it.excluded && <StatusBadge excluded />}
+                    {it.kind !== "rating" && (
+                      <select aria-label="Statut" value={it.status} disabled={busy === it.id} onChange={(e) => setStatus(it, e.target.value as FeedbackStatus)}
+                        className="ml-auto h-9 rounded-xl border border-border bg-card px-2 text-[14px]">
+                        {(Object.keys(STATUS_LABEL) as FeedbackStatus[]).map((k) => <option key={k} value={k}>{STATUS_LABEL[k]}</option>)}
+                      </select>
+                    )}
+                  </div>
+                  <p className="mt-3 whitespace-pre-wrap text-[15px] leading-relaxed">{it.message || <span className="italic text-muted-foreground">Sans commentaire</span>}</p>
+                  <p className="mt-2 text-[12px] text-muted-foreground">{[ctxLine(it.context || {}), it.slug].filter(Boolean).join(" · ")}</p>
+                  {(errs.length > 0 || typeof it.context?.ua === "string") && (
+                    <details className="mt-1 text-[12px] text-muted-foreground">
+                      <summary className="cursor-pointer">Détails techniques</summary>
+                      {typeof it.context?.ua === "string" && <p className="mt-1 break-all">{String(it.context.ua)}</p>}
+                      {errs.map((e, i) => <p key={i} className="mt-1 break-all font-mono">{e}</p>)}
+                    </details>
+                  )}
+                </article>
+              );
+            })}
+          </div>
+        </>
+      )}
+    </Section>
   );
 }
 
@@ -384,10 +484,10 @@ export function AdminDashboard() {
   const valid = useMemo(() => /^\d{4}-\d{2}-\d{2}$/.test(period.from) && /^\d{4}-\d{2}-\d{2}$/.test(period.to) && period.from <= period.to, [period]);
   const signOut = async () => { await auth.signOut(); setUser(null); setData(null); };
 
-  if (user === undefined) return <Shell user={null}><Loading /></Shell>;
+  if (user === undefined) return <Shell user={null} report={false}><Loading /></Shell>;
   if (!user) {
     return (
-      <Shell user={null}>
+      <Shell user={null} report={false}>
         <section id="signin" className="mx-auto mt-6 w-full max-w-[440px] rounded-[28px] border border-white/60 bg-card p-7 shadow-float sm:mt-14">
           <AuthPanel title="Tableau de bord" text="Espace réservé à l’administrateur de Maison Meli." noSignup
             returnTo={location.href.split("#")[0].split("?")[0]} onSignedIn={(u) => setUser(u)} />
@@ -397,7 +497,7 @@ export function AdminDashboard() {
   }
   if (state === "denied") {
     return (
-      <Shell user={user} onSignOut={signOut}>
+      <Shell user={user} onSignOut={signOut} report={false}>
         <section id="denied" className="mx-auto mt-14 max-w-[480px] text-center">
           <h1 className="font-serif text-[40px]">Accès réservé</h1>
           <p className="t-lead mt-3">Ce compte n’a pas accès au tableau de bord.</p>
@@ -407,7 +507,7 @@ export function AdminDashboard() {
     );
   }
   return (
-    <Shell user={user} onSignOut={signOut}>
+    <Shell user={user} onSignOut={signOut} report={false}>
       <div className="flex flex-col gap-8">
         <header className="flex flex-wrap items-end justify-between gap-4">
           <h1 id="admin-dash-title" className="t-display !text-[clamp(40px,5vw,60px)]">Tableau de bord</h1>
@@ -442,6 +542,7 @@ export function AdminDashboard() {
         {state === "error" && <p id="admin-error" className="rounded-2xl border border-border bg-card p-4 text-[15px]">Les chiffres n’ont pas pu se charger. Réessayez avec le bouton Actualiser.</p>}
         {!data && state === "loading" && <Loading />}
         {data && <div className={cn("transition-opacity", state === "loading" && "opacity-50")}><Board d={data} period={period} open={open} setOpen={setOpen} onChanged={() => load(period, exclude)} /></div>}
+        {data && valid && <FeedbackSection period={period} exclude={exclude} />}
       </div>
     </Shell>
   );
