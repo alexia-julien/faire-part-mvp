@@ -55,6 +55,11 @@ Pour modifier sereinement sans toucher aux vrais utilisateurs ni fausser les chi
 3. La recette n'est jamais indexée (`robots.txt` interdit tout + en-tête `X-Robots-Tag: noindex` sur toutes les pages).
 4. Une fois validé : `git checkout dev && git merge staging`, puis `cd web && npm run deploy`, commit et push sur `dev` (= production).
 
+**Process de test (depuis le 26/11/2026) — détail et checklist : [`tests/CHECKLIST.md`](tests/CHECKLIST.md)**
+- Chaque dev : test **ciblé** de la fonctionnalité sur staging (mobile 390 px + ordinateur) et contrôle de base (build, accueil sans erreur).
+- Chaque mise en prod (2 à 4 devs max) : **toute** la checklist (tests automatiques, mobile en profondeur dont vrais téléphones, parcours fonctionnels) **avant** le merge vers `dev` ; puis contrôle léger en prod.
+- La checklist s'enrichit à chaque dev et à chaque bug trouvé (lignes `(+JJ/MM)` / `(bug JJ/MM)`). Le mobile est le canal principal : tout dev qui touche une page y ajoute au moins une ligne mobile.
+
 **Tableau de bord `/admin/`** : uniquement sur https://staging.maison-meli.com/admin/ (retiré de la production le 26/11/2026), mais il lit **les statistiques de production** (`PROD_SUPABASE` dans `web/lib/config.ts`, session séparée `fp:session:prod`, CSP de cette page ouverte à la base de production seulement).
 
 Mise en ligne (production) : `cd web && npm run deploy`, puis commit et push sur `dev`. Après chaque mise en ligne : `npm run indexnow` (prévient Bing et Copilot).
@@ -82,7 +87,9 @@ pip install playwright pillow opencv-python && python3 tests/e2e.py
 ```
 230 vérifications au 21/11/2026 (dont pages SEO/GEO, générateur, rétroplanning, exemple) : page d'accueil (SEO, données structurées, accroche, mesure, Do Not Track), éditeur (validations, brouillon, photos, ambiances et réglages, ouverture dans l'aperçu, sections, réponses), publication (compte par code ou Google, rituel, lien, partage, QR relu par OpenCV), modification et règle « un faire-part par compte », faire-part invité (ouverture, mouvement réduit, monogramme, fuseau de l'agenda, liens filtrés), réponse pas à pas et correction, tableau de suivi (doublons, recherche, filtres, tri, CSV sans formule, emails, suppressions), accessibilité (axe-core, WCAG 2.2 AA), absence de débordement à 375/390/430/1440 px, CSP sans violation, aucune erreur JavaScript, XSS. Captures dans `tests/out/`.
 
-La base se teste avec `supabase/tests.sql` (invités), `tests-comptes.sql` et `tests-mesure.sql` dans le SQL Editor (tout est annulé à la fin).
+La base se teste avec `supabase/tests.sql` (invités), `tests-comptes.sql`, `tests-mesure.sql` et `tests-retours.sql` dans le SQL Editor (tout est annulé à la fin).
+
+Limite actuelle : `tests/e2e.py` tourne sous Chromium avec une fenêtre redimensionnée (ni moteur Safari, ni tactile). Le mobile réel est couvert par la section M de `tests/CHECKLIST.md`.
 
 ## Sécurité et performance
 - **CSP stricte** posée dans chaque page par `scripts/postbuild.mjs` (ses empreintes dépendent de chaque page) : scripts autorisés par empreinte SHA-256, jamais `unsafe-inline` ; Google Identity Services seulement sur `/creer/` et `/mon-faire-part/`. Polices auto-hébergées (plus aucun appel à Google Fonts).
