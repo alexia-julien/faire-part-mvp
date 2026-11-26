@@ -36,7 +36,7 @@ export function ShareKit({ url, cfg, slug }: { url: string; cfg: Config; slug: s
     <div className="share-kit flex flex-col gap-5">
       <div className="flex items-center gap-2 rounded-2xl border border-border bg-card p-1.5 pl-4 shadow-soft">
         <input id="public-link" readOnly value={url} aria-label="Lien du faire-part" onFocus={(e) => e.currentTarget.select()}
-          className="min-w-0 flex-1 truncate bg-transparent text-[15px] text-foreground outline-none" />
+          className="min-w-0 flex-1 truncate bg-transparent text-[16px] text-foreground outline-none" />
         <Button type="button" size="sm" onClick={copy} data-copy="public-link" className="h-10 px-4">
           {copied ? <><Check aria-hidden="true" /> Copié</> : <><Copy aria-hidden="true" /> Copier</>}
         </Button>

@@ -85,6 +85,17 @@ export function Editor() {
   // Note de la création (26/11/2026) : proposée sur l'écran de succès si le compte n'a pas encore noté.
   const [rating, setRating] = useState<MyRating | undefined>(undefined);
   const [previewOpen, setPreviewOpen] = useState(false);
+  // Geste retour (Android / iOS) : ferme l'aperçu au lieu de quitter l'éditeur (26/11/2026, recette mobile).
+  useEffect(() => {
+    if (!previewOpen) return;
+    window.history.pushState({ ...window.history.state, fpPreview: 1 }, "");
+    const onPop = () => setPreviewOpen(false);
+    window.addEventListener("popstate", onPop);
+    return () => {
+      window.removeEventListener("popstate", onPop);
+      if (window.history.state?.fpPreview) window.history.back();
+    };
+  }, [previewOpen]);
   const [replayKey, setReplayKey] = useState(0);
   const [pendingPhotos, setPendingPhotos] = useState(0);
   const [wide, setWide] = useState(true);
@@ -289,8 +300,12 @@ export function Editor() {
     writeDraft(); pendingSet(); track("auth_gate", { once: true }); setGate(true);
   }, [writeDraft]);
 
+  const publishing = useRef(false); // double toucher sur « Publier » : une seule publication
   const publish = useCallback(async () => {
     if (!auth.user()) { openAuth(); return; }
+    if (publishing.current) return;
+    publishing.current = true;
+    try {
     setMsg(""); setBusy(true);
     const cfg = cleanForPublish(), seconds = cfg.meta?.durationSec ?? null;
     const fail = (e: ApiError) => {
@@ -309,6 +324,7 @@ export function Editor() {
       try { await api.createInvitation(slug, cfg); setBusy(false); finishPublish(slug, seconds); return; }
       catch (e) { if (!(e as ApiError)?.conflict || tries === 3) { fail(e as ApiError); return; } }
     }
+    } finally { publishing.current = false; }
   }, [cleanForPublish, finishPublish, openAuth]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Juste après la connexion : si ce compte a déjà un faire-part, on l'ouvre (un seul par compte) ; sinon on publie.
@@ -472,7 +488,7 @@ export function Editor() {
             <DrawerTitle className="sr-only">Aperçu du faire-part</DrawerTitle>
             <div className="flex items-center justify-between px-5 pb-3 pt-1">
               {preview.intro !== "aucune" ? <Button variant="ghost" size="sm" onClick={replayIntro}><RotateCcw aria-hidden="true" /> Revoir l’ouverture</Button> : <span />}
-              <Button id="close-preview" variant="ghost" size="icon-sm" onClick={() => setPreviewOpen(false)} aria-label="Fermer l’aperçu"><X aria-hidden="true" /></Button>
+              <Button id="close-preview" variant="ghost" size="icon" onClick={() => setPreviewOpen(false)} aria-label="Fermer l’aperçu"><X aria-hidden="true" /></Button>
             </div>
             <div className="mx-auto w-full max-w-[340px] flex-1 px-4 pb-6" style={{ maxWidth: "min(340px, calc((92dvh - 110px) * 433 / 882))" }}>{phone(drawerScroller)}</div>
           </DrawerContent>

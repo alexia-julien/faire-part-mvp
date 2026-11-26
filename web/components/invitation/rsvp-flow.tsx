@@ -68,6 +68,7 @@ export function RsvpFlow({ cfg, preview, previous, couple, madeWith, onMadeWith,
   const [dir, setDir] = useState(1);
   const [msg, setMsg] = useState("");
   const [busy, setBusy] = useState(false);
+  const sending = useRef(false); // double toucher sur « Envoyer » : un seul envoi (l'état busy n'est pas encore à jour au 2e toucher)
   const box = useRef<HTMLDivElement>(null);
   const set = <K extends keyof Draft>(k: K, v: Draft[K]) => { setX((o) => ({ ...o, [k]: v })); setMsg(""); };
 
@@ -121,11 +122,11 @@ export function RsvpFlow({ cfg, preview, previous, couple, madeWith, onMadeWith,
     setTimeout(() => { moved.current = true; setDir(1); setI((n) => n + 1); }, reduce ? 0 : 260);
   }
   async function submit() {
-    if (preview || !onSubmit || busy) return;
+    if (preview || !onSubmit || busy || sending.current) return;
     if (x.website) return; // anti-spam : champ piège rempli par les robots
     for (const id of steps) { const e = validate(id); if (e) { setMsg(e); setI(steps.indexOf(id)); return; } }
     const data = toData(x);
-    setBusy(true); setMsg("");
+    sending.current = true; setBusy(true); setMsg("");
     try {
       await onSubmit(data);
       setSent(data); setFresh(true); setEditing(false); setMode("thanks");
@@ -133,7 +134,7 @@ export function RsvpFlow({ cfg, preview, previous, couple, madeWith, onMadeWith,
       const m = String((err as Error)?.message || "");
       setMsg(/invalid email/.test(m) ? "L’adresse email ne semble pas valide." : /invalid phone/.test(m) ? "Le numéro de téléphone ne semble pas valide."
         : /rate limit/.test(m) ? "Trop de réponses envoyées depuis cette connexion. Réessayez dans une heure." : "Oups, l’envoi a échoué. Merci de réessayer dans un instant.");
-    } finally { setBusy(false); }
+    } finally { sending.current = false; setBusy(false); }
   }
   function edit() {
     setX(fromData(sent)); setI(0); setDir(-1); setEditing(true); setMode("form"); moved.current = true;

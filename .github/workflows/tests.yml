@@ -1,0 +1,79 @@
+# Recette automatique à chaque push sur staging (et à la demande) :
+# - mobile : Safari (WebKit, iPhone SE + iPhone 15) et Chrome Android (Pixel 7), écran tactile — tests/e2e_mobile.py
+# - ordinateur : parcours complet, accessibilité, CSP — tests/e2e.py ; SEO — tests/seo.py
+# Résultat visible dans l'onglet « Actions » du dépôt ; captures téléchargeables (artefacts) en cas d'échec comme de succès.
+name: Recette
+
+on:
+  push:
+    branches: [staging]
+  pull_request:
+  workflow_dispatch:
+
+concurrency:
+  group: recette-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  mobile:
+    name: Mobile (Safari iOS + Chrome Android)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Export local du site
+        working-directory: web
+        run: npm ci && npm run build:local
+      - name: Playwright (WebKit + Chromium)
+        run: |
+          pip install playwright==1.63.0 pillow
+          python -m playwright install --with-deps webkit chromium
+      - name: Recette mobile
+        run: python tests/e2e_mobile.py --strict
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: captures-mobile
+          path: tests/out/mobile/
+          retention-days: 14
+
+  desktop:
+    name: Ordinateur + SEO
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.13"
+      - name: Export local du site
+        working-directory: web
+        run: npm ci && npm run build:local
+      - name: Playwright (Chromium)
+        run: |
+          pip install playwright==1.63.0 pillow opencv-python-headless numpy
+          python -m playwright install --with-deps chromium
+      - name: Recette SEO
+        working-directory: web
+        run: npm run test:seo
+      - name: Recette de bout en bout
+        run: python tests/e2e.py
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: captures-ordinateur
+          path: tests/out/
+          retention-days: 14

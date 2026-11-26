@@ -209,7 +209,7 @@ export function ReportButton({ variant = "header", context, className }: { varia
         <button type="button" data-report className={cn("text-left hover:text-foreground", className)} onClick={() => setOpen(true)}>Signaler un problème</button>
       ) : (
         <button type="button" data-report onClick={() => setOpen(true)}
-          className={cn("inline-flex h-9 min-w-9 items-center justify-center gap-1.5 rounded-full px-2 font-medium sm:px-2.5 text-foreground/70 hover:bg-foreground/[0.05] hover:text-foreground", className)}>
+          className={cn("inline-flex h-11 min-w-11 items-center justify-center gap-1.5 rounded-full px-2 font-medium sm:px-2.5 text-foreground/70 hover:bg-foreground/[0.05] hover:text-foreground", className)}>
           <LifeBuoy className="size-4" aria-hidden="true" /><span className="max-sm:sr-only">Un souci ?</span>
         </button>
       )}

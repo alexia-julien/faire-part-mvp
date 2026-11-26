@@ -303,7 +303,7 @@ export function Dashboard() {
                               );
                             })}
                             <td className="act px-4 py-3 text-right">
-                              <Button variant="ghost" size="sm" className={cn("text-muted-foreground", confirm === "r" + r.id && "confirm bg-destructive/10 text-destructive")} aria-label={"Supprimer la réponse de " + txt(r.data.name)}
+                              <Button variant="ghost" size="sm" className={cn("text-muted-foreground max-sm:h-11 max-sm:min-w-11", confirm === "r" + r.id && "confirm bg-destructive/10 text-destructive")} aria-label={"Supprimer la réponse de " + txt(r.data.name)}
                                 onClick={() => (confirm === "r" + r.id ? del(r) : setConfirm("r" + r.id))}>
                                 {confirm === "r" + r.id ? "Confirmer ?" : <Trash2 className="size-4" />}
                               </Button>
