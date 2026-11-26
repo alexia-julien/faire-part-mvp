@@ -1,7 +1,7 @@
-:HL["/_next/static/chunks/1rizvjli5rcac.css","style"]
+:HL["/_next/static/chunks/07btabc5008h4.css","style"]
 :HL["/_next/static/chunks/2bl5wi9b8jm54.css","style"]
 :HC["/",""]
 3:[["children",{"s":"__PAGE__","h":160}]]
 2:[["children",{"s":{"n":"slug","t":"d","k":"elegance","s":[]},"h":65632,"c":"$Q3"}]]
 1:[["children",{"s":"ambiances","h":131136,"c":"$Q2"}]]
-0:{"b":"zyPAqjfgaXriEMwX-YuwC","t":{"t":{"s":"","h":131088,"c":"$Q1"}}}
+0:{"b":"0817F8sf7P2vbuY0C_h6O","t":{"t":{"s":"","h":131088,"c":"$Q1"}}}
