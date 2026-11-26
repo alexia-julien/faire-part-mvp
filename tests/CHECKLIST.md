@@ -10,7 +10,7 @@ Ce fichier est la référence ; une copie est tenue à jour dans le projet Claud
 | Moment | Ce qu'on teste | Où |
 |---|---|---|
 | **Chaque nouveau dev** | Test ciblé de la fonctionnalité, **sur mobile (390 px) et sur ordinateur**, + contrôle de base : le build passe, l'accueil s'affiche, 0 erreur console | staging.maison-meli.com |
-| **Mise en prod (release)** | Toute la checklist (A + M + B) sur la version qui part en prod (un ou plusieurs devs). Feu vert seulement si tout est vert. | Local + staging + vrais téléphones |
+| **Mise en prod (release)** | Tests automatiques (A, dont mobile) verts sur le dernier push `staging` + parcours B touchés par la release. Feu vert seulement si tout est vert. | CI GitHub + staging |
 | **Après la mise en prod** | Contrôle léger en lecture seule (section C) | maison-meli.com |
 
 Règles :
@@ -43,9 +43,8 @@ Règles :
 - [ ] `npm run build:staging` et `npm run build` sans erreur
 
 ## M. Mobile en profondeur
-Deux passes à chaque release :
-- **M-auto (CI)** : `tests/e2e_mobile.py`, voir section A. Les lignes M marquées (auto) y sont vérifiées.
-- **M-réel (Julien, ~15 min)** : un **iPhone (Safari)** et un **Android (Chrome)**, plus le **navigateur intégré de WhatsApp** sur les deux. Ces points ne sont pas fiables en émulation : clavier, partage natif, Photos, agenda, WhatsApp. Si un des deux téléphones n'est pas disponible, le noter dans la section D.
+- **M-auto (CI, à chaque release, bloquant)** : `tests/e2e_mobile.py`, voir section A. Les lignes M marquées (auto) y sont vérifiées.
+- **M-réel (vrais téléphones, non systématique — décision de Julien du 26/11)** : un iPhone (Safari), un Android (Chrome) et le navigateur intégré de WhatsApp. À faire **quand une release touche le clavier, le partage, les photos, l'agenda, la connexion ou l'aperçu WhatsApp**, et au moins de temps en temps. Risque accepté : ce que l'émulation ne voit pas (lignes « réel ») peut passer en prod sans être vu. Noter dans la section D si la passe a été faite.
 
 ### M1. Environnements
 - [ ] Safari iOS, Chrome Android : parcours création → publication → faire-part invité → RSVP en entier (réel)
@@ -149,4 +148,4 @@ Navigateur marqué `fp:admin`. Ne pas ouvrir de vrai faire-part (ça compterait 
 |---|---|---|---|---|---|
 | 26/11/2026 | 129a6ba | Recette complète (9 corrections) | e2e 230/230, SEO OK | non (émulation seule) | Lignes « bug 26/11 » |
 | 26/11/2026 | 9e5f0dd | Retours & signalement ; accueil compte connecté ; /admin/ ouvertures (fb6ea7d) | e2e 262/262, SEO OK, prod vérifiée | non (émulation seule) | Lignes « +26/11 » ; section M créée |
-| (sur staging, pas encore en prod) | — | Recette mobile automatique + CI GitHub ; 7 corrections mobiles (double envoi RSVP, double publication, geste retour, zones 44 px, champ 15 px, débordements 320 px) | e2e 262/262, mobile 261/261 (Safari + Chrome Android), SEO OK | à faire | Lignes « auto » et « bug 26/11 » de M |
+| 26/11/2026 | 8b9f34f | Recette mobile automatique + CI GitHub ; 7 corrections mobiles (double envoi RSVP, double publication, geste retour, zones 44 px, champ 15 px, débordements 320 px) | e2e 262/262, mobile 261/261 (Safari + Chrome Android, 2 passages), SEO OK ; prod vérifiée (C) à 390/1440 px, 0 erreur | non (décision : pas systématique) | Lignes « auto » et « bug 26/11 » de M ; M-réel devient non systématique |
