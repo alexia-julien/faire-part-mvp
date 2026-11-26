@@ -128,7 +128,7 @@ const local = {
   // Tableau de bord admin : jamais de données en mode local (le compte de test n'est pas admin).
   adminDashboard: (_from: string, _to: string, _exclude = true) => asAccount<AdminData>(notAdmin),
   adminAccounts: (_from: string, _to: string) => asAccount<AdminAccount[]>(notAdmin),
-  adminInvitations: (_from: string, _to: string) => asAccount<AdminInvitation[]>(notAdmin),
+  adminInvitations: (_from: string, _to: string, _exclude = true) => asAccount<AdminInvitation[]>(notAdmin),
   adminSetExclusion: (_kind: "account" | "slug", _id: string, _excluded: boolean) => asAccount<void>(notAdmin),
   adminFeedback: (_from: string, _to: string, _exclude = true) => asAccount<AdminFeedback>(notAdmin),
   adminSetFeedbackStatus: (_id: number, _status: FeedbackStatus) => asAccount<void>(notAdmin),
@@ -198,7 +198,7 @@ const supa = {
   listRsvps: async () => (await arpc("account_rsvps", {})) as RsvpRow[] | null,
   adminDashboard: async (from: string, to: string, exclude = true) => (await arpc("admin_dashboard", { p_from: from, p_to: to, p_exclude: exclude })) as AdminData,
   adminAccounts: async (from: string, to: string) => (await arpc("admin_accounts", { p_from: from, p_to: to })) as AdminAccount[],
-  adminInvitations: async (from: string, to: string) => (await arpc("admin_invitations", { p_from: from, p_to: to })) as AdminInvitation[],
+  adminInvitations: async (from: string, to: string, exclude = true) => (await arpc("admin_invitations", { p_from: from, p_to: to, p_exclude: exclude })) as AdminInvitation[],
   adminSetExclusion: async (kind: "account" | "slug", id: string, excluded: boolean) => { await arpc("admin_set_exclusion", { p_kind: kind, p_id: id, p_excluded: excluded }); },
   adminFeedback: async (from: string, to: string, exclude = true) => (await arpc("admin_feedback", { p_from: from, p_to: to, p_exclude: exclude })) as AdminFeedback,
   adminSetFeedbackStatus: async (id: number, status: FeedbackStatus) => { await arpc("admin_set_feedback_status", { p_id: id, p_status: status }); },

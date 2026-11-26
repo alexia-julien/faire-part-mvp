@@ -663,6 +663,8 @@ begin
   ev as (select * from private.events where not (coalesce(visitor, '') = any(xv)) and not (coalesce(slug, '') = any(xs))),
   us as (select * from auth.users where not (id = any(xa))),
   e as (select p.periode, ev.* from p join ev on ev.created_at >= p.a and ev.created_at < p.b),
+  -- Réseaux qui ont créé ou gèrent chaque faire-part : leurs ouvertures ne sont pas des ouvertures d'invités.
+  own as (select distinct slug, visitor from private.events where visitor is not null and slug is not null and event in ('invitation_created', 'invitation_updated', 'invitation_attached', 'rsvps_listed', 'share', 'qr_download')),
   s as (select periode, visitor, (created_at at time zone 'Europe/Paris')::date as jour, max((meta->>'seconds')::int) as sec
         from e where event = 'session_end' and meta ? 'seconds' group by 1, 2, 3),
   m as (
@@ -674,7 +676,8 @@ begin
       (select count(*) from us u where u.created_at >= p.a and u.created_at < p.b) as comptes,
       (select count(*) from e where e.periode = p.periode and event = 'invitation_created') as faire_part,
       (select count(*) from e where e.periode = p.periode and event = 'invitation_created' and meta->>'src' = 'faire-part') as faire_part_viraux,
-      (select count(distinct (slug, visitor)) from e where e.periode = p.periode and event = 'invitation_viewed') as ouvertures_invites,
+      (select count(distinct (slug, visitor)) from e where e.periode = p.periode and event = 'invitation_viewed'
+         and not exists (select 1 from own where own.slug = e.slug and own.visitor = e.visitor)) as ouvertures_invites,
       (select count(*) from e where e.periode = p.periode and event = 'rsvp_submitted' and coalesce((meta->>'edit')::boolean, false) = false) as reponses_rsvp,
       (select count(*) from s where s.periode = p.periode) as sessions_mesurees,
       (select round(percentile_cont(0.5) within group (order by sec))::int from s where s.periode = p.periode) as duree_mediane_s,
@@ -751,11 +754,14 @@ begin
 end $$;
 
 -- Détail des faire-part créés sur la période, y compris ceux supprimés depuis (prénoms alors inconnus).
-create or replace function public.admin_invitations(p_from date, p_to date) returns jsonb
+drop function if exists public.admin_invitations(date, date);
+-- Ouvertures et réponses comptées sur la période, comme les cartes ; hors créateur du faire-part et, si p_exclude, hors activité de l'admin.
+create or replace function public.admin_invitations(p_from date, p_to date, p_exclude boolean default true) returns jsonb
 language plpgsql stable security definer set search_path = public, extensions as $$
-declare d0 timestamptz := p_from::timestamp at time zone 'Europe/Paris'; d1 timestamptz := (p_to + 1)::timestamp at time zone 'Europe/Paris';
+declare d0 timestamptz := p_from::timestamp at time zone 'Europe/Paris'; d1 timestamptz := (p_to + 1)::timestamp at time zone 'Europe/Paris'; xv text[] := '{}';
 begin
   if not private.is_admin() then raise exception 'not admin' using errcode = '42501'; end if;
+  if p_exclude then xv := array(select private.excluded_visitors()); end if;
   return coalesce((
     with c as (
       select slug, created_at from invitations where created_at >= d0 and created_at < d1
@@ -767,8 +773,11 @@ begin
       'slug', c.slug, 'created_at', c.created_at, 'online', i.slug is not null,
       'partner1', i.config->>'partner1', 'partner2', i.config->>'partner2', 'wedding_date', i.config->>'date',
       'owner_email', u.email,
-      'ouvertures', (select count(distinct visitor) from private.events v where v.event = 'invitation_viewed' and v.slug = c.slug),
-      'reponses', (select count(*) from rsvps r where r.slug = c.slug and coalesce((r.data->>'manual')::boolean, false) = false),
+      'ouvertures', (select count(distinct v.visitor) from private.events v where v.event = 'invitation_viewed' and v.slug = c.slug
+                       and v.created_at >= d0 and v.created_at < d1 and not (coalesce(v.visitor, '') = any(xv))
+                       and not exists (select 1 from private.events o where o.slug = c.slug and o.visitor = v.visitor and o.event in ('invitation_created', 'invitation_updated', 'invitation_attached', 'rsvps_listed', 'share', 'qr_download'))),
+      'reponses', (select count(*) from rsvps r where r.slug = c.slug and r.created_at >= d0 and r.created_at < d1
+                     and coalesce((r.data->>'manual')::boolean, false) = false),
       'excluded', c.slug in (select private.excluded_slugs()),
       'excluded_by_account', i.owner in (select private.excluded_accounts())
     ) order by c.created_at desc)
@@ -786,8 +795,8 @@ begin
   else delete from private.exclusions where kind = p_kind and id = p_id; end if;
 end $$;
 
-revoke all on function public.admin_accounts(date, date), public.admin_invitations(date, date), public.admin_set_exclusion(text, text, boolean) from public, anon, authenticated;
-grant execute on function public.admin_accounts(date, date), public.admin_invitations(date, date), public.admin_set_exclusion(text, text, boolean) to authenticated;
+revoke all on function public.admin_accounts(date, date), public.admin_invitations(date, date, boolean), public.admin_set_exclusion(text, text, boolean) from public, anon, authenticated;
+grant execute on function public.admin_accounts(date, date), public.admin_invitations(date, date, boolean), public.admin_set_exclusion(text, text, boolean) to authenticated;
 
 -- ---------------------------------------------------------------- Retours utilisateurs (26/11/2026)
 -- Note de l'expérience de création (0 à 10, une par compte, modifiable) + avis libre, et signalements

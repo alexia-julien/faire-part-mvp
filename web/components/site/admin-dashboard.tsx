@@ -80,14 +80,14 @@ function StatusBadge({ excluded, admin }: { excluded: boolean; admin?: boolean }
 }
 
 // Détail cliquable des comptes ou des faire-part de la période, avec exclusion à la ligne.
-function Detail({ kind, period, onChanged }: { kind: "comptes" | "faire_part"; period: { from: string; to: string }; onChanged: () => void }) {
+function Detail({ kind, period, exclude, onChanged }: { kind: "comptes" | "faire_part"; period: { from: string; to: string }; exclude: boolean; onChanged: () => void }) {
   const [rows, setRows] = useState<AdminAccount[] | AdminInvitation[] | null>(null);
   const [err, setErr] = useState(false);
   const [busy, setBusy] = useState("");
   const fetchRows = useCallback(async () => {
-    try { setErr(false); setRows(kind === "comptes" ? await api.adminAccounts(period.from, period.to) : await api.adminInvitations(period.from, period.to)); }
+    try { setErr(false); setRows(kind === "comptes" ? await api.adminAccounts(period.from, period.to) : await api.adminInvitations(period.from, period.to, exclude)); }
     catch { setErr(true); }
-  }, [kind, period]);
+  }, [kind, period, exclude]);
   useEffect(() => { fetchRows(); }, [fetchRows]);
   const toggle = async (k: "account" | "slug", id: string, excluded: boolean) => {
     setBusy(id);
@@ -126,7 +126,7 @@ function Detail({ kind, period, onChanged }: { kind: "comptes" | "faire_part"; p
               <>
                 <thead><tr className="text-left text-[12px] text-muted-foreground">
                   <th className="font-medium">Faire-part</th><th className="font-medium">Mariage</th><th className="font-medium">Créé le</th><th className="font-medium">Compte</th>
-                  <th className="text-right font-medium">Ouvertures</th><th className="text-right font-medium">Réponses</th><th className="font-medium">Statut</th><th></th>
+                  <th className="text-right font-medium" title="Invités distincts sur la période, hors créateur du faire-part">Ouvertures invités</th><th className="text-right font-medium">Réponses</th><th className="font-medium">Statut</th><th></th>
                 </tr></thead>
                 <tbody>
                   {(rows as AdminInvitation[]).map((r) => (
@@ -263,7 +263,7 @@ function Board({ d, period, open, setOpen, onChanged }: { d: AdminData; period: 
             <Evo k="faire_part" a={a} b={b} /> · avant : {nf(b.faire_part)} · en ligne : {nf(d.totaux.faire_part)}
           </Card>
         </div>
-        {open && <Detail key={open} kind={open} period={period} onChanged={onChanged} />}
+        {open && <Detail key={open} kind={open} period={period} exclude={d.exclusion?.active ?? true} onChanged={onChanged} />}
         <div id="ch-creations" className="rounded-[20px] border border-border bg-card p-6 shadow-soft">
           <p className="mb-3 text-[12px] uppercase tracking-[0.08em] text-muted-foreground">Comptes et faire-part créés par jour</p>
           <DailyBars rows={d.jours} label="Comptes et faire-part créés par jour" series={[
@@ -335,7 +335,7 @@ function Board({ d, period, open, setOpen, onChanged }: { d: AdminData; period: 
 
       <Section id="apres-publication" title="Après publication">
         <div className="grid gap-4 sm:grid-cols-3">
-          <Card id="a-ouvertures" label="Ouvertures de faire-part" value={nf(a.ouvertures_invites)}>Invités distincts · <Evo k="ouvertures_invites" a={a} b={b} /></Card>
+          <Card id="a-ouvertures" label="Ouvertures de faire-part" value={nf(a.ouvertures_invites)}>Invités distincts, hors créateurs · <Evo k="ouvertures_invites" a={a} b={b} /></Card>
           <Card id="a-rsvp" label="Réponses RSVP" value={nf(a.reponses_rsvp)}>Taux de réponse {pct(a.taux_reponse_invites)}</Card>
           <Card id="a-viral" label="Faire-part venus d’un faire-part" value={nf(a.faire_part_viraux)}>Créés via « Créez le vôtre »</Card>
         </div>
@@ -346,6 +346,7 @@ function Board({ d, period, open, setOpen, onChanged }: { d: AdminData; period: 
         <dl className="mt-2 flex flex-col gap-2">
           <div><dt className="text-foreground">Visiteur unique</dt><dd>Personne distincte (empreinte de son adresse IP) ayant ouvert l’accueil. Mesure interne, sans cookie ; « Do Not Track » non compté.</dd></div>
           <div><dt className="text-foreground">Durée de session</dt><dd>Temps passé page visible, plus longue valeur par visiteur et par jour. Mesurée depuis le 25/11/2026.</dd></div>
+          <div><dt className="text-foreground">Ouverture de faire-part</dt><dd>Invité distinct (réseau) ayant ouvert un faire-part sur la période. Les ouvertures du créateur du faire-part (même réseau que sa création ou sa gestion) ne comptent pas, ni, si l’exclusion est active, les vôtres.</dd></div>
           <div><dt className="text-foreground">Démarré · Terminé</dt><dd>A saisi les prénoms dans l’éditeur · est arrivé au moment de publier (écran de connexion ou publication directe).</dd></div>
           <div><dt className="text-foreground">Comptes, faire-part créés</dt><dd>Inscriptions et publications de la période, y compris celles supprimées depuis.</dd></div>
           <div><dt className="text-foreground">Évolution</dt><dd>Écart avec la période de même durée juste avant : % pour les volumes, points pour les taux. Jours de minuit à minuit, heure de Paris.</dd></div>
