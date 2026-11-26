@@ -74,9 +74,14 @@ CULPRITS = """(()=>{const W=document.documentElement.clientWidth;const over=e=>{
  const clipped=e=>{for(let p=e.parentElement;p&&p!==document.body;p=p.parentElement){const o=getComputedStyle(p).overflowX;if(o!=='visible')return true}return false};
  return [...document.querySelectorAll('body *')].filter(e=>over(e)&&getComputedStyle(e).position!=='fixed'&&!clipped(e)&&![...e.children].some(over))
   .slice(0,5).map(e=>(e.id?'#'+e.id:'')+'<'+e.tagName.toLowerCase()+'.'+e.className.toString().slice(0,50)+'> r='+Math.round(e.getBoundingClientRect().right)+' «'+(e.innerText||'').slice(0,25).replace(/\\n/g,' ')+'»')})()"""
+# Éléments plus larges que la zone de contenu de leur parent (ce sont eux qui élargissent la colonne).
+FORCERS = """(()=>{const out=[];for(const e of document.querySelectorAll('body *')){const p=e.parentElement;if(!p||getComputedStyle(e).position==='fixed'||getComputedStyle(e).position==='absolute')continue;
+ const cs=getComputedStyle(p);if(cs.overflowX!=='visible')continue;const inner=p.clientWidth-parseFloat(cs.paddingLeft)-parseFloat(cs.paddingRight);const w=e.getBoundingClientRect().width;
+ if(inner>0&&w>inner+1&&![...e.children].some(c=>c.getBoundingClientRect().width>w-1))out.push('<'+e.tagName.toLowerCase()+'.'+e.className.toString().slice(0,40)+'> w='+Math.round(w)+' parent='+Math.round(inner)+' «'+(e.innerText||'').slice(0,20).replace(/\\n/g,' ')+'»')}
+ return out.slice(-4)})()"""
 def no_overflow(pg, label):
     o = overflow(pg)
-    check(label, o <= 0, "%s px : %s" % (o, pg.evaluate(CULPRITS)) if o > 0 else "")
+    check(label, o <= 0, "%s px : %s | forcé par : %s" % (o, pg.evaluate(CULPRITS), pg.evaluate(FORCERS)) if o > 0 else "")
 def shot(pg, name): pg.screenshot(path=os.path.join(OUT, "%s-%s.png" % (re.sub(r'\W+', '-', DEV).strip('-').lower(), name)))
 
 def tappable(pg, sel, min_size=MIN_TAP):
@@ -145,7 +150,9 @@ def run_device(p, name, engine):
         check("viewport mobile : largeur de l'appareil, zoom utilisateur autorisé", "width=device-width" in vp and "user-scalable=no" not in vp and "maximum-scale=1" not in vp, vp)
         no_overflow(pg, "accueil : aucun débordement horizontal")
         ok, d = tappable(pg, 'main a[href^="/creer"]'); check("accueil : « Créer mon faire-part » facile à toucher", ok, d)
-        pg.evaluate("window.scrollTo(0, 1600)"); pg.wait_for_timeout(900)  # (molette indisponible en WebKit mobile)
+        # Juste après le héros (molette indisponible en WebKit mobile : défilement par script)
+        pg.evaluate("window.scrollTo(0, document.querySelector('main > *').getBoundingClientRect().bottom + scrollY + 400)")
+        wait_until(lambda: pg.evaluate("(()=>{const e=document.querySelector('a.glass[data-create]');if(!e)return false;const b=e.getBoundingClientRect();return b.bottom<=innerHeight&&b.top>=0})()"), 4)
         ok, d = tappable(pg, 'a.glass[data-create]'); check("accueil : bouton flottant visible, ≥ 44 px, non recouvert", ok, d)
         bad = fixed_bottom_unsafe(pg); check("accueil : éléments fixés en bas au-dessus de la barre d'accueil iPhone (safe area)", not bad, bad)
         shot(pg, "accueil")
@@ -280,7 +287,8 @@ def run_device(p, name, engine):
         pg.tap('#f-name'); pg.keyboard.type('Sophie Martin')
         ok, d = tappable(pg, '.rq-nav .btn'); check("réponse : bouton suivant visible", ok, d)
         pg.tap('.rq-nav .btn'); pg.wait_for_timeout(500)
-        pg.tap('.rq-card:has(input[value=yes])'); pg.wait_for_timeout(800)
+        pg.tap('.rq-card:has(input[value=yes])')
+        pg.wait_for_selector('[aria-label^="Plus — Adultes"]', timeout=5000); pg.wait_for_timeout(400)
         ok, d = tappable(pg, '[aria-label^="Plus — Adultes"]'); check("réponse : boutons + / − ≥ 44 px", ok, d)
         pg.tap('[aria-label^="Plus — Adultes"]'); zoomi.update(small_inputs(pg))
         for _ in range(6):
