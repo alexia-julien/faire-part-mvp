@@ -25,8 +25,7 @@ export function SiteHeader({ current }: { current?: string }) {
             <a key={p.path} href={p.path} aria-current={current === p.path ? "page" : undefined}
               className="hidden rounded-full px-3 py-2 text-foreground/75 hover:text-foreground aria-[current=page]:text-foreground md:block">{p === PAGES.exemple ? "Exemple" : p.crumb}</a>
           ))}
-          <NavAccount />
-          <Button asChild size="sm" className="hidden h-10 sm:inline-flex"><a href={CREATE} data-create>Créer mon faire-part</a></Button>
+          <NavAccount createHref={CREATE} />
         </div>
       </nav>
     </header>

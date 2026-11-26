@@ -137,6 +137,15 @@ try:
     check("mesure : provenance « faire-part » (lien « Créez le vôtre »)", events(pg)[-1]["meta"].get("src") == "faire-part")
     sign_in(pg); pg.goto(BASE + "/"); pg.wait_for_timeout(400)
     check("visiteur connecté : « Mon faire-part » et lien de retour", pg.inner_text('#nav-mine') == "Mon faire-part" and pg.locator('#back-link').count() == 1)
+    check("visiteur connecté : « Mon faire-part » est le bouton principal de l'en-tête, plus de « Créer »", pg.get_attribute('#nav-mine', 'data-slot') == "button" and pg.locator('header nav a[data-create]').count() == 0)
+    hero_cls = pg.get_attribute('#cta-hero', 'class') or ""; back_cls = pg.get_attribute('#back-link', 'class') or ""
+    check("visiteur connecté : retour au faire-part en bouton plein, « Créer » en secondaire", "bg-primary" in back_cls and "bg-primary" not in hero_cls and "border" in hero_cls)
+    for w in [320, 375]:
+        pg.set_viewport_size({"width": w, "height": 844}); pg.wait_for_timeout(200)
+        check(f"visiteur connecté : accueil sans débordement à {w} px", overflow(pg) <= 0, overflow(pg))
+    pg.set_viewport_size({"width": 390, "height": 844}); pg.mouse.wheel(0, 1400); pg.wait_for_timeout(900)
+    check("visiteur connecté (mobile) : le bouton flottant mène à « Mon faire-part »", pg.locator('#float-mine').count() == 1 and pg.locator('a.glass[data-create]').count() == 0)
+    pg.set_viewport_size({"width": 1280, "height": 900}); pg.goto(BASE + "/"); pg.wait_for_timeout(600)
     pg.set_viewport_size({"width": 1440, "height": 900})
     v = axe(pg); check("accessibilité de l'accueil (axe, WCAG 2.2 AA, aucune violation grave)", not v, v)
     c.close()
