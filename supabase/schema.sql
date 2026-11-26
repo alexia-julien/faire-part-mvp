@@ -15,9 +15,9 @@
 --   - Fonctions et tables internes dans le schéma « private », non exposé par l'API.
 --
 -- Mesure du funnel (PRD, section KPIs), sans cookie : private.events. Un visiteur = empreinte SHA-256 de son IP.
---   landing_view, editor_start, auth_gate, share, qr_download, cta_create, premium_click, session_end : navigateur (public.track)
+--   landing_view, editor_start, auth_gate, share, qr_download, cta_create, premium_click, session_end, feedback_shown : navigateur (public.track)
 --   invitation_created / updated / deleted, invitation_viewed, rsvp_submitted, rsvp_added_manual, rsvps_listed,
---   account_deleted, premium_interest, digest_sent : base
+--   account_deleted, premium_interest, digest_sent, feedback_submitted : base
 -- Lecture : select * from private.kpis_30j;  select * from private.funnel_semaine;
 
 begin;
@@ -252,7 +252,7 @@ create or replace function public.track(p_event text, p_slug text default null, 
 language plpgsql security definer set search_path = public, extensions as $$
 declare v_meta jsonb := '{}'::jsonb; v_slug text;
 begin
-  if p_event is null or p_event not in ('landing_view', 'editor_start', 'auth_gate', 'share', 'qr_download', 'cta_create', 'premium_click', 'session_end') then return; end if;
+  if p_event is null or p_event not in ('landing_view', 'editor_start', 'auth_gate', 'share', 'qr_download', 'cta_create', 'premium_click', 'session_end', 'feedback_shown') then return; end if;
   begin
     perform private.rate_limit('track', 600);
   exception when others then return;
@@ -361,6 +361,7 @@ declare v_uid uuid := private.account_id();
 begin
   if v_uid is null then raise exception 'not signed in' using errcode = '42501'; end if;
   perform private.rate_limit('delete', 120);
+  update private.feedback set email = null where account = v_uid; -- retours conservés, mais anonymisés
   delete from invitations where owner = v_uid;
   delete from auth.users where id = v_uid;
   perform private.log_event('account_deleted');
@@ -787,6 +788,203 @@ end $$;
 
 revoke all on function public.admin_accounts(date, date), public.admin_invitations(date, date), public.admin_set_exclusion(text, text, boolean) from public, anon, authenticated;
 grant execute on function public.admin_accounts(date, date), public.admin_invitations(date, date), public.admin_set_exclusion(text, text, boolean) to authenticated;
+
+-- ---------------------------------------------------------------- Retours utilisateurs (26/11/2026)
+-- Note de l'expérience de création (0 à 10, une par compte, modifiable) + avis libre, et signalements
+-- (bug, mécontentement, idée), ouverts aussi aux visiteurs sans compte. Chaque nouveau retour envoie un e-mail
+-- aux administrateurs (private.admins) via Resend, si la clé est dans le coffre (sinon rien n'est envoyé).
+-- Lecture : section « Retours » de /admin/ (admin_feedback). Conservation : 13 mois.
+create extension if not exists pg_net with schema extensions;
+
+-- (private.html est aussi définie plus haut : répétée ici pour que cette section soit rejouable seule.)
+create or replace function private.html(p text) returns text
+language sql immutable set search_path = '' as $$
+  select replace(replace(replace(replace(replace(coalesce(p, ''), '&', '&amp;'), '<', '&lt;'), '>', '&gt;'), '"', '&quot;'), '''', '&#39;');
+$$;
+revoke all on function private.html(text) from public, anon, authenticated;
+
+create table if not exists private.feedback (
+  id         bigint generated always as identity primary key,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  kind       text not null check (kind in ('rating', 'bug', 'unhappy', 'idea')),
+  score      smallint check (score between 0 and 10),
+  message    text check (char_length(message) <= 2000),
+  email      text check (char_length(email) <= 254),
+  account    uuid references auth.users(id) on delete set null,
+  visitor    text,
+  slug       text,
+  context    jsonb not null default '{}'::jsonb,
+  status     text not null default 'new' check (status in ('new', 'in_progress', 'done')),
+  constraint feedback_score_rating check ((kind = 'rating') = (score is not null))
+);
+create unique index if not exists feedback_rating_one on private.feedback(account) where kind = 'rating';
+create index if not exists feedback_created_idx on private.feedback(created_at desc);
+alter table private.feedback enable row level security;
+revoke all on private.feedback from public, anon, authenticated;
+
+-- E-mail aux administrateurs pour un retour. Ne casse jamais l'envoi du retour.
+create or replace function private.notify_feedback(p_id bigint) returns void
+language plpgsql security definer set search_path = public, extensions as $$
+declare
+  v_key text; f private.feedback; v_to jsonb; v_label text; v_subject text; v_html text; v_txt text; v_from text; v_ctx text;
+begin
+  select decrypted_secret into v_key from vault.decrypted_secrets where name = 'resend_api_key' limit 1;
+  if v_key is null or v_key = '' then return; end if;
+  select * into f from private.feedback where id = p_id;
+  if not found then return; end if;
+  select jsonb_agg(u.email) into v_to from private.admins a join auth.users u on u.id = a.user_id where u.email is not null;
+  if v_to is null then return; end if;
+  v_from := coalesce(f.email, (select email from auth.users where id = f.account), 'visiteur sans compte');
+  v_label := case f.kind when 'rating' then 'Note ' || f.score || '/10' when 'bug' then 'Bug signalé'
+               when 'unhappy' then 'Mécontentement' else 'Idée' end;
+  v_subject := '[Maison Meli] ' || v_label || coalesce(' · ' || left(regexp_replace(f.message, '\s+', ' ', 'g'), 60), '');
+  v_ctx := concat_ws(' · ', f.context->>'page', f.context->>'device',
+             case when f.context ? 'vw' then (f.context->>'vw') || '×' || (f.context->>'vh') || ' px' end,
+             case when f.context ? 'step' then 'étape ' || (f.context->>'step') end, f.slug);
+  v_html := '<div style="font-family:Helvetica,Arial,sans-serif;color:#1C1A17;max-width:560px">'
+    || '<p style="margin:0 0 4px;font-size:12px;letter-spacing:.12em;text-transform:uppercase;color:#8A6D33">Maison Meli · nouveau retour</p>'
+    || '<h1 style="margin:0 0 16px;font-family:Georgia,serif;font-weight:400;font-size:26px">' || private.html(v_label) || '</h1>'
+    || '<p style="margin:0 0 16px;font-size:16px;white-space:pre-wrap">' || coalesce(private.html(f.message), '<em>(sans commentaire)</em>') || '</p>'
+    || '<p style="margin:0 0 6px;font-size:14px"><strong>De :</strong> ' || private.html(v_from) || '</p>'
+    || '<p style="margin:0 0 6px;font-size:14px"><strong>Contexte :</strong> ' || private.html(nullif(v_ctx, '')) || '</p>'
+    || case when jsonb_array_length(coalesce(f.context->'errors', '[]'::jsonb)) > 0
+         then '<p style="margin:0 0 6px;font-size:13px;color:#6B645B"><strong>Erreurs JS :</strong><br>'
+              || (select string_agg(private.html(e), '<br>') from jsonb_array_elements_text(f.context->'errors') e) || '</p>' else '' end
+    || '<p style="margin:16px 0 0"><a href="https://staging.maison-meli.com/admin/#retours">Voir tous les retours</a></p></div>';
+  v_txt := v_label || E'\n\n' || coalesce(f.message, '(sans commentaire)') || E'\n\nDe : ' || v_from
+    || E'\nContexte : ' || coalesce(nullif(v_ctx, ''), '—') || E'\n\nTous les retours : https://staging.maison-meli.com/admin/#retours';
+  perform net.http_post(
+    url := 'https://api.resend.com/emails',
+    headers := jsonb_build_object('Authorization', 'Bearer ' || v_key, 'Content-Type', 'application/json'),
+    body := jsonb_strip_nulls(jsonb_build_object(
+      'from', 'Maison Meli <notifications@maison-meli.com>', 'to', v_to,
+      'reply_to', case when v_from ~ '@' then v_from end,
+      'subject', v_subject, 'html', v_html, 'text', v_txt)));
+exception when others then
+  null; -- l'alerte ne doit jamais empêcher d'enregistrer le retour
+end $$;
+revoke all on function private.notify_feedback(bigint) from public, anon, authenticated;
+
+-- Envoyer un retour. p_kind : rating (compte obligatoire, p_score 0-10) | bug | unhappy | idea (p_message obligatoire).
+-- p_context : liste blanche (page, step, vw, vh, editing, ua, errors). p_hp : champ piège invisible (robots).
+create or replace function public.submit_feedback(p_kind text, p_score integer default null, p_message text default null,
+  p_email text default null, p_context jsonb default '{}'::jsonb, p_hp text default null) returns void
+language plpgsql security definer set search_path = public, extensions as $$
+declare
+  v_uid uuid := private.account_id(); v_msg text; v_email text; v_ctx jsonb := '{}'::jsonb; v_slug text; v_id bigint;
+  ua text; dev text; v_err jsonb;
+begin
+  if coalesce(p_hp, '') <> '' then return; end if; -- robot : on fait comme si de rien n'était
+  if p_kind is null or p_kind not in ('rating', 'bug', 'unhappy', 'idea') then raise exception 'invalid kind' using errcode = '22023'; end if;
+  perform private.rate_limit('feedback', 5);
+  v_msg := nullif(btrim(left(coalesce(p_message, ''), 2000)), '');
+  if p_kind = 'rating' then
+    if v_uid is null then raise exception 'not signed in' using errcode = '42501'; end if;
+    if p_score is null or p_score < 0 or p_score > 10 then raise exception 'invalid score' using errcode = '22023'; end if;
+  elsif v_msg is null or char_length(v_msg) < 3 then
+    raise exception 'message required' using errcode = '22023';
+  end if;
+  v_email := nullif(lower(btrim(coalesce(p_email, ''))), '');
+  if v_email is not null and v_email !~ '^[^\s@]{1,64}@[^\s@]+\.[a-z]{2,24}$' then raise exception 'invalid email' using errcode = '22023'; end if;
+  if v_email is null and v_uid is not null then select email into v_email from auth.users where id = v_uid; end if;
+
+  begin ua := nullif(current_setting('request.headers', true), '')::json->>'user-agent'; exception when others then ua := null; end;
+  dev := case
+    when ua is null or ua = '' then 'inconnu'
+    when ua ~* 'ipad|tablet|playbook|silk|kindle' or (ua ~* 'android' and ua !~* 'mobile') then 'tablette'
+    when ua ~* 'mobi|iphone|ipod|android|windows phone' then 'mobile'
+    else 'ordinateur' end;
+  v_ctx := jsonb_build_object('device', dev);
+  if jsonb_typeof(p_context) = 'object' then
+    if p_context->>'page' ~ '^/[A-Za-z0-9/._-]{0,120}$' then v_ctx := v_ctx || jsonb_build_object('page', p_context->>'page'); end if;
+    if p_context->>'step' ~ '^[a-z]{2,20}$' then v_ctx := v_ctx || jsonb_build_object('step', p_context->>'step'); end if;
+    if jsonb_typeof(p_context->'vw') = 'number' and (p_context->>'vw')::numeric between 100 and 10000 then v_ctx := v_ctx || jsonb_build_object('vw', round((p_context->>'vw')::numeric)::int); end if;
+    if jsonb_typeof(p_context->'vh') = 'number' and (p_context->>'vh')::numeric between 100 and 10000 then v_ctx := v_ctx || jsonb_build_object('vh', round((p_context->>'vh')::numeric)::int); end if;
+    if jsonb_typeof(p_context->'editing') = 'boolean' then v_ctx := v_ctx || jsonb_build_object('editing', p_context->'editing'); end if;
+    if p_kind <> 'rating' then
+      -- Navigateur exact et dernières erreurs : seulement pour un signalement, utiles pour reproduire.
+      if ua is not null then v_ctx := v_ctx || jsonb_build_object('ua', left(ua, 300)); end if;
+      if jsonb_typeof(p_context->'errors') = 'array' then
+        select jsonb_agg(left(e, 300)) into v_err from (select e from jsonb_array_elements_text(p_context->'errors') e limit 5) x;
+        if v_err is not null then v_ctx := v_ctx || jsonb_build_object('errors', v_err); end if;
+      end if;
+    end if;
+  end if;
+  if v_uid is not null then select slug into v_slug from invitations where owner = v_uid; end if;
+
+  if p_kind = 'rating' then
+    insert into private.feedback(kind, score, message, email, account, visitor, slug, context)
+    values ('rating', p_score, v_msg, v_email, v_uid, private.client_id(), v_slug, v_ctx)
+    on conflict (account) where kind = 'rating' do update
+      set score = excluded.score, message = excluded.message, email = excluded.email, slug = excluded.slug,
+          context = excluded.context, updated_at = now(), status = 'new'
+    returning id into v_id;
+  else
+    insert into private.feedback(kind, message, email, account, visitor, slug, context)
+    values (p_kind, v_msg, v_email, v_uid, private.client_id(), v_slug, v_ctx)
+    returning id into v_id;
+  end if;
+  perform private.log_event('feedback_submitted', null, v_slug,
+    jsonb_strip_nulls(jsonb_build_object('kind', p_kind, 'score', case when p_kind = 'rating' then p_score end)));
+  perform private.notify_feedback(v_id);
+  if random() < 0.02 then delete from private.feedback where created_at < now() - interval '13 months'; end if; -- conservation
+end $$;
+
+-- La note du compte connecté : { score, message, updated_at } ou null.
+create or replace function public.account_rating() returns jsonb
+language plpgsql stable security definer set search_path = public, extensions as $$
+declare v_uid uuid := private.account_id();
+begin
+  if v_uid is null then raise exception 'not signed in' using errcode = '42501'; end if;
+  return (select jsonb_build_object('score', score, 'message', message, 'updated_at', updated_at)
+          from private.feedback where kind = 'rating' and account = v_uid);
+end $$;
+
+-- /admin/ : retours de la période (notes : moyenne et répartition hors activité exclue ; liste complète).
+create or replace function public.admin_feedback(p_from date, p_to date, p_exclude boolean default true) returns jsonb
+language plpgsql stable security definer set search_path = public, extensions as $$
+declare d0 timestamptz; d1 timestamptz; xa uuid[] := '{}'; xv text[] := '{}';
+begin
+  if not private.is_admin() then raise exception 'not admin' using errcode = '42501'; end if;
+  if p_from is null or p_to is null or p_from > p_to or p_to - p_from > 731 then raise exception 'période invalide' using errcode = '22023'; end if;
+  d0 := p_from::timestamp at time zone 'Europe/Paris';
+  d1 := (p_to + 1)::timestamp at time zone 'Europe/Paris';
+  xa := array(select private.excluded_accounts());
+  xv := array(select private.excluded_visitors());
+  return (
+    with f as (
+      select fb.*, (coalesce(fb.account = any(xa), false) or coalesce(fb.visitor, '') = any(xv)) as excluded,
+             (select email from auth.users u where u.id = fb.account) as account_email
+      from private.feedback fb where fb.updated_at >= d0 and fb.updated_at < d1
+    ),
+    r as (select score from f where kind = 'rating' and (not p_exclude or not excluded))
+    select jsonb_build_object(
+      'notes', jsonb_build_object(
+        'nombre', (select count(*) from r),
+        'moyenne', (select round(avg(score), 1) from r),
+        'repartition', (select jsonb_agg((select count(*) from r where score = s) order by s) from generate_series(0, 10) s)),
+      'signalements', (select count(*) from f where kind <> 'rating' and (not p_exclude or not excluded)),
+      'a_traiter', (select count(*) from f where kind <> 'rating' and status <> 'done' and (not p_exclude or not excluded)),
+      'items', coalesce((select jsonb_agg(jsonb_build_object(
+          'id', id, 'created_at', created_at, 'updated_at', updated_at, 'kind', kind, 'score', score, 'message', message,
+          'email', coalesce(email, account_email), 'account', account is not null, 'slug', slug, 'context', context,
+          'status', status, 'excluded', excluded) order by updated_at desc) from f), '[]'::jsonb)
+    ));
+end $$;
+
+create or replace function public.admin_set_feedback_status(p_id bigint, p_status text) returns void
+language plpgsql security definer set search_path = public, extensions as $$
+begin
+  if not private.is_admin() then raise exception 'not admin' using errcode = '42501'; end if;
+  if p_status not in ('new', 'in_progress', 'done') then raise exception 'statut invalide' using errcode = '22023'; end if;
+  update private.feedback set status = p_status where id = p_id;
+end $$;
+
+revoke all on function public.submit_feedback(text, integer, text, text, jsonb, text), public.account_rating(),
+  public.admin_feedback(date, date, boolean), public.admin_set_feedback_status(bigint, text) from public, anon, authenticated;
+grant execute on function public.submit_feedback(text, integer, text, text, jsonb, text) to anon, authenticated;
+grant execute on function public.account_rating(), public.admin_feedback(date, date, boolean), public.admin_set_feedback_status(bigint, text) to authenticated;
 
 select cron.unschedule(jobid) from cron.job where jobname = 'rsvp-digest';
 select cron.schedule('rsvp-digest', '30 7 * * *', 'select private.send_rsvp_digests()');

@@ -66,6 +66,12 @@ Le Worker `faire-part-mvp` est relié au dépôt (branche `dev`) : chaque push r
 
 Domaine : zone `maison-meli.com` sur Cloudflare (DNS chez Cloudflare, e-mails toujours chez OVH : MX, SPF, DMARC, DKIM Resend), `www` redirigé vers la racine, HTTPS forcé, robots IA autorisés. GitHub Pages n'est plus utilisé.
 
+### Retours utilisateurs (depuis le 26/11/2026)
+- **Note de la création** (0 à 10, « Comment s’est passée la création ? ») + avis libre dont la question dépend de la note : sur l'écran de succès après publication, puis un seul rappel dans « Mon faire-part » si la carte a été ignorée. Une note par compte, modifiable (« Votre note de la création : 8/10 · Modifier »).
+- **« Un souci ? »** (bug, mécontentement, idée), avec ou sans compte : en-tête de l'éditeur, en-tête de « Mon faire-part », pied de page du site. Jamais sur le faire-part invité. Contexte joint : page, étape de l'éditeur, taille d'écran, appareil, navigateur, 5 dernières erreurs JS.
+- Code : `web/components/site/feedback.tsx`, `web/lib/feedback.ts` ; base : `private.feedback`, `submit_feedback`, `account_rating`, `admin_feedback`, `admin_set_feedback_status` (section « Retours utilisateurs » de `supabase/schema.sql`, recette `supabase/tests-retours.sql`).
+- Chaque retour envoie un e-mail aux comptes de `private.admins` (Resend, clé `resend_api_key` du coffre ; sans clé, rien n'est envoyé). Lecture et suivi (Nouveau / En cours / Réglé) : section « Retours » de `/admin/`.
+
 ## Tests
 
 `cd web && npm run build:local && npm run test:seo` : recette SEO/GEO de l'export (2 400+ contrôles).

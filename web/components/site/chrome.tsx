@@ -5,6 +5,7 @@ import { ArrowRight, ChevronRight, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { NavAccount } from "@/components/site/landing-islands";
 import { BrandMark } from "@/components/site/brand-mark";
+import { ReportButton } from "@/components/site/feedback";
 import { AMBIANCES } from "@/lib/ambiances";
 import { ENTITY, PAGES, type Page } from "@/lib/site";
 import { GUIDE_LINKS } from "@/lib/guides";
@@ -67,6 +68,7 @@ export function SiteFooter() {
           <a href={PAGES.confidentialite.path} className={link}>Confidentialité</a>
           <a href={PAGES.conditions.path} className={link}>Conditions d’utilisation</a>
           <a href="mailto:contact@maison-meli.com" className={link}>Contact</a>
+          <ReportButton variant="link" />
         </nav>
       </div>
     </footer>

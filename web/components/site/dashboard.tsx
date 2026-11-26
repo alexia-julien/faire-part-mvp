@@ -21,6 +21,9 @@ import { AuthPanel } from "./auth-panel";
 import { ShareKit } from "./share-kit";
 import { BrandMark } from "@/components/site/brand-mark";
 import { DigestToggle, ManualRsvp, PremiumDoor } from "./dashboard-extras";
+import { RatingCard, RatingSummary, ReportButton } from "./feedback";
+import { dismissReminder, markReminded, ratingSeenThisVisit, wasReminded } from "@/lib/feedback";
+import type { MyRating } from "@/lib/api";
 
 // « Mon faire-part » : le faire-part du compte connecté et les réponses de ses invités. Sans session : connexion.
 // Les réponses viennent d'inconnus : on ne fait jamais confiance à leur forme, même si le serveur les filtre aussi.
@@ -84,6 +87,9 @@ export function Dashboard() {
   const [err, setErr] = useState("");
   const [view, setView] = useState({ filter: "all", q: "", sort: "date", dir: -1, replaced: false });
   const [confirm, setConfirm] = useState<string | null>(null);
+  // Note de la création : un seul rappel ici si la carte de l'écran de succès a été ignorée (pas pendant la même visite).
+  const [rating, setRating] = useState<MyRating | undefined>(undefined);
+  const [remind, setRemind] = useState(false);
 
   const load = useCallback(async () => {
     setErr("");
@@ -94,6 +100,11 @@ export function Dashboard() {
       const cfg = sanitizeConfig(inv.config);
       document.title = "Suivi des réponses — " + cfg.partner1 + " & " + cfg.partner2;
       setData({ slug: inv.slug, cfg, rows });
+      api.myRating().then((r) => {
+        setRating(r);
+        const uid = auth.user()?.id || "";
+        if (!r && uid && !wasReminded(uid) && !ratingSeenThisVisit()) { setRemind(true); markReminded(uid); }
+      }).catch(() => {});
     } catch (e) {
       if ((e as ApiError)?.signedOut) { setUser(null); return; }
       setErr(userError(e)); setData(undefined);
@@ -227,6 +238,8 @@ export function Dashboard() {
         <Button id="refresh" variant="ghost" onClick={load}><RefreshCw aria-hidden="true" /> Actualiser</Button>
       </div>
 
+      {remind && rating === null && <RatingCard origin="tableau" className="mt-8 max-w-[640px]" onClose={() => { setRemind(false); dismissReminder(); }} onSignedOut={() => setUser(null)} />}
+
       <div className="mt-12 grid grid-cols-[minmax(0,1fr)] gap-10 lg:grid-cols-[minmax(0,1fr)_360px]">
         <section aria-labelledby="h-list" className="min-w-0">
           <h2 id="h-list" className="t-section !text-[30px]">Les réponses</h2>
@@ -322,6 +335,7 @@ export function Dashboard() {
           <ManualRsvp onAdded={load} onSignedOut={() => setUser(null)} />
           <DigestToggle onSignedOut={() => setUser(null)} />
           <PremiumDoor email={user.email} origin="tableau" />
+          {rating && <RatingSummary rating={rating} onSignedOut={() => setUser(null)} />}
         </aside>
       </div>
       {danger}
@@ -355,16 +369,17 @@ export function Loading() {
   );
 }
 
-export function Shell({ user, onSignOut, children }: { user: User | null; onSignOut?: () => void; children: React.ReactNode }) {
+export function Shell({ user, onSignOut, children, report = true }: { user: User | null; onSignOut?: () => void; children: React.ReactNode; report?: boolean }) {
   return (
     <div className="paper-grain min-h-dvh">
       <Toaster position="top-center" toastOptions={{ classNames: { toast: "!rounded-[20px] !shadow-lift !border-border !font-sans" } }} />
       <header className="glass sticky top-3 z-20 mx-auto mt-3 flex h-14 w-[calc(100%-24px)] max-w-6xl items-center justify-between rounded-full px-5">
         <a href="/" className="flex items-center gap-2 font-serif text-[22px] font-medium"><BrandMark className="size-8" />Maison Meli</a>
-        {user && (
-          <div className="flex items-center gap-3 text-[14px]">
-            <span id="account-email" className="hidden text-muted-foreground sm:inline">{user.email ? "Connecté : " + user.email : "Connecté"}</span>
-            <Button id="signout" variant="ghost" size="sm" onClick={onSignOut}>Se déconnecter</Button>
+        {(user || report) && (
+          <div className="flex items-center gap-1 text-[14px] sm:gap-3">
+            {user && <span id="account-email" className="hidden text-muted-foreground lg:inline">{user.email ? "Connecté : " + user.email : "Connecté"}</span>}
+            {report && <ReportButton />}
+            {user && <Button id="signout" variant="ghost" size="sm" onClick={onSignOut}>Se déconnecter</Button>}
           </div>
         )}
       </header>
