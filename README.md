@@ -89,7 +89,9 @@ pip install playwright pillow opencv-python && python3 tests/e2e.py
 
 La base se teste avec `supabase/tests.sql` (invités), `tests-comptes.sql`, `tests-mesure.sql` et `tests-retours.sql` dans le SQL Editor (tout est annulé à la fin).
 
-Limite actuelle : `tests/e2e.py` tourne sous Chromium avec une fenêtre redimensionnée (ni moteur Safari, ni tactile). Le mobile réel est couvert par la section M de `tests/CHECKLIST.md`.
+**Recette mobile** : `python3 tests/e2e_mobile.py` — Safari iOS (WebKit : iPhone SE 320 px, iPhone 15) et Chrome Android (Pixel 7, Galaxy S24 360 px), écran tactile, parcours complet au doigt (voir l'en-tête du fichier). WebKit : `python3 -m playwright install webkit`.
+
+**CI GitHub** (`.github/workflows/tests.yml`) : à chaque push sur `staging`, SEO + `e2e.py` + `e2e_mobile.py --strict` (onglet « Actions », captures en artefacts). Une mise en prod ne part que si le dernier passage est vert. Ce qui demande un vrai téléphone reste dans la section M de `tests/CHECKLIST.md`.
 
 ## Sécurité et performance
 - **CSP stricte** posée dans chaque page par `scripts/postbuild.mjs` (ses empreintes dépendent de chaque page) : scripts autorisés par empreinte SHA-256, jamais `unsafe-inline` ; Google Identity Services seulement sur `/creer/` et `/mon-faire-part/`. Polices auto-hébergées (plus aucun appel à Google Fonts).

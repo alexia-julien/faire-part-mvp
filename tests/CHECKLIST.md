@@ -29,17 +29,22 @@ Règles :
 ---
 
 ## A. Tests automatiques (local, `cd web && npm run build:local`)
+**Lancés automatiquement par GitHub à chaque push sur `staging`** (onglet « Actions » du dépôt, workflow « Recette », captures en artefacts). Une release ne part que si le dernier passage est vert.
 - [ ] `python3 tests/e2e.py` : 100 % (262/262 au 26/11)
+- [ ] `python3 tests/e2e_mobile.py --strict` : 100 % (261/261 au 26/11) — **Safari iOS (WebKit) en iPhone SE 320 px et iPhone 15**, **Chrome Android en Pixel 7 et Galaxy S24 360 px**, écran tactile
 - [ ] `npm run test:seo` : 100 % (3 127/3 127 au 26/11)
 - [ ] axe-core (WCAG 2.2 AA, inclus dans e2e) : OK
 - [ ] Aucun débordement horizontal à 320 / 375 / 390 / 430 px (inclus dans e2e)
 - [ ] Recette SQL sur la base **staging** (SQL Editor, tout est annulé à la fin) : `supabase/tests.sql`, `tests-comptes.sql`, `tests-mesure.sql`, `tests-retours.sql` (+ tout nouveau fichier)
 - [ ] `npm run build:staging` et `npm run build` sans erreur
-- [ ] ⚠ **À construire (prochain dev proposé)** : passe mobile automatique. Aujourd'hui `e2e.py` tourne **uniquement sous Chromium avec une fenêtre redimensionnée** : pas de moteur Safari (WebKit), pas d'écran tactile, pas d'agent utilisateur mobile. Cible : rejouer les parcours clés (accueil, éditeur complet, publication, faire-part invité + RSVP, Mon faire-part) sous **WebKit en iPhone SE et iPhone 15** et sous **Chromium en Pixel 7** (`is_mobile`, `has_touch`), réseau ralenti sur le faire-part invité.
+  Couvre, au doigt, sur chaque appareil : accueil → éditeur complet → photo de téléphone → connexion par code → publication → partage / QR ; faire-part invité → agenda → réponse ; Mon faire-part ; zones tactiles ≥ 44 px et non recouvertes ; champs ≥ 16 px (zoom Safari) ; safe area iPhone ; claviers (e-mail, code `one-time-code`) ; geste retour (aperçu) ; double toucher (Envoyer) ; onglet rouvert (session, brouillon) ; paysage ; mode sombre ; texte agrandi 125 % ; réseau lent ; navigateur intégré WhatsApp.
+  Ne couvre pas (reste en M-réel) : vrai clavier virtuel, feuille de partage native, Photos / agenda / Maps du téléphone, aperçu WhatsApp, connexion Google réelle.
+  En local, WebKit ne s'installe que si le poste autorise le téléchargement de Playwright (`python3 -m playwright install webkit`) ; sinon les iPhone sont ignorés et la CI fait foi.
+  Information affichée (non bloquante) : temps d'affichage du faire-part en 4G lente, aide pour Google dans WhatsApp.
 
 ## M. Mobile en profondeur
 Deux passes à chaque release :
-- **M-émulation (Claude)** : outils de développement / WebKit, 320 · 375 · 390 · 430 px, tactile activé.
+- **M-auto (CI)** : `tests/e2e_mobile.py`, voir section A. Les lignes M marquées (auto) y sont vérifiées.
 - **M-réel (Julien, ~15 min)** : un **iPhone (Safari)** et un **Android (Chrome)**, plus le **navigateur intégré de WhatsApp** sur les deux. Ces points ne sont pas fiables en émulation : clavier, partage natif, Photos, agenda, WhatsApp. Si un des deux téléphones n'est pas disponible, le noter dans la section D.
 
 ### M1. Environnements
@@ -49,21 +54,22 @@ Deux passes à chaque release :
 - [ ] Portrait **et** paysage : rien de cassé ni de masqué
 - [ ] Mode sombre du système : rendu du site et du faire-part inchangé ou lisible
 - [ ] Texte système agrandi (taille de police iOS / Android au maximum courant) : pas de texte coupé ni de bouton qui déborde
-- [ ] Réseau lent (« Slow 4G » / 3G ralenti) : faire-part invité utilisable, états de chargement visibles, pas de double envoi de RSVP ni de double publication
+- [ ] Réseau lent (« Slow 4G » / 3G ralenti) : faire-part invité utilisable, pas de faux message d'erreur (auto) ; pas de double envoi de RSVP (auto, bug 26/11 : 2 réponses enregistrées) ni de double publication (corrigé 26/11)
+- [ ] 320 px (iPhone SE) : écran de succès, Mon faire-part, boutons de suppression sans débordement (auto, bug 26/11)
 
 ### M2. Saisie & clavier
-- [ ] Aucun zoom automatique d'iOS sur les champs (taille de police des champs ≥ 16 px)
+- [ ] Aucun zoom automatique d'iOS sur les champs (taille de police des champs ≥ 16 px) (auto ; bug 26/11 : lien du faire-part à 15 px)
 - [ ] Le clavier ne masque ni le champ actif ni le bouton Suivant / Envoyer (éditeur, RSVP, connexion, « Un souci ? ») (réel)
 - [ ] Bon clavier : e-mail, téléphone, chiffres pour le code ; le code à 6 chiffres est proposé automatiquement au-dessus du clavier (`autocomplete="one-time-code"`) (réel)
 - [ ] Sélecteurs de date et d'heure natifs : saisie correcte, heure conservée (pas de décalage de fuseau)
 - [ ] Collage d'un lien partagé depuis Plans (Apple) et Google Maps (bug 26/11 pour `maps.apple/p/…`) (réel)
 
 ### M3. Tactile & ergonomie
-- [ ] Zones tactiles ≥ 44 px, pas deux boutons collés
+- [ ] Zones tactiles ≥ 44 px, pas deux boutons collés (auto pour les boutons clés ; bug 26/11 : fermer l'aperçu, « Un souci ? », supprimer une réponse étaient à 36 px)
 - [ ] Rien ne dépend du survol (menus, infobulles, aperçus)
 - [ ] Panneau d'aperçu de l'éditeur : ouverture / fermeture au geste ; pas de double défilement ; pas de défilement horizontal parasite
 - [ ] Encoche et barre d'accueil iPhone : boutons flottants et bas de page jamais masqués ; barre d'adresse Safari qui se rétracte sans casser la mise en page (réel)
-- [ ] Retour Android / geste retour iOS : ferme le panneau ouvert, ne perd jamais le brouillon (réel)
+- [ ] Retour Android / geste retour iOS : ferme l'aperçu de l'éditeur (auto, corrigé 26/11), ne perd jamais le brouillon (auto) ; vérifier aussi sur vrai téléphone (réel)
 - [ ] Retour sur l'onglet après plusieurs heures (ou appli fermée) : session et brouillon conservés (réel)
 - [ ] En-tête de l'éditeur sur une ligne à 320 px (bug 26/11) ; « Ajouter à mon agenda » non coupé (bug 26/11) ; réponses en fiches sur téléphone (bug 26/11)
 
@@ -143,3 +149,4 @@ Navigateur marqué `fp:admin`. Ne pas ouvrir de vrai faire-part (ça compterait 
 |---|---|---|---|---|---|
 | 26/11/2026 | 129a6ba | Recette complète (9 corrections) | e2e 230/230, SEO OK | non (émulation seule) | Lignes « bug 26/11 » |
 | 26/11/2026 | 9e5f0dd | Retours & signalement ; accueil compte connecté ; /admin/ ouvertures (fb6ea7d) | e2e 262/262, SEO OK, prod vérifiée | non (émulation seule) | Lignes « +26/11 » ; section M créée |
+| (sur staging, pas encore en prod) | — | Recette mobile automatique + CI GitHub ; 7 corrections mobiles (double envoi RSVP, double publication, geste retour, zones 44 px, champ 15 px, débordements 320 px) | e2e 262/262, mobile 261/261 (Safari + Chrome Android), SEO OK | à faire | Lignes « auto » et « bug 26/11 » de M |
