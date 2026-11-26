@@ -47,7 +47,17 @@ npm run build          # export de production + CSP stricte (scripts/postbuild.m
 npm run deploy         # build de production puis copie de web/out à la racine du dépôt
 ```
 
-Mise en ligne : `cd web && npm run deploy`, puis commit et push sur `dev`. Après chaque mise en ligne : `npm run indexnow` (prévient Bing et Copilot).
+### Préproduction (recette) : https://staging.maison-meli.com — depuis le 26/11/2026
+Pour modifier sereinement sans toucher aux vrais utilisateurs ni fausser les chiffres :
+
+1. Travailler sur la branche **`staging`** (jamais directement sur `dev`) : modifier `web/`, commit, push. Workers Builds construit le site (`cd web && npm ci && npm run build:staging`) et le déploie sur le Worker `maison-meli-staging` (`npx wrangler deploy --env staging`, voir `wrangler.jsonc`). Rien n'est publié à la racine du dépôt sur cette branche.
+2. La recette parle à une **base Supabase séparée** (projet `maison-meli-staging`, `pcppyluqhsbhkjzmjpzk`, gratuit) : comptes, faire-part, réponses et mesures de test y restent. Une modification de la base se teste d'abord là (rejouer `supabase/schema.sql`), puis en production.
+3. La recette n'est jamais indexée (`robots.txt` interdit tout + en-tête `X-Robots-Tag: noindex` sur toutes les pages).
+4. Une fois validé : `git checkout dev && git merge staging`, puis `cd web && npm run deploy`, commit et push sur `dev` (= production).
+
+**Tableau de bord `/admin/`** : uniquement sur https://staging.maison-meli.com/admin/ (retiré de la production le 26/11/2026), mais il lit **les statistiques de production** (`PROD_SUPABASE` dans `web/lib/config.ts`, session séparée `fp:session:prod`, CSP de cette page ouverte à la base de production seulement).
+
+Mise en ligne (production) : `cd web && npm run deploy`, puis commit et push sur `dev`. Après chaque mise en ligne : `npm run indexnow` (prévient Bing et Copilot).
 
 ### Hébergement Cloudflare (Worker avec fichiers statiques)
 Le Worker `faire-part-mvp` est relié au dépôt (branche `dev`) : chaque push redéploie le site. `wrangler.jsonc` (racine) sert le site déjà publié à la racine par `npm run deploy` ; `.assetsignore` exclut les sources ; `_redirects` fait les vraies 301 et `_headers` les en-têtes (X-Robots-Tag, cache).
