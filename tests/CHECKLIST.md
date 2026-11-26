@@ -32,15 +32,15 @@ Règles :
 **Lancés automatiquement par GitHub à chaque push sur `staging`** (onglet « Actions » du dépôt, workflow « Recette », captures en artefacts). Une release ne part que si le dernier passage est vert.
 - [ ] `python3 tests/e2e.py` : 100 % (262/262 au 26/11)
 - [ ] `python3 tests/e2e_mobile.py --strict` : 100 % (261/261 au 26/11) — **Safari iOS (WebKit) en iPhone SE 320 px et iPhone 15**, **Chrome Android en Pixel 7 et Galaxy S24 360 px**, écran tactile
+  Couvre, au doigt, sur chaque appareil : accueil → éditeur complet → photo de téléphone → connexion par code → publication → partage / QR ; faire-part invité → agenda → réponse ; Mon faire-part ; zones tactiles ≥ 44 px et non recouvertes ; champs ≥ 16 px (zoom Safari) ; safe area iPhone ; claviers (e-mail, code `one-time-code`) ; geste retour (aperçu) ; double toucher (Envoyer) ; onglet rouvert (session, brouillon) ; paysage ; mode sombre ; texte agrandi 125 % ; réseau lent ; navigateur intégré WhatsApp.
+  Ne couvre pas (reste en M-réel) : vrai clavier virtuel, feuille de partage native, Photos / agenda / Maps du téléphone, aperçu WhatsApp, connexion Google réelle.
+  En local, WebKit ne s'installe que si le poste autorise le téléchargement de Playwright (`python3 -m playwright install webkit`) ; sinon les iPhone sont ignorés et la CI fait foi.
+  Information affichée (non bloquante) : temps d'affichage du faire-part en 4G lente, aide pour Google dans WhatsApp.
 - [ ] `npm run test:seo` : 100 % (3 127/3 127 au 26/11)
 - [ ] axe-core (WCAG 2.2 AA, inclus dans e2e) : OK
 - [ ] Aucun débordement horizontal à 320 / 375 / 390 / 430 px (inclus dans e2e)
 - [ ] Recette SQL sur la base **staging** (SQL Editor, tout est annulé à la fin) : `supabase/tests.sql`, `tests-comptes.sql`, `tests-mesure.sql`, `tests-retours.sql` (+ tout nouveau fichier)
 - [ ] `npm run build:staging` et `npm run build` sans erreur
-  Couvre, au doigt, sur chaque appareil : accueil → éditeur complet → photo de téléphone → connexion par code → publication → partage / QR ; faire-part invité → agenda → réponse ; Mon faire-part ; zones tactiles ≥ 44 px et non recouvertes ; champs ≥ 16 px (zoom Safari) ; safe area iPhone ; claviers (e-mail, code `one-time-code`) ; geste retour (aperçu) ; double toucher (Envoyer) ; onglet rouvert (session, brouillon) ; paysage ; mode sombre ; texte agrandi 125 % ; réseau lent ; navigateur intégré WhatsApp.
-  Ne couvre pas (reste en M-réel) : vrai clavier virtuel, feuille de partage native, Photos / agenda / Maps du téléphone, aperçu WhatsApp, connexion Google réelle.
-  En local, WebKit ne s'installe que si le poste autorise le téléchargement de Playwright (`python3 -m playwright install webkit`) ; sinon les iPhone sont ignorés et la CI fait foi.
-  Information affichée (non bloquante) : temps d'affichage du faire-part en 4G lente, aide pour Google dans WhatsApp.
 
 ## M. Mobile en profondeur
 Deux passes à chaque release :
