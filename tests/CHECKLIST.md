@@ -42,7 +42,7 @@ Règles :
 - [ ] `npm run test:seo` : 100 % (3 127/3 127 au 26/11)
 - [ ] axe-core (WCAG 2.2 AA, inclus dans e2e) : OK
 - [ ] Aucun débordement horizontal à 320 / 375 / 390 / 430 px (inclus dans e2e)
-- [ ] Recette SQL sur la base **staging** (SQL Editor, tout est annulé à la fin) : `supabase/tests.sql`, `tests-comptes.sql`, `tests-mesure.sql`, `tests-retours.sql`, `tests-brouillons.sql` (16/16 au 27/11), `tests-protection.sql` (14/14 au 27/11 : corbeille, historique des réponses, versions, health) (+ tout nouveau fichier)
+- [ ] Recette SQL sur la base **staging** (SQL Editor, tout est annulé à la fin) : `supabase/tests.sql`, `tests-comptes.sql`, `tests-mesure.sql`, `tests-retours.sql`, `tests-brouillons.sql` (16/16 au 27/11), `tests-protection.sql` (14/14 au 27/11 : corbeille, historique des réponses, versions, health) ; `tests-mesure.sql` ignore désormais le champ `device` du journal (test périmé corrigé le 27/11) (+ tout nouveau fichier)
 - [ ] `npm run build:staging` et `npm run build` sans erreur
 
 ## M. Mobile en profondeur
