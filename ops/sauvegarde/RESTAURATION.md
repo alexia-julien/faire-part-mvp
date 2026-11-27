@@ -19,7 +19,7 @@ et envoie un e-mail à Julien en cas de problème. Son appel régulier empêche 
 3. Dépôt privé > Settings > Secrets and variables > Actions : `SUPABASE_DB_URL` (chaîne ci-dessus) et `BACKUP_PASSPHRASE`
    (phrase longue, **aussi rangée dans le gestionnaire de mots de passe** : sans elle, aucune sauvegarde ne se déchiffre).
 4. Onglet Actions > « Sauvegarde nocturne » > Run workflow : vérifier que le premier passage est vert.
-5. Cloudflare > Workers > faire-part-mvp > Settings > Variables and secrets : secrets `RESEND_API_KEY` et `ALERT_TO` (adresse de Julien).
+5. Cloudflare > Workers > faire-part-mvp > Settings > Variables and secrets : secret `RESEND_API_KEY` (les alertes partent vers contact@maison-meli.com, réglé dans `wrangler.jsonc`).
 6. GitHub > Settings > Notifications > Actions : laisser « Notify on failed workflows » activé (e-mail).
 
 ## Restaurer une réponse supprimée (SQL Editor de la prod)

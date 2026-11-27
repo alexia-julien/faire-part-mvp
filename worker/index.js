@@ -47,7 +47,8 @@ function withHeaders(res) {
 //   2. la base répond (rpc/health) — cet appel régulier empêche aussi la mise en pause de l'offre gratuite Supabase ;
 //   3. (prod) une sauvegarde nocturne a réussi il y a moins de 30 h.
 // Alerte par e-mail (Resend) après 2 contrôles ratés d'affilée, rappel toutes les 3 h, message de retour à la normale.
-// Secrets du Worker (Cloudflare > Workers > faire-part-mvp > Settings > Variables, type « Secret ») : RESEND_API_KEY, ALERT_TO.
+// Destinataire : ALERT_TO (wrangler.jsonc, contact@maison-meli.com). Secret du Worker (Cloudflare > Workers > faire-part-mvp
+// > Settings > Variables, type « Secret ») : RESEND_API_KEY.
 // Sans ces secrets (préprod), la sentinelle ne fait que garder la base éveillée et écrire dans les journaux.
 async function probe(url, init) {
   for (let i = 0; i < 2; i++) {

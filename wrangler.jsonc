@@ -18,11 +18,12 @@
     "SUPABASE_URL": "https://pmtwhrqfdvbxbgrzcytl.supabase.co",
     "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtdHdocnFmZHZieGJncnpjeXRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1MjQ3MzEsImV4cCI6MjEwODEwMDczMX0.7jw9LLJC8dCBHe4fIPnLfgmIFVdbTC19oIR5ZytF-aw",
     "SITE_URL": "https://maison-meli.com",
-    "CHECK_BACKUP": "1"
+    "CHECK_BACKUP": "1",
+    "ALERT_TO": "contact@maison-meli.com"
   },
   // Sentinelle (worker/index.js, scheduled) : site + base + fraîcheur de la sauvegarde toutes les 5 min, alerte e-mail.
   // L'appel régulier à la base empêche la mise en pause automatique de l'offre gratuite Supabase.
-  // Secrets à définir dans le tableau de bord Cloudflare (jamais dans ce dépôt public) : RESEND_API_KEY, ALERT_TO.
+  // Seul secret à définir dans le tableau de bord Cloudflare (jamais dans ce dépôt public) : RESEND_API_KEY.
   "triggers": { "crons": ["*/5 * * * *"] },
   "kv_namespaces": [{ "binding": "SENTINEL", "id": "b01e9770d8954ed196147349ded5ea52" }],
   // Recette (préproduction) : branche `staging` → Worker « maison-meli-staging » sur https://staging.maison-meli.com.
