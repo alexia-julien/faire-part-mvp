@@ -7,6 +7,7 @@ web
 supabase
 tests
 README.md
+CLAUDE.md
 SECURITY.md
 wrangler.jsonc
 .assetsignore

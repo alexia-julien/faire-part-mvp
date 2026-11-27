@@ -56,7 +56,7 @@ Pour modifier sereinement sans toucher aux vrais utilisateurs ni fausser les chi
 4. Une fois validé : `git checkout dev && git merge staging`, puis `cd web && npm run deploy`, commit et push sur `dev` (= production).
 
 **Process de test (depuis le 26/11/2026) — détail et checklist : [`tests/CHECKLIST.md`](tests/CHECKLIST.md)**
-- Chaque dev : test **ciblé** de la fonctionnalité sur staging (mobile 390 px + ordinateur) et contrôle de base (build, accueil sans erreur).
+- Chaque dev : test **ciblé** de la fonctionnalité sur staging (mobile 390 px + ordinateur) et contrôle de base (build, accueil sans erreur). **Pas de recette complète, pas de CI.**
 - Chaque mise en prod (2 à 4 devs max) : **toute** la checklist (tests automatiques, mobile en profondeur dont vrais téléphones, parcours fonctionnels) **avant** le merge vers `dev` ; puis contrôle léger en prod.
 - La checklist s'enrichit à chaque dev et à chaque bug trouvé (lignes `(+JJ/MM)` / `(bug JJ/MM)`). Le mobile est le canal principal : tout dev qui touche une page y ajoute au moins une ligne mobile.
 
@@ -79,6 +79,8 @@ Domaine : zone `maison-meli.com` sur Cloudflare (DNS chez Cloudflare, e-mails to
 
 ## Tests
 
+> **Ces recettes complètes ne se lancent qu'à la mise en prod.** Pendant un dev : test ciblé de la fonctionnalité seulement (voir `CLAUDE.md`).
+
 `cd web && npm run build:local && npm run test:seo` : recette SEO/GEO de l'export (2 400+ contrôles).
 
 ```bash
@@ -91,7 +93,7 @@ La base se teste avec `supabase/tests.sql` (invités), `tests-comptes.sql`, `tes
 
 **Recette mobile** : `python3 tests/e2e_mobile.py` — Safari iOS (WebKit : iPhone SE 320 px, iPhone 15) et Chrome Android (Pixel 7, Galaxy S24 360 px), écran tactile, parcours complet au doigt (voir l'en-tête du fichier). WebKit : `python3 -m playwright install webkit`.
 
-**CI GitHub** (`.github/workflows/tests.yml`) : à chaque push sur `staging`, SEO + `e2e.py` + `e2e_mobile.py --strict` (onglet « Actions », captures en artefacts). Une mise en prod ne part que si le dernier passage est vert. Ce qui demande un vrai téléphone reste dans la section M de `tests/CHECKLIST.md`.
+**CI GitHub** (`.github/workflows/tests.yml`) : déclenchée à la main à la mise en prod uniquement, SEO + `e2e.py` + `e2e_mobile.py --strict` (onglet « Actions », captures en artefacts). Une mise en prod ne part que si le dernier passage est vert. Ce qui demande un vrai téléphone reste dans la section M de `tests/CHECKLIST.md`.
 
 ## Sécurité et performance
 - **CSP stricte** posée dans chaque page par `scripts/postbuild.mjs` (ses empreintes dépendent de chaque page) : scripts autorisés par empreinte SHA-256, jamais `unsafe-inline` ; Google Identity Services seulement sur `/creer/` et `/mon-faire-part/`. Polices auto-hébergées (plus aucun appel à Google Fonts).

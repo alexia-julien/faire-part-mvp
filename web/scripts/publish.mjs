@@ -10,7 +10,7 @@ const WEB = join(dirname(fileURLToPath(import.meta.url)), "..");
 const ROOT = join(WEB, "..");
 const OUT = join(WEB, "out");
 const MANIFEST = join(ROOT, ".deploy-manifest");
-const KEEP = new Set(["web", "supabase", "tests", "worker", ".git", ".github", "README.md", "SECURITY.md", ".gitignore", ".deploy-manifest", "wrangler.jsonc", ".assetsignore"]);
+const KEEP = new Set(["web", "supabase", "tests", "worker", ".git", ".github", "README.md", "CLAUDE.md", "SECURITY.md", ".gitignore", ".deploy-manifest", "wrangler.jsonc", ".assetsignore"]);
 
 if (!existsSync(join(OUT, "index.html"))) throw new Error("Pas d'export : lancez d'abord `npm run build`.");
 const html = readFileSync(join(OUT, "index.html"), "utf8");

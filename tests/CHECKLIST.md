@@ -1,9 +1,11 @@
 # Maison Meli — process de livraison & checklist de non-régression
 
 Créée le 26/11/2026. **Document vivant : il s'enrichit à chaque release** (voir « Règles d'incrémentation »).
-Ce fichier est la référence ; une copie est tenue à jour dans le projet Claude (`claude/checklist-non-regression.md`).
+Ce fichier est la référence ; une copie est tenue à jour dans le projet Claude (`claude/checklist-non-regression.md`), le dépôt fait foi.
 
 **Le mobile est le canal principal** (création depuis le téléphone, faire-part ouvert depuis WhatsApp). Il a sa propre section (M) et chaque parcours B se fait d'abord sur mobile.
+
+> **Pendant un dev : test ciblé uniquement. Ne lancez ni `tests/e2e*.py`, ni `npm run test:seo`, ni la CI — la recette complète se fait seulement à la mise en prod** (décision de Julien, rappelée le 27/11/2026). Règles détaillées : `CLAUDE.md` à la racine du dépôt.
 
 ## Le process (décision de Julien, 26/11/2026)
 
@@ -23,13 +25,13 @@ Règles :
 ## Règles d'incrémentation
 1. Chaque dev livré ajoute ses lignes de contrôle dans la bonne section (M ou B), marquées `(+JJ/MM)`. **Un dev qui touche une page ajoute toujours au moins une ligne mobile.**
 2. Chaque bug trouvé en prod ou en recette ajoute une ligne qui l'aurait détecté, marquée `(bug JJ/MM)`.
-3. Chaque fois que c'est possible, la ligne manuelle devient un test automatique (`tests/e2e.py`, `tests/seo.py`, SQL) et passe en section A.
+3. Chaque fois que c'est possible, la ligne manuelle devient un test automatique (`tests/e2e.py`, `tests/seo.py`, SQL) et passe en section A. Le test s'écrit pendant le dev **mais n'est pas lancé** : il tourne pour la première fois à la mise en prod.
 4. Une ligne devenue obsolète (fonctionnalité retirée) est supprimée, avec une mention dans la section D.
 
 ---
 
 ## A. Tests automatiques (local, `cd web && npm run build:local`)
-**Lancés automatiquement par GitHub à chaque push sur `staging`** (onglet « Actions » du dépôt, workflow « Recette », captures en artefacts). Une release ne part que si le dernier passage est vert.
+**Lancés uniquement à la mise en prod** : workflow GitHub « Recette » déclenché à la main sur `staging` (onglet « Actions », captures en artefacts ; voir `CLAUDE.md`). Jamais pendant un dev. La release ne part que si ce passage est vert.
 - [ ] `python3 tests/e2e.py` : 100 % (275/275 au 27/11)
 - [ ] `python3 tests/e2e_mobile.py --strict` : 100 % (261/261 au 26/11) — **Safari iOS (WebKit) en iPhone SE 320 px et iPhone 15**, **Chrome Android en Pixel 7 et Galaxy S24 360 px**, écran tactile
   Couvre, au doigt, sur chaque appareil : accueil → éditeur complet → photo de téléphone → connexion par code → publication → partage / QR ; faire-part invité → agenda → réponse ; Mon faire-part ; zones tactiles ≥ 44 px et non recouvertes ; champs ≥ 16 px (zoom Safari) ; safe area iPhone ; claviers (e-mail, code `one-time-code`) ; geste retour (aperçu) ; double toucher (Envoyer) ; onglet rouvert (session, brouillon) ; paysage ; mode sombre ; texte agrandi 125 % ; réseau lent ; navigateur intégré WhatsApp.
