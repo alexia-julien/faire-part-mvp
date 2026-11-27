@@ -11,8 +11,8 @@ Ce fichier est la référence ; une copie est tenue à jour dans le projet Claud
 
 | Moment | Ce qu'on teste | Où |
 |---|---|---|
-| **Chaque nouveau dev** | Test ciblé de la fonctionnalité, **sur mobile (390 px) et sur ordinateur**, + contrôle de base : le build passe, l'accueil s'affiche, 0 erreur console | staging.maison-meli.com |
-| **Mise en prod (release)** | Tests automatiques (A, dont mobile) verts sur le dernier push `staging` + parcours B touchés par la release. Feu vert seulement si tout est vert. | CI GitHub + staging |
+| **Chaque nouveau dev** | Test ciblé de la fonctionnalité seulement, **sur mobile (390 px) et sur ordinateur**, + contrôle de base : le build passe, l'accueil s'affiche, 0 erreur console. **Pas de `tests/e2e*.py`, pas de `test:seo`, pas de CI.** | staging.maison-meli.com |
+| **Mise en prod (release)** | Recette complète lancée à ce moment-là : tests automatiques (A, dont mobile) verts sur `staging` + parcours B touchés par la release. Feu vert seulement si tout est vert. | CI GitHub + staging |
 | **Après la mise en prod** | Contrôle léger en lecture seule (section C) | maison-meli.com |
 
 Règles :
