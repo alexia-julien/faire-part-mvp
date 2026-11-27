@@ -1,13 +1,10 @@
-# Recette automatique à chaque push sur staging (et à la demande) :
+# Recette complète, lancée UNIQUEMENT à la mise en prod (déclenchement manuel, voir CLAUDE.md) — jamais pendant un dev :
 # - mobile : Safari (WebKit, iPhone SE + iPhone 15) et Chrome Android (Pixel 7), écran tactile — tests/e2e_mobile.py
 # - ordinateur : parcours complet, accessibilité, CSP — tests/e2e.py ; SEO — tests/seo.py
 # Résultat visible dans l'onglet « Actions » du dépôt ; captures téléchargeables (artefacts) en cas d'échec comme de succès.
 name: Recette
 
 on:
-  push:
-    branches: [staging]
-  pull_request:
   workflow_dispatch:
 
 concurrency:
