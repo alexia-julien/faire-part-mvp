@@ -36,10 +36,11 @@ Règles :
   Ne couvre pas (reste en M-réel) : vrai clavier virtuel, feuille de partage native, Photos / agenda / Maps du téléphone, aperçu WhatsApp, connexion Google réelle.
   En local, WebKit ne s'installe que si le poste autorise le téléchargement de Playwright (`python3 -m playwright install webkit`) ; sinon les iPhone sont ignorés et la CI fait foi.
   Information affichée (non bloquante) : temps d'affichage du faire-part en 4G lente, aide pour Google dans WhatsApp.
+- [ ] `python3 tests/e2e_brouillon.py` : 100 % (39/39 au 27/11) — reprise du brouillon sur ordinateur et téléphone 390 px : « Mon faire-part » sans compte et connecté, rattachement au compte, autre appareil, déconnexion, « Recommencer à zéro », publication (+27/11)
 - [ ] `npm run test:seo` : 100 % (3 127/3 127 au 26/11)
 - [ ] axe-core (WCAG 2.2 AA, inclus dans e2e) : OK
 - [ ] Aucun débordement horizontal à 320 / 375 / 390 / 430 px (inclus dans e2e)
-- [ ] Recette SQL sur la base **staging** (SQL Editor, tout est annulé à la fin) : `supabase/tests.sql`, `tests-comptes.sql`, `tests-mesure.sql`, `tests-retours.sql` (+ tout nouveau fichier)
+- [ ] Recette SQL sur la base **staging** (SQL Editor, tout est annulé à la fin) : `supabase/tests.sql`, `tests-comptes.sql`, `tests-mesure.sql`, `tests-retours.sql`, `tests-brouillons.sql` (16/16 au 27/11) (+ tout nouveau fichier)
 - [ ] `npm run build:staging` et `npm run build` sans erreur
 
 ## M. Mobile en profondeur
@@ -70,6 +71,7 @@ Règles :
 - [ ] Encoche et barre d'accueil iPhone : boutons flottants et bas de page jamais masqués ; barre d'adresse Safari qui se rétracte sans casser la mise en page (réel)
 - [ ] Retour Android / geste retour iOS : ferme l'aperçu de l'éditeur (auto, corrigé 26/11), ne perd jamais le brouillon (auto) ; vérifier aussi sur vrai téléphone (réel)
 - [ ] Retour sur l'onglet après plusieurs heures (ou appli fermée) : session et brouillon conservés (réel)
+- [ ] Brouillon commencé sur ordinateur, connexion sur le téléphone avec le même compte : « Mon faire-part » propose de le reprendre (réel, +27/11)
 - [ ] En-tête de l'éditeur sur une ligne à 320 px (bug 26/11) ; « Ajouter à mon agenda » non coupé (bug 26/11) ; réponses en fiches sur téléphone (bug 26/11)
 
 ### M4. Fonctions natives (réel)
@@ -99,6 +101,7 @@ Règles :
 - [ ] Lien Maps : `maps.apple/p/…` accepté ; lien sans `https://` complété (bug 26/11)
 - [ ] Générateur de texte : heure seule sans date, pas de doublon « cadeau » avec la cagnotte, articles corrects (« au Château », « à la Mairie ») (bug 26/11)
 - [ ] Brouillon conservé après rechargement
+- [ ] Connecté : le brouillon part sur le compte quelques secondes après une modification ; « Recommencer à zéro » l'efface aussi du compte (auto, +27/11)
 
 ### B3. Compte & connexion
 - [ ] Code e-mail (6 chiffres) reçu et accepté
@@ -112,6 +115,8 @@ Règles :
 - [ ] Rappel de note : une seule fois si la carte a été ignorée, jamais pendant la visite où la carte a été vue (+26/11)
 - [ ] Liste des réponses : fiches sur téléphone, ombre de défilement sur ordinateur (bug 26/11)
 - [ ] Modification d'un faire-part publié : changement visible côté invité
+- [ ] Brouillon non publié : « Mon faire-part » affiche « Votre faire-part vous attend » (mini-carte aux vrais prénoms, jamais de date d'exemple) au lieu de la page vide, connecté ou non (auto, bug 27/11 : cas de Chloé)
+- [ ] Publication : brouillon effacé du navigateur et du compte ; déconnexion : brouillon déjà gardé sur le compte retiré de l'appareil (auto, +27/11)
 
 ### B5. Faire-part invité (`/invitation.html?f=…`)
 - [ ] Rendu correct (aussi avec une config proche d'un vrai faire-part, en local ; jamais en ouvrant un vrai faire-part en prod)

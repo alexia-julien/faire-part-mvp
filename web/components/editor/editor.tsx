@@ -24,6 +24,8 @@ import { StepCustomize, StepDate, StepNames, StepReview, StepRsvp, StepStyle, St
 import { PublishRitual } from "./publish-ritual";
 import { BrandMark } from "@/components/site/brand-mark";
 import { RatingCard, ReportButton } from "@/components/site/feedback";
+import { deleteLocalDraft, readDraft, writeLocalDraft, type Draft } from "@/lib/draft";
+import { cancelDraftSync, flushDraftSync, reconcileDraft, scheduleDraftSync } from "@/lib/draft-sync";
 import { markRatingSeen } from "@/lib/feedback";
 import type { MyRating } from "@/lib/api";
 
@@ -38,11 +40,7 @@ export const STEPS = [
   { id: "review", label: "Aperçu" },
 ] as const;
 const TOTAL = STEPS.length;
-const DRAFT_KEY = "fp:draft", PENDING_KEY = "fp:publish-pending", MAX_YEAR = 2050;
-
-function storeGet(k: string) { try { return JSON.parse(localStorage.getItem(k) || "null"); } catch { return null; } }
-function storeSet(k: string, v: unknown) { try { localStorage.setItem(k, JSON.stringify(v)); return true; } catch { return false; } }
-function storeDel(k: string) { try { localStorage.removeItem(k); } catch {} }
+const PENDING_KEY = "fp:publish-pending", MAX_YEAR = 2050;
 const pendingSet = () => { try { sessionStorage.setItem(PENDING_KEY, String(Date.now())); } catch {} };
 const pendingDel = () => { try { sessionStorage.removeItem(PENDING_KEY); } catch {} };
 const pendingGet = () => { try { const t = Number(sessionStorage.getItem(PENDING_KEY)); return t > 0 && Date.now() - t < 3600000; } catch { return false; } };
@@ -148,8 +146,8 @@ export function Editor() {
     clearTimeout(timer.current); timer.current = 0;
     if (editingRef.current || publishedRef.current || !dirty.current) return;
     dirty.current = false;
-    const d = { state: stateRef.current, activeMs: activeMs.current, step: stepRef.current + 1 };
-    if (!storeSet(DRAFT_KEY, d)) storeSet(DRAFT_KEY, { ...d, state: { ...d.state, photos: [] } }); // photos trop lourdes : on garde le reste
+    writeLocalDraft({ state: stateRef.current, activeMs: activeMs.current, step: stepRef.current + 1, at: Date.now() });
+    scheduleDraftSync(); // compte connecté : gardé aussi sur le compte (reprise sur un autre appareil)
     setSaved(true);
   }, []);
   const saveDraft = useCallback(() => {
@@ -157,9 +155,10 @@ export function Editor() {
     dirty.current = true; setSaved(false); clearTimeout(timer.current); timer.current = window.setTimeout(writeDraft, 300);
   }, [writeDraft]);
   useEffect(() => {
-    const vis = () => { if (document.visibilityState === "hidden") writeDraft(); };
-    window.addEventListener("pagehide", writeDraft); document.addEventListener("visibilitychange", vis);
-    return () => { window.removeEventListener("pagehide", writeDraft); document.removeEventListener("visibilitychange", vis); };
+    const hide = () => { writeDraft(); flushDraftSync(); };
+    const vis = () => { if (document.visibilityState === "hidden") hide(); };
+    window.addEventListener("pagehide", hide); document.addEventListener("visibilitychange", vis);
+    return () => { window.removeEventListener("pagehide", hide); document.removeEventListener("visibilitychange", vis); };
   }, [writeDraft]);
 
   const update = useCallback((fn: (c: Config) => Config) => {
@@ -179,15 +178,14 @@ export function Editor() {
     setNotice(fromDraft ? "Ce compte a déjà un faire-part : le voici. Un compte ne peut en avoir qu’un, vous pouvez le modifier autant que vous voulez." : "");
     setGate(false); setReady(true);
   }, []);
-  const startNew = useCallback(() => {
+  // draft : brouillon déjà choisi (compte connecté : le plus récent entre ce navigateur et le compte), sinon celui du navigateur.
+  const startNew = useCallback((given?: Draft | null) => {
     let s = defaults(), st = 0, restoredDraft = false;
-    const draft = storeGet(DRAFT_KEY);
-    if (draft && draft.state && typeof draft.state === "object") {
-      const meta = draft.state.meta;
-      s = sanitizeConfig(draft.state); if (meta) s.meta = s.meta || meta;
-      if (typeof draft.activeMs === "number" && draft.activeMs >= 0 && draft.activeMs < 864e5) activeMs.current = draft.activeMs;
+    const draft = given === undefined ? readDraft() : given;
+    if (draft) {
+      s = draft.state; activeMs.current = draft.activeMs;
       restoredDraft = !!(s.partner1 || s.partner2 || s.date || s.venueName || s.photos.length);
-      st = Math.min(Math.max((parseInt(draft.step, 10) || 1) - 1, 0), TOTAL - 1);
+      st = Math.min(Math.max(draft.step - 1, 0), TOTAL - 1);
     }
     // Arrivée depuis la page d'accueil : prénoms et ambiance (dans le fragment, jamais envoyés au serveur).
     const h = new URLSearchParams(location.hash.slice(1));
@@ -216,9 +214,9 @@ export function Editor() {
       if (auth.takeRedirectError() && pendingGet()) { setStep(TOTAL - 1); setGate(true); }
       return unsub;
     }
-    api.myInvitation().then((inv) => {
+    Promise.all([api.myInvitation(), reconcileDraft()]).then(([inv, draft]) => {
       if (inv) { pendingDel(); enterEdit(inv, pendingGet()); return; }
-      startNew();
+      startNew(draft);
       // Retour d'une connexion par lien email demandée au moment de publier : on termine la publication.
       if (pendingGet() && auth.justSignedIn) setAutoPublish(true); else pendingDel();
     }).catch((e: ApiError) => {
@@ -291,7 +289,7 @@ export function Editor() {
 
   const finishPublish = useCallback((slug: string, seconds: number | null) => {
     setPublished({ slug, seconds }); setRitual(!editingRef.current); setGate(false);
-    clearTimeout(timer.current); storeDel(DRAFT_KEY); pendingDel();
+    clearTimeout(timer.current); cancelDraftSync(); deleteLocalDraft(); pendingDel(); // côté compte : supprimé par la base à la publication
     window.scrollTo({ top: 0 });
     api.myRating().then((r) => { setRating(r); if (!r) markRatingSeen(); }).catch(() => setRating(undefined));
   }, []);
@@ -433,7 +431,11 @@ export function Editor() {
               {restored && (
                 <p id="draft-note" className="flex flex-wrap items-center gap-x-2 rounded-2xl bg-muted/70 px-4 py-3 text-[14px] text-muted-foreground">
                   Votre brouillon a été restauré.
-                  <button type="button" id="reset-draft" className="font-medium text-foreground underline decoration-foreground/25 underline-offset-4" onClick={() => { storeDel(DRAFT_KEY); location.replace("/creer/"); }}>Recommencer à zéro</button>
+                  <button type="button" id="reset-draft" className="font-medium text-foreground underline decoration-foreground/25 underline-offset-4" onClick={async () => {
+                    cancelDraftSync(); deleteLocalDraft();
+                    if (auth.user()) { try { await api.deleteDraft(); } catch {} }
+                    location.replace("/creer/");
+                  }}>Recommencer à zéro</button>
                 </p>
               )}
               {notice && <p id="notice" role="status" className="rounded-2xl bg-muted/70 px-4 py-3 text-[14px] text-muted-foreground">{notice}</p>}

@@ -4,6 +4,7 @@
 // Mode local (tests) : un faux service accepte le code 123456. La session vit dans le stockage du navigateur ;
 // le serveur vérifie le jeton à chaque appel (lib/api.ts).
 import { CONFIG, IS_REMOTE } from "./config";
+import { forgetSyncedDraft } from "./draft";
 
 const BASE = IS_REMOTE ? CONFIG.supabaseUrl.replace(/\/$/, "") + "/auth/v1" : "";
 const KEY = CONFIG.sessionKey;
@@ -141,7 +142,7 @@ export const auth = {
     return { id: s.user.id, email: s.user.email };
   },
   async signOut() {
-    const s = read(); write(null); notify();
+    const s = read(); write(null); forgetSyncedDraft(); notify(); // brouillon gardé sur le compte : pas besoin de le laisser ici
     if (!IS_REMOTE || !s) return;
     try { await call("/logout?scope=local", {}, s.access_token); } catch {}
   },

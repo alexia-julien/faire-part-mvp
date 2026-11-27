@@ -24,6 +24,8 @@ import { DigestToggle, ManualRsvp, PremiumDoor } from "./dashboard-extras";
 import { RatingCard, RatingSummary, ReportButton } from "./feedback";
 import { dismissReminder, markReminded, ratingSeenThisVisit, wasReminded } from "@/lib/feedback";
 import type { MyRating } from "@/lib/api";
+import { meaningful, readDraft, type Draft } from "@/lib/draft";
+import { reconcileDraft } from "@/lib/draft-sync";
 
 // « Mon faire-part » : le faire-part du compte connecté et les réponses de ses invités. Sans session : connexion.
 // Les réponses viennent d'inconnus : on ne fait jamais confiance à leur forme, même si le serveur les filtre aussi.
@@ -90,12 +92,15 @@ export function Dashboard() {
   // Note de la création : un seul rappel ici si la carte de l'écran de succès a été ignorée (pas pendant la même visite).
   const [rating, setRating] = useState<MyRating | undefined>(undefined);
   const [remind, setRemind] = useState(false);
+  // Brouillon en cours (27/11/2026) : sans faire-part publié, on propose de le reprendre au lieu d'une page vide.
+  const [draft, setDraft] = useState<Draft | null>(null);
 
   const load = useCallback(async () => {
     setErr("");
     try {
       const [inv, list] = await Promise.all([api.myInvitation(), api.listRsvps()]);
-      if (!inv) { setData(null); return; }
+      // Connexion depuis cette page : le brouillon de ce navigateur est rattaché au compte (reconcileDraft).
+      if (!inv) { setDraft(await reconcileDraft()); setData(null); return; }
       const rows = (Array.isArray(list) ? list : []).filter((r) => r && r.data && typeof r.data === "object");
       const cfg = sanitizeConfig(inv.config);
       document.title = "Suivi des réponses — " + cfg.partner1 + " & " + cfg.partner2;
@@ -116,6 +121,7 @@ export function Dashboard() {
     cleanupLegacy(); consumeRedirect();
     const u = auth.user(); setUser(u);
     if (u) load();
+    else { const d = readDraft(); setDraft(d && meaningful(d.state) ? d : null); }
   }, [load]);
   useEffect(() => { if (!confirm) return; const t = setTimeout(() => setConfirm(null), 5000); return () => clearTimeout(t); }, [confirm]);
 
@@ -127,8 +133,9 @@ export function Dashboard() {
   if (!user) {
     return (
       <Shell user={null}>
-        <section id="signin" className="mx-auto mt-6 w-full max-w-[440px] rounded-[28px] border border-white/60 bg-card p-7 shadow-float sm:mt-14">
-          <AuthPanel title="Mon faire-part" text="Connectez-vous pour retrouver votre faire-part et les réponses de vos invités."
+        {draft && <ResumeDraft draft={draft} className="mx-auto mt-6 sm:mt-14" />}
+        <section id="signin" className={cn("mx-auto w-full max-w-[440px] rounded-[28px] border border-white/60 bg-card p-7 shadow-float", draft ? "mt-6" : "mt-6 sm:mt-14")}>
+          <AuthPanel title={draft ? "Déjà publié ?" : "Mon faire-part"} text={draft ? "Connectez-vous pour retrouver votre faire-part publié et les réponses de vos invités." : "Connectez-vous pour retrouver votre faire-part et les réponses de vos invités."}
             returnTo={location.href.split("#")[0].split("?")[0]} onSignedIn={(u) => { setUser(u); load(); }} />
         </section>
       </Shell>
@@ -152,6 +159,14 @@ export function Dashboard() {
     </section>
   );
 
+  if (!data && draft) {
+    return (
+      <Shell user={user} onSignOut={signOut}>
+        <ResumeDraft draft={draft} className="mx-auto mt-6 sm:mt-14" />
+        {danger}
+      </Shell>
+    );
+  }
   if (!data) {
     return (
       <Shell user={user} onSignOut={signOut}>
@@ -356,6 +371,27 @@ function TwoStep({ id, label, confirmLabel, confirm, setConfirm, run, onSignedOu
       }}>
       {on ? confirmLabel : label}
     </Button>
+  );
+}
+
+// Faire-part commencé mais pas encore publié : mini-carte aux prénoms du couple et reprise dans l'éditeur.
+function ResumeDraft({ draft, className }: { draft: Draft; className?: string }) {
+  const c = draft.state, names = [c.partner1.trim(), c.partner2.trim()].filter(Boolean).join(" & ");
+  const when = draft.at ? new Date(draft.at) : null;
+  const ago = when && !isNaN(+when) ? when.toLocaleDateString("fr-FR", { day: "numeric", month: "long" }) : "";
+  return (
+    <section id="draft-resume" aria-labelledby="draft-title" className={cn("flex w-full max-w-[440px] flex-col items-center gap-5 rounded-[28px] border border-white/60 bg-card px-7 py-9 text-center shadow-float", className)}>
+      <div className="w-36 rotate-[-4deg]"><MiniCard cfg={c} real className="rounded-[14px] shadow-lift" /></div>
+      <div className="flex flex-col gap-2">
+        <p className="t-label">Faire-part en cours</p>
+        <h1 id="draft-title" className="t-section">Votre <span className="whitespace-nowrap">faire-part</span> vous attend</h1>
+        <p className="text-[15px] text-muted-foreground">
+          {names ? <>{"Celui de "}<span className="font-medium text-foreground">{names}</span>{" n’est pas encore publié."}</> : "Il n’est pas encore publié."}
+          {ago ? " Dernière modification le " + ago + "." : ""}
+        </p>
+      </div>
+      <Button asChild size="lg" className="w-full sm:w-auto"><a id="draft-resume-link" href="/creer/">Reprendre mon faire-part</a></Button>
+    </section>
   );
 }
 

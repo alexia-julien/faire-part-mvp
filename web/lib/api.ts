@@ -6,6 +6,7 @@ import { auth } from "./auth";
 
 export type ApiError = Error & { conflict?: boolean; forbidden?: boolean; onePerAccount?: boolean; signedOut?: boolean; notAdmin?: boolean };
 export type MyInvitation = { slug: string; config: unknown; created_at?: string; updated_at?: string; responses?: number; last_response?: string | null };
+export type AccountDraft = { data: unknown; updated_at: string } | null;
 export type RsvpRow = { id: number; created_at: string; data: Record<string, unknown> };
 export type AdminKpis = Record<string, number | null>;
 export type AdminData = {
@@ -75,7 +76,8 @@ async function arpc(fn: string, args: unknown) {
 }
 
 // --- Mode local : db = { inv: { <slug>: { owner, config, created_at, updated_at } }, rsvps: { <slug>: [...] } } ---
-type LocalDb = { inv: Record<string, { owner: string; config: unknown; created_at: string; updated_at: string }>; rsvps: Record<string, RsvpRow[]> };
+type LocalDb = { inv: Record<string, { owner: string; config: unknown; created_at: string; updated_at: string }>; rsvps: Record<string, RsvpRow[]>;
+  drafts?: Record<string, { data: unknown; updated_at: string }> };
 const DB_KEY = "fp:db";
 function load(): LocalDb { try { return JSON.parse(localStorage.getItem(DB_KEY) || "null") || { inv: {}, rsvps: {} }; } catch { return { inv: {}, rsvps: {} }; } }
 function save(db: LocalDb) {
@@ -113,6 +115,7 @@ const local = {
     if (db.inv[slug]) { e = new Error("slug pris"); e.conflict = true; throw e; }
     const now = new Date().toISOString();
     db.inv[slug] = { owner: me(), config, created_at: now, updated_at: now }; db.rsvps[slug] = [];
+    if (db.drafts) delete db.drafts[me()]; // comme le déclencheur SQL : publié = plus de brouillon
     return { save: true };
   }),
   updateInvitation: (config: unknown) => asAccount<void>((db, slug) => {
@@ -156,6 +159,21 @@ const local = {
       return { value: r ? { score: Number(r.score), message: (r.message as string) || null, updated_at: String(r.at) } : null };
     } catch { return { value: null }; }
   }),
+  // Brouillon du compte : mêmes règles que le serveur (rien si le faire-part est publié).
+  myDraft: () => asAccount<AccountDraft>((db, slug) => {
+    const d = !slug && db.drafts?.[me()];
+    return { value: d ? { data: d.data, updated_at: d.updated_at } : null };
+  }),
+  saveDraft: (data: unknown) => asAccount<boolean>((db, slug) => {
+    if (slug) return { value: false };
+    if (JSON.stringify(data).length > 3100000) throw new Error("draft too large");
+    db.drafts = db.drafts || {}; db.drafts[me()] = { data, updated_at: new Date().toISOString() };
+    return { save: true, value: true };
+  }),
+  deleteDraft: () => asAccount<boolean>((db) => {
+    const had = !!db.drafts?.[me()]; if (db.drafts) delete db.drafts[me()];
+    return { save: true, value: had };
+  }),
   listRsvps: () => asAccount<RsvpRow[] | null>((db, slug) => ({ value: slug ? db.rsvps[slug] || [] : null })),
   deleteRsvp: (id: number) => asAccount<void>((db, slug) => {
     if (!slug) throw new Error("aucun faire-part");
@@ -163,7 +181,7 @@ const local = {
     return { save: true };
   }),
   async deleteAccount() {
-    await asAccount<void>((db, slug) => { if (slug) { delete db.inv[slug]; delete db.rsvps[slug]; } return { save: true }; });
+    await asAccount<void>((db, slug) => { if (slug) { delete db.inv[slug]; delete db.rsvps[slug]; } if (db.drafts) delete db.drafts[me()]; return { save: true }; });
     auth.drop();
   },
   addRsvp: (data: Record<string, unknown>) => asAccount<number>((db, slug) => {
@@ -196,6 +214,9 @@ const supa = {
   updateInvitation: async (config: unknown) => { const ok = await arpc("account_update_invitation", { p_config: config }); if (!ok) throw new Error("aucun faire-part"); },
   deleteInvitation: async () => !!(await arpc("account_delete_invitation", {})),
   listRsvps: async () => (await arpc("account_rsvps", {})) as RsvpRow[] | null,
+  myDraft: async (): Promise<AccountDraft> => { const v = (await arpc("account_draft", {})) as AccountDraft; return v && typeof v === "object" && v.data ? v : null; },
+  saveDraft: async (data: unknown) => !!(await arpc("account_save_draft", { p_data: data })),
+  deleteDraft: async () => !!(await arpc("account_delete_draft", {})),
   adminDashboard: async (from: string, to: string, exclude = true) => (await arpc("admin_dashboard", { p_from: from, p_to: to, p_exclude: exclude })) as AdminData,
   adminAccounts: async (from: string, to: string) => (await arpc("admin_accounts", { p_from: from, p_to: to })) as AdminAccount[],
   adminInvitations: async (from: string, to: string, exclude = true) => (await arpc("admin_invitations", { p_from: from, p_to: to, p_exclude: exclude })) as AdminInvitation[],

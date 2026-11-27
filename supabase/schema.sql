@@ -995,6 +995,71 @@ revoke all on function public.submit_feedback(text, integer, text, text, jsonb, 
 grant execute on function public.submit_feedback(text, integer, text, text, jsonb, text) to anon, authenticated;
 grant execute on function public.account_rating(), public.admin_feedback(date, date, boolean), public.admin_set_feedback_status(bigint, text) to authenticated;
 
+-- ---------------------------------------------------------------- Brouillon du compte (27/11/2026)
+-- Le brouillon de l'éditeur vit dans le navigateur (fp:draft). Dès qu'un compte est connecté, il est aussi gardé ici :
+-- on le retrouve sur un autre appareil, et Safari ne peut plus l'effacer. Un seul brouillon par compte, supprimé
+-- automatiquement à la publication (déclencheur) et avec le compte (cascade).
+-- Forme : { state: <config de l'éditeur>, step, activeMs, at (horodatage navigateur, ms) }.
+create table if not exists private.drafts (
+  owner      uuid primary key references auth.users(id) on delete cascade,
+  data       jsonb not null,
+  updated_at timestamptz not null default now()
+);
+alter table private.drafts enable row level security;
+revoke all on private.drafts from public, anon, authenticated;
+
+-- Brouillon du compte : { data, updated_at }, ou null (aucun brouillon, ou faire-part déjà publié).
+create or replace function public.account_draft() returns jsonb
+language plpgsql security definer set search_path = public, extensions as $$
+declare v_uid uuid := private.account_id();
+begin
+  if v_uid is null then raise exception 'not signed in' using errcode = '42501'; end if;
+  perform private.rate_limit('account', 240);
+  if exists (select 1 from invitations where owner = v_uid) then return null; end if;
+  return (select jsonb_build_object('data', d.data, 'updated_at', d.updated_at) from private.drafts d where d.owner = v_uid);
+end $$;
+
+-- Enregistrement (écrase le précédent). false si le compte a déjà publié son faire-part (rien n'est gardé).
+create or replace function public.account_save_draft(p_data jsonb) returns boolean
+language plpgsql security definer set search_path = public, extensions as $$
+declare v_uid uuid := private.account_id();
+begin
+  if v_uid is null then raise exception 'not signed in' using errcode = '42501'; end if;
+  perform private.rate_limit('draft', 900);
+  if p_data is null or jsonb_typeof(p_data) <> 'object' or jsonb_typeof(p_data->'state') is distinct from 'object' then raise exception 'invalid draft'; end if;
+  if octet_length(p_data::text) > 3100000 then raise exception 'draft too large'; end if;
+  if exists (select 1 from invitations where owner = v_uid) then return false; end if;
+  insert into private.drafts(owner, data, updated_at) values (v_uid, p_data, now())
+  on conflict (owner) do update set data = excluded.data, updated_at = now();
+  return true;
+end $$;
+
+-- « Recommencer à zéro ».
+create or replace function public.account_delete_draft() returns boolean
+language plpgsql security definer set search_path = public, extensions as $$
+declare v_uid uuid := private.account_id();
+begin
+  if v_uid is null then raise exception 'not signed in' using errcode = '42501'; end if;
+  perform private.rate_limit('delete', 120);
+  delete from private.drafts where owner = v_uid;
+  return found;
+end $$;
+
+-- Publication : le brouillon n'a plus lieu d'être.
+create or replace function private.drop_draft_on_publish() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.owner is not null then delete from private.drafts where owner = new.owner; end if;
+  return new;
+end $$;
+drop trigger if exists invitations_drop_draft on public.invitations;
+create trigger invitations_drop_draft after insert on public.invitations
+  for each row execute function private.drop_draft_on_publish();
+revoke all on function private.drop_draft_on_publish() from public, anon, authenticated;
+
+revoke all on function public.account_draft(), public.account_save_draft(jsonb), public.account_delete_draft() from public, anon, authenticated;
+grant execute on function public.account_draft(), public.account_save_draft(jsonb), public.account_delete_draft() to authenticated, service_role;
+
 select cron.unschedule(jobid) from cron.job where jobname = 'rsvp-digest';
 select cron.schedule('rsvp-digest', '30 7 * * *', 'select private.send_rsvp_digests()');
 
