@@ -396,6 +396,15 @@ html.fp-locked,html.fp-locked body{overflow:hidden}
 .fp footer .fnames .amp{font-family:var(--display);text-transform:none}
 .fp footer .fp-brand{display:flex;align-items:center;justify-content:center;gap:.45rem;margin:2.2rem 0 0;font-size:.68rem;letter-spacing:.2em;text-transform:uppercase;color:var(--ink-soft)}
 .fp footer .fp-brand-mark{width:18px;height:18px}
+.fp footer .fp-credit .fp-brand-mark{width:22px;height:22px}
+.fp footer .fp-credit{margin:2.2rem 0 0;text-align:center}
+.fp footer .fp-credit>a,.fp footer .fp-credit>span{display:inline-flex;flex-direction:column;align-items:center;justify-content:center;gap:.45rem;min-height:44px;padding:.6rem 1.1rem;border-radius:18px;color:var(--ink-soft);text-decoration:none;transition:color .2s,background-color .2s}
+.fp footer .fp-credit>a:hover,.fp footer .fp-credit>a:focus-visible{color:var(--accent-deep);background:color-mix(in srgb,var(--accent) 10%,transparent)}
+.fp footer .fp-credit>a:focus-visible{outline:2px solid var(--accent-deep);outline-offset:2px}
+.fp footer .fpc-text{display:flex;flex-direction:column;align-items:center;gap:.2rem;font-size:.78rem;line-height:1.35;text-align:center}
+.fp footer .fpc-text .fpc-name{margin-left:.15rem}
+.fp footer .fpc-name{font-size:.68rem;letter-spacing:.2em;text-transform:uppercase}
+.fp footer .fpc-cta{text-decoration:underline;text-underline-offset:3px;text-decoration-color:var(--line)}
 .fp footer .fdate{font-size:.74rem;letter-spacing:.18em;text-transform:uppercase;margin-top:.3rem}
 .fp .rq{min-height:0}
 .fp .rq-fields{display:flex;flex-direction:column}

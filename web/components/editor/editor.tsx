@@ -280,6 +280,8 @@ export function Editor() {
     (["lodging", "gifts"] as const).forEach((k) => { cfg.sections[k].url = (cfg.sections[k].url || "").trim(); });
     if (!cfg.tz) { try { cfg.tz = Intl.DateTimeFormat().resolvedOptions().timeZone || ""; } catch {} }
     cfg = sanitizeConfig(cfg); // revalide le fuseau
+    // Mention Maison Meli : posée sur tout nouveau faire-part ; une modification garde l'état d'origine (ancien = sans).
+    if (!editingRef.current) cfg.credit = true;
     const prev = stateRef.current.meta;
     cfg.meta = { durationSec: editingRef.current ? prev?.durationSec ?? null : Math.round(activeMs.current / 1000), updatedAt: new Date().toISOString(),
       // Provenance du couple (coefficient viral), conservée lors des modifications.
@@ -350,7 +352,8 @@ export function Editor() {
   };
 
   // ---------- Aperçu ----------
-  const preview = useMemo(() => sanitizeConfig(state), [state]);
+  // Aperçu fidèle : un nouveau faire-part affiche déjà la mention qu'il aura une fois publié.
+  const preview = useMemo(() => sanitizeConfig(editing ? state : { ...state, credit: true }), [state, editing]);
   const replayIntro = useCallback(() => setReplayKey((k) => k + 1), []);
   const api_: EditorApi = { state, update, editing: !!editing, pendingPhotos, setPendingPhotos, replayIntro, dateRef, deadlineRef, next };
   const presetMatch = matchingPreset(preview);

@@ -73,6 +73,7 @@ Règles :
 - [ ] Retour sur l'onglet après plusieurs heures (ou appli fermée) : session et brouillon conservés (réel)
 - [ ] Brouillon commencé sur ordinateur, connexion sur le téléphone avec le même compte : « Mon faire-part » propose de le reprendre (réel, +27/11)
 - [ ] En-tête de l'éditeur sur une ligne à 320 px (bug 26/11) ; « Ajouter à mon agenda » non coupé (bug 26/11) ; réponses en fiches sur téléphone (bug 26/11)
+- [ ] Mention « Faire-part créé avec Maison Meli · Créer le vôtre » en pied de faire-part : zone tactile ≥ 44 px, centrée, sans débordement à 320 px, cachet lisible sur papier sombre (Gatsby, Élégance, Jardin d’hiver) (+27/11, auto à 320/390/1440 px)
 
 ### M4. Fonctions natives (réel)
 - [ ] Partage du lien : feuille de partage native → WhatsApp, SMS ; « Copier le lien » fonctionne
@@ -123,6 +124,8 @@ Règles :
 - [ ] RSVP : envoi, réponse visible dans Mon faire-part
 - [ ] Coupure réseau → « n'a pas pu s'ouvrir » + Réessayer ; faire-part inexistant → lien vers l'accueil (bug 26/11)
 - [ ] **Pas** de bouton « Un souci ? » (+26/11)
+- [ ] Nouveau faire-part (`credit: true` posé à la publication) : mention cliquable en pied de page, visible avant toute réponse, lien vers l'accueil avec `src=faire-part` + `utm_content=pied-de-page`, clic mesuré (`cta_create`) ; aperçu de l'éditeur : mention visible, non cliquable (+27/11, auto)
+- [ ] Ancien faire-part (sans `credit`) : signature discrète inchangée, **aucune** mention cliquable, même après modification par le couple (+27/11, auto)
 - [ ] Anciens liens `invitation.html?f=…` toujours valides
 
 ### B6. Retours utilisateurs (+26/11)

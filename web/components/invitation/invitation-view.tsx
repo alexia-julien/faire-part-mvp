@@ -129,6 +129,8 @@ export function InvitationView({
           preview={preview}
           namesTag={namesTag}
           reveal={reveal && revealKey > 0}
+          creditHref={madeWith && !preview ? madeWith + "&utm_content=pied-de-page" : undefined}
+          onCredit={onMadeWith}
           rsvp={withRsvp ? <Suspense fallback={<div aria-busy="true" style={{ minHeight: 280 }} />}><RsvpFlow cfg={cfg} preview={preview} previous={previous} couple={couple} madeWith={madeWith} onMadeWith={onMadeWith} onSubmit={onSubmit} /></Suspense> : <p className="preview-note" style={{ margin: 0 }}>Vos invités répondent ici, une question à la fois.</p>}
         />
       </div>
