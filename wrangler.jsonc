@@ -16,8 +16,15 @@
   // Clé « anon » publique par conception (déjà présente dans le site) : l'accès est verrouillé par les fonctions SQL.
   "vars": {
     "SUPABASE_URL": "https://pmtwhrqfdvbxbgrzcytl.supabase.co",
-    "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtdHdocnFmZHZieGJncnpjeXRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1MjQ3MzEsImV4cCI6MjEwODEwMDczMX0.7jw9LLJC8dCBHe4fIPnLfgmIFVdbTC19oIR5ZytF-aw"
+    "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBtdHdocnFmZHZieGJncnpjeXRsIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI1MjQ3MzEsImV4cCI6MjEwODEwMDczMX0.7jw9LLJC8dCBHe4fIPnLfgmIFVdbTC19oIR5ZytF-aw",
+    "SITE_URL": "https://maison-meli.com",
+    "CHECK_BACKUP": "1"
   },
+  // Sentinelle (worker/index.js, scheduled) : site + base + fraîcheur de la sauvegarde toutes les 5 min, alerte e-mail.
+  // L'appel régulier à la base empêche la mise en pause automatique de l'offre gratuite Supabase.
+  // Secrets à définir dans le tableau de bord Cloudflare (jamais dans ce dépôt public) : RESEND_API_KEY, ALERT_TO.
+  "triggers": { "crons": ["*/5 * * * *"] },
+  "kv_namespaces": [{ "binding": "SENTINEL", "id": "b01e9770d8954ed196147349ded5ea52" }],
   // Recette (préproduction) : branche `staging` → Worker « maison-meli-staging » sur https://staging.maison-meli.com.
   // Workers Builds construit le site (cd web && npm ci && npm run build:staging) puis lance `npx wrangler deploy --env staging`.
   // Base Supabase de recette (projet pcppyluqhsbhkjzmjpzk) : aucune vraie donnée, aucune mesure comptée en production.
@@ -36,8 +43,11 @@
       },
       "vars": {
         "SUPABASE_URL": "https://pcppyluqhsbhkjzmjpzk.supabase.co",
-        "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBjcHB5bHVxaHNiaGtqem1qcHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU3MTQ4MzUsImV4cCI6MjExMTI5MDgzNX0.3Za1JrUuf45PYMl2gor2QvoiRzdTnIIbQ8OoGmCvEd8"
-      }
+        "SUPABASE_ANON_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InBjcHB5bHVxaHNiaGtqem1qcHprIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTU3MTQ4MzUsImV4cCI6MjExMTI5MDgzNX0.3Za1JrUuf45PYMl2gor2QvoiRzdTnIIbQ8OoGmCvEd8",
+        "SITE_URL": "https://staging.maison-meli.com"
+      },
+      // Préprod : sentinelle toutes les heures, sans alerte e-mail (garde la base de recette éveillée).
+      "triggers": { "crons": ["7 * * * *"] }
     }
   }
 }

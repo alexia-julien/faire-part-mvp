@@ -14,3 +14,4 @@ wrangler.jsonc
 .gitignore
 worker
 .wrangler
+ops

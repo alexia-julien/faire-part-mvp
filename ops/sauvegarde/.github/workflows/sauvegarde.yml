@@ -1,0 +1,111 @@
+# Sauvegarde nocturne de la base de production Maison Meli (Supabase, offre gratuite = aucune sauvegarde fournie).
+# Ce workflow vit dans le dépôt PRIVÉ alexia-julien/maison-meli-backups (jamais dans le dépôt public du site).
+#
+# Chaque nuit :
+#   1. dump complet des données (schémas public + private, comptes auth) avec pg_dump 17 ;
+#   2. test de restauration automatique dans un Postgres vierge + comparaison des nombres de faire-part et de réponses ;
+#   3. chiffrement AES-256 (gpg, phrase secrète) puis dépôt en « release » privée de ce dépôt ;
+#   4. suppression des sauvegardes de plus de 35 jours (engagement de la politique de confidentialité) ;
+#   5. trace dans private.backups_log : la sentinelle du site alerte Julien si aucune sauvegarde depuis 30 h.
+# En cas d'échec, GitHub envoie un e-mail au propriétaire du dépôt (réglage par défaut des notifications Actions).
+#
+# Secrets du dépôt (Settings > Secrets and variables > Actions), saisis par Julien :
+#   SUPABASE_DB_URL   chaîne « Session pooler » du projet faire-part-mvp (Supabase > Connect), mot de passe inclus
+#   BACKUP_PASSPHRASE phrase secrète longue, aussi rangée dans le gestionnaire de mots de passe (sans elle, rien ne se déchiffre)
+name: Sauvegarde nocturne
+
+on:
+  schedule:
+    - cron: "17 2 * * *"   # 3 h 17 à Paris (heure d'hiver)
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sauvegarde
+  cancel-in-progress: false
+
+jobs:
+  sauvegarde:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    services:
+      verif:
+        image: postgres:17
+        env:
+          POSTGRES_PASSWORD: verif
+        ports: ["5433:5432"]
+        options: --health-cmd pg_isready --health-interval 5s --health-retries 20
+    env:
+      DB: ${{ secrets.SUPABASE_DB_URL }}
+      PG: docker run --rm --network host -v ${{ github.workspace }}:/w -w /w postgres:17
+    steps:
+      - name: Contrôle des secrets
+        run: |
+          test -n "$DB" || { echo "::error::Secret SUPABASE_DB_URL manquant"; exit 1; }
+          test -n "${{ secrets.BACKUP_PASSPHRASE }}" || { echo "::error::Secret BACKUP_PASSPHRASE manquant"; exit 1; }
+
+      - name: Dump de la production
+        run: |
+          set -euo pipefail
+          D=$(date -u +%Y-%m-%d)
+          echo "D=$D" >> "$GITHUB_ENV"
+          mkdir -p out
+          $PG pg_dump "$DB" -Fc --no-owner --no-privileges -n public -n private -f out/metier.dump
+          $PG pg_dump "$DB" -Fc --no-owner --no-privileges --data-only -t auth.users -t auth.identities -f out/comptes.dump
+          $PG psql "$DB" -Atc "select json_build_object('date', now(), 'comptes', (select count(*) from auth.users),
+            'faire_part', (select count(*) from public.invitations), 'reponses', (select count(*) from public.rsvps),
+            'corbeille', (select count(*) from private.trash))" > out/comptes-rendus.json
+          cat out/comptes-rendus.json
+          test "$(jq .faire_part out/comptes-rendus.json)" -ge 0
+
+      - name: Test de restauration (Postgres vierge)
+        run: |
+          set -euo pipefail
+          V="postgresql://postgres:verif@localhost:5433/postgres"
+          # Rôles et schéma auth absents d'un Postgres vierge : certaines fonctions ne se recréent pas, c'est attendu.
+          # Ce qui compte : toutes les lignes métier reviennent.
+          $PG pg_restore -d "$V" --no-owner --no-privileges out/metier.dump > restore.log 2>&1 || true
+          got_i=$($PG psql "$V" -Atc "select count(*) from public.invitations")
+          got_r=$($PG psql "$V" -Atc "select count(*) from public.rsvps")
+          want_i=$(jq .faire_part out/comptes-rendus.json); want_r=$(jq .reponses out/comptes-rendus.json)
+          echo "Restauré : $got_i faire-part / $want_i, $got_r réponses / $want_r"
+          # Écart toléré : une réponse arrivée entre le dump et le comptage.
+          test "$got_i" -ge $((want_i - 1)) || { echo "::error::Restauration incomplète (faire-part)"; tail -40 restore.log; exit 1; }
+          test "$got_r" -ge $((want_r - 2)) || { echo "::error::Restauration incomplète (réponses)"; tail -40 restore.log; exit 1; }
+
+      - name: Chiffrement
+        env:
+          PASS: ${{ secrets.BACKUP_PASSPHRASE }}
+        run: |
+          set -euo pipefail
+          tar -C out -czf "maison-meli-$D.tar.gz" .
+          printf '%s' "$PASS" | gpg --batch --yes --pinentry-mode loopback --passphrase-fd 0 \
+            --symmetric --cipher-algo AES256 -o "maison-meli-$D.tar.gz.gpg" "maison-meli-$D.tar.gz"
+          sudo rm -rf out "maison-meli-$D.tar.gz"
+          # Vérifie que l'archive se déchiffre avant de la publier
+          printf '%s' "$PASS" | gpg --batch --pinentry-mode loopback --passphrase-fd 0 -d "maison-meli-$D.tar.gz.gpg" | tar -tz > /dev/null
+          echo "SIZE=$(stat -c %s "maison-meli-$D.tar.gz.gpg")" >> "$GITHUB_ENV"
+
+      - name: Dépôt de la sauvegarde
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          TAG="sauvegarde-$D-$(date -u +%H%M)"
+          gh release create "$TAG" "maison-meli-$D.tar.gz.gpg" --repo "$GITHUB_REPOSITORY" \
+            --title "Sauvegarde du $D" --notes "Sauvegarde chiffrée (AES-256). Restauration : voir RESTAURATION.md."
+
+      - name: Rotation (35 jours)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          limit=$(date -u -d '35 days ago' +%s)
+          gh release list --repo "$GITHUB_REPOSITORY" --limit 400 --json tagName,createdAt \
+            | jq -r --argjson l "$limit" '.[] | select(.tagName|startswith("sauvegarde-")) | select((.createdAt|fromdateiso8601) < $l) | .tagName' \
+            | while read -r t; do gh release delete "$t" --repo "$GITHUB_REPOSITORY" --cleanup-tag -y; done
+
+      - name: Trace pour la sentinelle
+        run: $PG psql "$DB" -c "insert into private.backups_log(source, bytes) values ('github', $SIZE)"

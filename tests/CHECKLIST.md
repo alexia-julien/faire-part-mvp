@@ -40,7 +40,7 @@ Règles :
 - [ ] `npm run test:seo` : 100 % (3 127/3 127 au 26/11)
 - [ ] axe-core (WCAG 2.2 AA, inclus dans e2e) : OK
 - [ ] Aucun débordement horizontal à 320 / 375 / 390 / 430 px (inclus dans e2e)
-- [ ] Recette SQL sur la base **staging** (SQL Editor, tout est annulé à la fin) : `supabase/tests.sql`, `tests-comptes.sql`, `tests-mesure.sql`, `tests-retours.sql`, `tests-brouillons.sql` (16/16 au 27/11) (+ tout nouveau fichier)
+- [ ] Recette SQL sur la base **staging** (SQL Editor, tout est annulé à la fin) : `supabase/tests.sql`, `tests-comptes.sql`, `tests-mesure.sql`, `tests-retours.sql`, `tests-brouillons.sql` (16/16 au 27/11), `tests-protection.sql` (14/14 au 27/11 : corbeille, historique des réponses, versions, health) (+ tout nouveau fichier)
 - [ ] `npm run build:staging` et `npm run build` sans erreur
 
 ## M. Mobile en profondeur
@@ -146,6 +146,8 @@ Navigateur marqué `fp:admin`. Ne pas ouvrir de vrai faire-part (ça compterait 
 - [ ] Aperçu du lien dans WhatsApp (prénoms + date + image, jamais le lieu) : coller le lien du faire-part fictif de test dans une conversation (réel)
 - [ ] Migration SQL éventuelle appliquée en prod (fonctions identiques au schéma)
 - [ ] Logs Supabase de prod sans nouvelle erreur
+- [ ] Sauvegarde : dernier passage de « Sauvegarde nocturne » vert dans le dépôt privé `maison-meli-backups` ; toute migration SQL de prod lancée **juste après** une sauvegarde manuelle (Run workflow) (+27/11)
+- [ ] Sentinelle : Cloudflare > Workers > faire-part-mvp > Logs : exécutions planifiées sans erreur, aucun e-mail d'alerte (+27/11)
 - [ ] Ce qui ne se teste pas en recette (pas de clé Resend dans la base staging) : e-mail de nouveau retour, récap RSVP → vérifier au premier envoi réel ou par un test explicitement validé par Julien
 
 ## D. Historique des releases
