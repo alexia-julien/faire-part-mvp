@@ -30,7 +30,7 @@ Règles :
 
 ## A. Tests automatiques (local, `cd web && npm run build:local`)
 **Lancés automatiquement par GitHub à chaque push sur `staging`** (onglet « Actions » du dépôt, workflow « Recette », captures en artefacts). Une release ne part que si le dernier passage est vert.
-- [ ] `python3 tests/e2e.py` : 100 % (262/262 au 26/11)
+- [ ] `python3 tests/e2e.py` : 100 % (275/275 au 27/11)
 - [ ] `python3 tests/e2e_mobile.py --strict` : 100 % (261/261 au 26/11) — **Safari iOS (WebKit) en iPhone SE 320 px et iPhone 15**, **Chrome Android en Pixel 7 et Galaxy S24 360 px**, écran tactile
   Couvre, au doigt, sur chaque appareil : accueil → éditeur complet → photo de téléphone → connexion par code → publication → partage / QR ; faire-part invité → agenda → réponse ; Mon faire-part ; zones tactiles ≥ 44 px et non recouvertes ; champs ≥ 16 px (zoom Safari) ; safe area iPhone ; claviers (e-mail, code `one-time-code`) ; geste retour (aperçu) ; double toucher (Envoyer) ; onglet rouvert (session, brouillon) ; paysage ; mode sombre ; texte agrandi 125 % ; réseau lent ; navigateur intégré WhatsApp.
   Ne couvre pas (reste en M-réel) : vrai clavier virtuel, feuille de partage native, Photos / agenda / Maps du téléphone, aperçu WhatsApp, connexion Google réelle.
