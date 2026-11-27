@@ -1229,6 +1229,11 @@ revoke all on function private.keep_rsvp_history(), private.keep_invitation_tras
 revoke all on function public.health() from public;
 grant execute on function public.health() to anon, authenticated, service_role;
 
+-- Rattrapage (idempotent) : les réponses antérieures à la protection sont historisées une fois.
+insert into private.rsvps_history(rsvp_id, slug, op, data, rsvp_created_at)
+  select r.id, r.slug, 'INSERT', r.data, r.created_at from public.rsvps r
+  where not exists (select 1 from private.rsvps_history h where h.rsvp_id = r.id);
+
 select cron.unschedule(jobid) from cron.job where jobname = 'protection-purge';
 select cron.schedule('protection-purge', '15 3 * * *', 'select private.purge_protection()');
 
