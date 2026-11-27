@@ -18,6 +18,9 @@ on:
   schedule:
     - cron: "17 2 * * *"   # 3 h 17 à Paris (heure d'hiver)
   workflow_dispatch:
+  push:            # un passage à chaque modification du workflow (vérification immédiate)
+    branches: [main]
+    paths: [".github/workflows/sauvegarde.yml"]
 
 permissions:
   contents: write
@@ -56,7 +59,8 @@ jobs:
           $PG pg_dump "$DB" -Fc --no-owner --no-privileges --data-only -t auth.users -t auth.identities -f out/comptes.dump
           $PG psql "$DB" -Atc "select json_build_object('date', now(), 'comptes', (select count(*) from auth.users),
             'faire_part', (select count(*) from public.invitations), 'reponses', (select count(*) from public.rsvps),
-            'corbeille', (select count(*) from private.trash))" > out/comptes-rendus.json
+            'corbeille', (select (xpath('/row/n/text()', query_to_xml('select count(*) as n from private.trash', false, true, '')))[1]::text::int
+                          where to_regclass('private.trash') is not null))" > out/comptes-rendus.json
           cat out/comptes-rendus.json
           test "$(jq .faire_part out/comptes-rendus.json)" -ge 0
 
@@ -108,4 +112,7 @@ jobs:
             | while read -r t; do gh release delete "$t" --repo "$GITHUB_REPOSITORY" --cleanup-tag -y; done
 
       - name: Trace pour la sentinelle
-        run: $PG psql "$DB" -c "insert into private.backups_log(source, bytes) values ('github', $SIZE)"
+        run: |
+          # Table créée par la protection des données (schema.sql, 27/11) ; tant qu'elle n'est pas en prod, on n'écrit rien.
+          $PG psql "$DB" -v ON_ERROR_STOP=1 -c "do \$\$ begin if to_regclass('private.backups_log') is not null then
+            insert into private.backups_log(source, bytes) values ('github', $SIZE); end if; end \$\$"
