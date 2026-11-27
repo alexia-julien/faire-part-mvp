@@ -995,6 +995,248 @@ revoke all on function public.submit_feedback(text, integer, text, text, jsonb, 
 grant execute on function public.submit_feedback(text, integer, text, text, jsonb, text) to anon, authenticated;
 grant execute on function public.account_rating(), public.admin_feedback(date, date, boolean), public.admin_set_feedback_status(bigint, text) to authenticated;
 
+-- ---------------------------------------------------------------- Brouillon du compte (27/11/2026)
+-- Le brouillon de l'éditeur vit dans le navigateur (fp:draft). Dès qu'un compte est connecté, il est aussi gardé ici :
+-- on le retrouve sur un autre appareil, et Safari ne peut plus l'effacer. Un seul brouillon par compte, supprimé
+-- automatiquement à la publication (déclencheur) et avec le compte (cascade).
+-- Forme : { state: <config de l'éditeur>, step, activeMs, at (horodatage navigateur, ms) }.
+create table if not exists private.drafts (
+  owner      uuid primary key references auth.users(id) on delete cascade,
+  data       jsonb not null,
+  updated_at timestamptz not null default now()
+);
+alter table private.drafts enable row level security;
+revoke all on private.drafts from public, anon, authenticated;
+
+-- Brouillon du compte : { data, updated_at }, ou null (aucun brouillon, ou faire-part déjà publié).
+create or replace function public.account_draft() returns jsonb
+language plpgsql security definer set search_path = public, extensions as $$
+declare v_uid uuid := private.account_id();
+begin
+  if v_uid is null then raise exception 'not signed in' using errcode = '42501'; end if;
+  perform private.rate_limit('account', 240);
+  if exists (select 1 from invitations where owner = v_uid) then return null; end if;
+  return (select jsonb_build_object('data', d.data, 'updated_at', d.updated_at) from private.drafts d where d.owner = v_uid);
+end $$;
+
+-- Enregistrement (écrase le précédent). false si le compte a déjà publié son faire-part (rien n'est gardé).
+create or replace function public.account_save_draft(p_data jsonb) returns boolean
+language plpgsql security definer set search_path = public, extensions as $$
+declare v_uid uuid := private.account_id();
+begin
+  if v_uid is null then raise exception 'not signed in' using errcode = '42501'; end if;
+  perform private.rate_limit('draft', 900);
+  if p_data is null or jsonb_typeof(p_data) <> 'object' or jsonb_typeof(p_data->'state') is distinct from 'object' then raise exception 'invalid draft'; end if;
+  if octet_length(p_data::text) > 3100000 then raise exception 'draft too large'; end if;
+  if exists (select 1 from invitations where owner = v_uid) then return false; end if;
+  insert into private.drafts(owner, data, updated_at) values (v_uid, p_data, now())
+  on conflict (owner) do update set data = excluded.data, updated_at = now();
+  return true;
+end $$;
+
+-- « Recommencer à zéro ».
+create or replace function public.account_delete_draft() returns boolean
+language plpgsql security definer set search_path = public, extensions as $$
+declare v_uid uuid := private.account_id();
+begin
+  if v_uid is null then raise exception 'not signed in' using errcode = '42501'; end if;
+  perform private.rate_limit('delete', 120);
+  delete from private.drafts where owner = v_uid;
+  return found;
+end $$;
+
+-- Publication : le brouillon n'a plus lieu d'être.
+create or replace function private.drop_draft_on_publish() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.owner is not null then delete from private.drafts where owner = new.owner; end if;
+  return new;
+end $$;
+drop trigger if exists invitations_drop_draft on public.invitations;
+create trigger invitations_drop_draft after insert on public.invitations
+  for each row execute function private.drop_draft_on_publish();
+revoke all on function private.drop_draft_on_publish() from public, anon, authenticated;
+
+revoke all on function public.account_draft(), public.account_save_draft(jsonb), public.account_delete_draft() from public, anon, authenticated;
+grant execute on function public.account_draft(), public.account_save_draft(jsonb), public.account_delete_draft() to authenticated, service_role;
+
+-- ---------------------------------------------------------------- Protection des données (27/11/2026)
+-- Objectif : aucune réponse ni aucun faire-part perdu, même après une fausse manipulation ou une requête ratée.
+--   - private.rsvps_history : chaque réponse créée / modifiée / supprimée est copiée (écriture seule, par trigger,
+--     y compris les suppressions en cascade). Une réponse supprimée reste restaurable 30 jours.
+--   - private.trash : un faire-part supprimé (par l'utilisateur, la suppression de compte ou une erreur) est gardé
+--     30 jours avec sa configuration complète. Restauration : select private.restore_invitation(<id>, '<email>');
+--   - private.invitation_versions : les 5 versions précédentes de chaque faire-part (30 jours), pour annuler une
+--     modification qui aurait cassé un faire-part : select private.restore_version(<id>);
+--   - private.backups_log : écrit par la sauvegarde nocturne (dépôt privé maison-meli-backups) ; public.health()
+--     expose l'âge de la dernière sauvegarde à la sentinelle (Worker Cloudflare), sans aucune donnée utilisateur.
+-- Aucune fonction existante n'est modifiée : tout repose sur des triggers. Rien n'est exposé à l'API.
+create table if not exists private.rsvps_history (
+  id       bigint generated always as identity primary key,
+  rsvp_id  bigint not null,
+  slug     text not null,
+  op       text not null check (op in ('INSERT', 'UPDATE', 'DELETE')),
+  data     jsonb not null,
+  rsvp_created_at timestamptz,
+  at       timestamptz not null default now(),
+  restored_at timestamptz
+);
+create index if not exists rsvps_history_slug_idx on private.rsvps_history(slug, at);
+
+create table if not exists private.trash (
+  id          bigint generated always as identity primary key,
+  slug        text not null,
+  config      jsonb not null,
+  owner       uuid,
+  owner_email text,
+  created_at  timestamptz,
+  deleted_at  timestamptz not null default now(),
+  restored_at timestamptz
+);
+
+create table if not exists private.invitation_versions (
+  id       bigint generated always as identity primary key,
+  slug     text not null,
+  config   jsonb not null,
+  saved_at timestamptz not null default now()
+);
+create index if not exists invitation_versions_slug_idx on private.invitation_versions(slug, saved_at desc);
+
+create table if not exists private.backups_log (
+  id     bigint generated always as identity primary key,
+  at     timestamptz not null default now(),
+  source text not null default 'github',
+  bytes  bigint
+);
+alter table private.rsvps_history enable row level security;
+alter table private.trash enable row level security;
+alter table private.invitation_versions enable row level security;
+alter table private.backups_log enable row level security;
+revoke all on private.rsvps_history, private.trash, private.invitation_versions, private.backups_log from public, anon, authenticated;
+
+create or replace function private.keep_rsvp_history() returns trigger
+language plpgsql security definer set search_path = public as $$
+declare r public.rsvps;
+begin
+  if tg_op = 'DELETE' then r := old; else r := new; end if;
+  insert into private.rsvps_history(rsvp_id, slug, op, data, rsvp_created_at) values (r.id, r.slug, tg_op, r.data, r.created_at);
+  return null;
+end $$;
+drop trigger if exists rsvps_keep_history on public.rsvps;
+create trigger rsvps_keep_history after insert or update or delete on public.rsvps
+  for each row execute function private.keep_rsvp_history();
+
+create or replace function private.keep_invitation_trash() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  insert into private.trash(slug, config, owner, owner_email, created_at)
+  values (old.slug, old.config, old.owner, (select email from auth.users where id = old.owner), old.created_at);
+  return null;
+end $$;
+drop trigger if exists invitations_keep_trash on public.invitations;
+create trigger invitations_keep_trash after delete on public.invitations
+  for each row execute function private.keep_invitation_trash();
+
+create or replace function private.keep_invitation_version() returns trigger
+language plpgsql security definer set search_path = public as $$
+begin
+  if new.config is distinct from old.config then
+    insert into private.invitation_versions(slug, config) values (old.slug, old.config);
+    delete from private.invitation_versions where slug = old.slug and id not in
+      (select id from private.invitation_versions where slug = old.slug order by saved_at desc, id desc limit 5);
+  end if;
+  return new;
+end $$;
+drop trigger if exists invitations_keep_version on public.invitations;
+create trigger invitations_keep_version before update on public.invitations
+  for each row execute function private.keep_invitation_version();
+
+-- Restaure un faire-part de la corbeille et toutes ses réponses supprimées avec lui (mêmes identifiants).
+-- p_email : compte à qui le rendre (par défaut le propriétaire d'origine s'il existe encore).
+create or replace function private.restore_invitation(p_trash_id bigint, p_email text default null) returns jsonb
+language plpgsql security definer set search_path = public as $$
+declare t private.trash; v_owner uuid; n int;
+begin
+  select * into t from private.trash where id = p_trash_id and restored_at is null;
+  if t.id is null then raise exception 'élément introuvable ou déjà restauré'; end if;
+  if p_email is not null then select id into v_owner from auth.users where lower(email) = lower(trim(p_email));
+  else select id into v_owner from auth.users where id = t.owner; end if;
+  if v_owner is null then raise exception 'compte introuvable : indiquer l''e-mail du compte à qui rendre le faire-part'; end if;
+  if exists (select 1 from invitations where owner = v_owner) then raise exception 'ce compte a déjà un faire-part'; end if;
+  if exists (select 1 from invitations where slug = t.slug) then raise exception 'lien déjà réutilisé'; end if;
+  insert into invitations(slug, config, owner, created_at) values (t.slug, t.config, v_owner, coalesce(t.created_at, now()));
+  insert into rsvps(id, slug, data, created_at) overriding system value
+    select distinct on (h.rsvp_id) h.rsvp_id, h.slug, h.data, coalesce(h.rsvp_created_at, h.at)
+    from private.rsvps_history h
+    where h.slug = t.slug and h.op = 'DELETE' and h.restored_at is null
+      and h.at between t.deleted_at - interval '5 minutes' and t.deleted_at + interval '5 minutes'
+      and not exists (select 1 from rsvps r where r.id = h.rsvp_id)
+    order by h.rsvp_id, h.at desc;
+  get diagnostics n = row_count;
+  update private.rsvps_history set restored_at = now() where slug = t.slug and op = 'DELETE' and restored_at is null
+    and at between t.deleted_at - interval '5 minutes' and t.deleted_at + interval '5 minutes';
+  update private.trash set restored_at = now() where id = t.id;
+  return jsonb_build_object('slug', t.slug, 'reponses_restaurees', n);
+end $$;
+
+-- Restaure une réponse supprimée (id de private.rsvps_history, ligne op = 'DELETE').
+create or replace function private.restore_rsvp(p_history_id bigint) returns boolean
+language plpgsql security definer set search_path = public as $$
+declare h private.rsvps_history;
+begin
+  select * into h from private.rsvps_history where id = p_history_id and op = 'DELETE' and restored_at is null;
+  if h.id is null then raise exception 'réponse introuvable ou déjà restaurée'; end if;
+  if not exists (select 1 from invitations where slug = h.slug) then raise exception 'faire-part absent : restaurer d''abord le faire-part'; end if;
+  insert into rsvps(id, slug, data, created_at) overriding system value
+    values (h.rsvp_id, h.slug, h.data, coalesce(h.rsvp_created_at, h.at)) on conflict (id) do nothing;
+  update private.rsvps_history set restored_at = now() where id = h.id;
+  return true;
+end $$;
+
+-- Remet une version précédente d'un faire-part (id de private.invitation_versions).
+create or replace function private.restore_version(p_version_id bigint) returns boolean
+language plpgsql security definer set search_path = public as $$
+declare v private.invitation_versions;
+begin
+  select * into v from private.invitation_versions where id = p_version_id;
+  if v.id is null then raise exception 'version introuvable'; end if;
+  update invitations set config = v.config, updated_at = now() where slug = v.slug;
+  return found;
+end $$;
+
+-- Purge (RGPD) : corbeille, réponses supprimées et anciennes versions effacées au bout de 30 jours ;
+-- historique d'un faire-part qui n'existe plus effacé avec lui.
+create or replace function private.purge_protection() returns void
+language sql security definer set search_path = public as $$
+  delete from private.trash where deleted_at < now() - interval '30 days';
+  delete from private.rsvps_history where at < now() - interval '30 days'
+    and (op = 'DELETE' or not exists (select 1 from invitations i where i.slug = rsvps_history.slug));
+  delete from private.invitation_versions where saved_at < now() - interval '30 days';
+  delete from private.backups_log where at < now() - interval '90 days';
+$$;
+
+-- Sonde de la sentinelle (toutes les 5 min) : prouve que la base répond, empêche la mise en pause de l'offre
+-- gratuite et donne l'âge de la dernière sauvegarde. Ne lit ni ne renvoie aucune donnée utilisateur.
+create or replace function public.health() returns jsonb
+language sql stable security definer set search_path = public as $$
+  select jsonb_build_object('ok', true,
+    'backup_age_h', (select floor(extract(epoch from now() - max(at)) / 3600)::int from private.backups_log));
+$$;
+
+revoke all on function private.keep_rsvp_history(), private.keep_invitation_trash(), private.keep_invitation_version(),
+  private.restore_invitation(bigint, text), private.restore_rsvp(bigint), private.restore_version(bigint),
+  private.purge_protection() from public, anon, authenticated;
+revoke all on function public.health() from public;
+grant execute on function public.health() to anon, authenticated, service_role;
+
+-- Rattrapage (idempotent) : les réponses antérieures à la protection sont historisées une fois.
+insert into private.rsvps_history(rsvp_id, slug, op, data, rsvp_created_at)
+  select r.id, r.slug, 'INSERT', r.data, r.created_at from public.rsvps r
+  where not exists (select 1 from private.rsvps_history h where h.rsvp_id = r.id);
+
+select cron.unschedule(jobid) from cron.job where jobname = 'protection-purge';
+select cron.schedule('protection-purge', '15 3 * * *', 'select private.purge_protection()');
+
 select cron.unschedule(jobid) from cron.job where jobname = 'rsvp-digest';
 select cron.schedule('rsvp-digest', '30 7 * * *', 'select private.send_rsvp_digests()');
 

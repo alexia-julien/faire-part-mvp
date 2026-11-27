@@ -68,6 +68,8 @@ jobs:
         run: npm run test:seo
       - name: Recette de bout en bout
         run: python tests/e2e.py
+      - name: Reprise du brouillon (ordinateur + téléphone)
+        run: python tests/e2e_brouillon.py
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -61,15 +61,19 @@ type Props = {
   revealKey?: number;
   rsvp: ReactNode;
   className?: string;
+  /** Lien de la mention « créé avec Maison Meli » (faire-part avec cfg.credit). Absent : mention affichée, non cliquable (aperçus). */
+  creditHref?: string;
+  onCredit?: () => void;
 };
 
 // Le faire-part lui-même (page publique ET aperçus) : héros, sections au fond alterné, réponse, pied de page.
-export const InvitationBody = forwardRef<HTMLDivElement, Props>(function InvitationBody({ cfg, preview, namesTag = "h1", reveal, revealKey = 0, rsvp, className }, ref) {
+export const InvitationBody = forwardRef<HTMLDivElement, Props>(function InvitationBody({ cfg, preview, namesTag = "h1", reveal, revealKey = 0, rsvp, className, creditHref, onCredit }, ref) {
   const ht = namesTag === "h1" ? "h2" : "p";
   const photos = cfg.photos.map(safeImg).filter(Boolean), sec = cfg.sections;
   const p1 = cfg.partner1 || "Prénom", p2 = cfg.partner2 || "Prénom";
   const dateLong = formatDate(cfg, false), time = hm(cfg.time), hasDate = !!eventDate(cfg), maps = mapsHref(cfg);
   const NamesTag = namesTag;
+  const dark = cfg.theme === "nuit" || cfg.theme === "noir" || cfg.theme === "emeraude"; // cachet clair sur papier sombre
   const names = <>{p1} <span className="amp">&amp;</span>{" "}{p2}</>;
 
   const blocks: { id: string; node: ReactNode }[] = [];
@@ -139,8 +143,18 @@ export const InvitationBody = forwardRef<HTMLDivElement, Props>(function Invitat
           <Divider />
           <div className="fnames">{names}</div>
           {dateLong && <div className="fdate">{dateLong}</div>}
-          {/* Signature discrète, non cliquable (PRD US-14 : aucun lien commercial avant la réponse). Retirée en Premium (US-22). */}
-          <p className="fp-brand"><BrandMark className="fp-brand-mark" />Maison Meli</p>
+          {cfg.credit ? (
+            // Faire-part créés depuis le 27/11/2026 (décision de Julien) : mention cliquable visible de tous les invités,
+            // pour faire découvrir Maison Meli. Toujours affichée (contrepartie du gratuit), sous la réponse.
+            <p className="fp-credit">
+              {creditHref
+                ? <a href={creditHref} data-credit onClick={() => onCredit?.()}><BrandMark className="fp-brand-mark" inverse={dark} /><span className="fpc-text"><span>Faire-part créé avec <span className="fpc-name">Maison Meli</span></span><span className="fpc-cta">Créer le vôtre <span aria-hidden="true">→</span></span></span></a>
+                : <span data-credit><BrandMark className="fp-brand-mark" inverse={dark} /><span className="fpc-text"><span>Faire-part créé avec <span className="fpc-name">Maison Meli</span></span><span className="fpc-cta">Créer le vôtre <span aria-hidden="true">→</span></span></span></span>}
+            </p>
+          ) : (
+            /* Faire-part plus anciens : signature discrète, non cliquable, inchangée (PRD US-14). */
+            <p className="fp-brand"><BrandMark className="fp-brand-mark" />Maison Meli</p>
+          )}
         </footer>
       </div>
     </div>

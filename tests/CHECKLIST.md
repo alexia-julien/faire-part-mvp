@@ -1,7 +1,7 @@
 # Maison Meli — process de livraison & checklist de non-régression
 
 Créée le 26/11/2026. **Document vivant : il s'enrichit à chaque release** (voir « Règles d'incrémentation »).
-Ce fichier est la référence ; une copie est tenue à jour dans le projet Claude (`claude/checklist-non-regression.md`).
+Ce fichier est la référence ; une copie est tenue à jour dans le projet Claude (`claude/checklist-non-regression.md`), le dépôt fait foi.
 
 **Le mobile est le canal principal** (création depuis le téléphone, faire-part ouvert depuis WhatsApp). Il a sa propre section (M) et chaque parcours B se fait d'abord sur mobile.
 
@@ -11,8 +11,8 @@ Ce fichier est la référence ; une copie est tenue à jour dans le projet Claud
 
 | Moment | Ce qu'on teste | Où |
 |---|---|---|
-| **Chaque nouveau dev** | Test ciblé de la fonctionnalité, **sur mobile (390 px) et sur ordinateur**, + contrôle de base : le build passe, l'accueil s'affiche, 0 erreur console | staging.maison-meli.com |
-| **Mise en prod (release)** | Tests automatiques (A, dont mobile) verts sur le dernier push `staging` + parcours B touchés par la release. Feu vert seulement si tout est vert. | CI GitHub + staging |
+| **Chaque nouveau dev** | Test ciblé de la fonctionnalité seulement, **sur mobile (390 px) et sur ordinateur**, + contrôle de base : le build passe, l'accueil s'affiche, 0 erreur console. **Pas de `tests/e2e*.py`, pas de `test:seo`, pas de CI.** | staging.maison-meli.com |
+| **Mise en prod (release)** | Recette complète lancée à ce moment-là : tests automatiques (A, dont mobile) verts sur `staging` + parcours B touchés par la release. Feu vert seulement si tout est vert. | CI GitHub + staging |
 | **Après la mise en prod** | Contrôle léger en lecture seule (section C) | maison-meli.com |
 
 Règles :
@@ -32,16 +32,17 @@ Règles :
 
 ## A. Tests automatiques (local, `cd web && npm run build:local`)
 **Lancés uniquement à la mise en prod** : workflow GitHub « Recette » déclenché à la main sur `staging` (onglet « Actions », captures en artefacts ; voir `CLAUDE.md`). Jamais pendant un dev. La release ne part que si ce passage est vert.
-- [ ] `python3 tests/e2e.py` : 100 % (262/262 au 26/11)
+- [ ] `python3 tests/e2e.py` : 100 % (275/275 au 27/11)
 - [ ] `python3 tests/e2e_mobile.py --strict` : 100 % (261/261 au 26/11) — **Safari iOS (WebKit) en iPhone SE 320 px et iPhone 15**, **Chrome Android en Pixel 7 et Galaxy S24 360 px**, écran tactile
   Couvre, au doigt, sur chaque appareil : accueil → éditeur complet → photo de téléphone → connexion par code → publication → partage / QR ; faire-part invité → agenda → réponse ; Mon faire-part ; zones tactiles ≥ 44 px et non recouvertes ; champs ≥ 16 px (zoom Safari) ; safe area iPhone ; claviers (e-mail, code `one-time-code`) ; geste retour (aperçu) ; double toucher (Envoyer) ; onglet rouvert (session, brouillon) ; paysage ; mode sombre ; texte agrandi 125 % ; réseau lent ; navigateur intégré WhatsApp.
   Ne couvre pas (reste en M-réel) : vrai clavier virtuel, feuille de partage native, Photos / agenda / Maps du téléphone, aperçu WhatsApp, connexion Google réelle.
   En local, WebKit ne s'installe que si le poste autorise le téléchargement de Playwright (`python3 -m playwright install webkit`) ; sinon les iPhone sont ignorés et la CI fait foi.
   Information affichée (non bloquante) : temps d'affichage du faire-part en 4G lente, aide pour Google dans WhatsApp.
+- [ ] `python3 tests/e2e_brouillon.py` : 100 % (39/39 au 27/11) — reprise du brouillon sur ordinateur et téléphone 390 px : « Mon faire-part » sans compte et connecté, rattachement au compte, autre appareil, déconnexion, « Recommencer à zéro », publication (+27/11)
 - [ ] `npm run test:seo` : 100 % (3 127/3 127 au 26/11)
 - [ ] axe-core (WCAG 2.2 AA, inclus dans e2e) : OK
 - [ ] Aucun débordement horizontal à 320 / 375 / 390 / 430 px (inclus dans e2e)
-- [ ] Recette SQL sur la base **staging** (SQL Editor, tout est annulé à la fin) : `supabase/tests.sql`, `tests-comptes.sql`, `tests-mesure.sql`, `tests-retours.sql` (+ tout nouveau fichier)
+- [ ] Recette SQL sur la base **staging** (SQL Editor, tout est annulé à la fin) : `supabase/tests.sql`, `tests-comptes.sql`, `tests-mesure.sql`, `tests-retours.sql`, `tests-brouillons.sql` (16/16 au 27/11), `tests-protection.sql` (14/14 au 27/11 : corbeille, historique des réponses, versions, health) ; `tests-mesure.sql` ignore désormais le champ `device` du journal (test périmé corrigé le 27/11) (+ tout nouveau fichier)
 - [ ] `npm run build:staging` et `npm run build` sans erreur
 
 ## M. Mobile en profondeur
@@ -72,7 +73,9 @@ Règles :
 - [ ] Encoche et barre d'accueil iPhone : boutons flottants et bas de page jamais masqués ; barre d'adresse Safari qui se rétracte sans casser la mise en page (réel)
 - [ ] Retour Android / geste retour iOS : ferme l'aperçu de l'éditeur (auto, corrigé 26/11), ne perd jamais le brouillon (auto) ; vérifier aussi sur vrai téléphone (réel)
 - [ ] Retour sur l'onglet après plusieurs heures (ou appli fermée) : session et brouillon conservés (réel)
+- [ ] Brouillon commencé sur ordinateur, connexion sur le téléphone avec le même compte : « Mon faire-part » propose de le reprendre (réel, +27/11)
 - [ ] En-tête de l'éditeur sur une ligne à 320 px (bug 26/11) ; « Ajouter à mon agenda » non coupé (bug 26/11) ; réponses en fiches sur téléphone (bug 26/11)
+- [ ] Mention « Faire-part créé avec Maison Meli · Créer le vôtre » en pied de faire-part : zone tactile ≥ 44 px, centrée, sans débordement à 320 px, cachet lisible sur papier sombre (Gatsby, Élégance, Jardin d’hiver) (+27/11, auto à 320/390/1440 px)
 
 ### M4. Fonctions natives (réel)
 - [ ] Partage du lien : feuille de partage native → WhatsApp, SMS ; « Copier le lien » fonctionne
@@ -101,6 +104,7 @@ Règles :
 - [ ] Lien Maps : `maps.apple/p/…` accepté ; lien sans `https://` complété (bug 26/11)
 - [ ] Générateur de texte : heure seule sans date, pas de doublon « cadeau » avec la cagnotte, articles corrects (« au Château », « à la Mairie ») (bug 26/11)
 - [ ] Brouillon conservé après rechargement
+- [ ] Connecté : le brouillon part sur le compte quelques secondes après une modification ; « Recommencer à zéro » l'efface aussi du compte (auto, +27/11)
 
 ### B3. Compte & connexion
 - [ ] Code e-mail (6 chiffres) reçu et accepté
@@ -114,12 +118,16 @@ Règles :
 - [ ] Rappel de note : une seule fois si la carte a été ignorée, jamais pendant la visite où la carte a été vue (+26/11)
 - [ ] Liste des réponses : fiches sur téléphone, ombre de défilement sur ordinateur (bug 26/11)
 - [ ] Modification d'un faire-part publié : changement visible côté invité
+- [ ] Brouillon non publié : « Mon faire-part » affiche « Votre faire-part vous attend » (mini-carte aux vrais prénoms, jamais de date d'exemple) au lieu de la page vide, connecté ou non (auto, bug 27/11 : cas de Chloé)
+- [ ] Publication : brouillon effacé du navigateur et du compte ; déconnexion : brouillon déjà gardé sur le compte retiré de l'appareil (auto, +27/11)
 
 ### B5. Faire-part invité (`/invitation.html?f=…`)
 - [ ] Rendu correct (aussi avec une config proche d'un vrai faire-part, en local ; jamais en ouvrant un vrai faire-part en prod)
 - [ ] RSVP : envoi, réponse visible dans Mon faire-part
 - [ ] Coupure réseau → « n'a pas pu s'ouvrir » + Réessayer ; faire-part inexistant → lien vers l'accueil (bug 26/11)
 - [ ] **Pas** de bouton « Un souci ? » (+26/11)
+- [ ] Nouveau faire-part (`credit: true` posé à la publication) : mention cliquable en pied de page, visible avant toute réponse, lien vers l'accueil avec `src=faire-part` + `utm_content=pied-de-page`, clic mesuré (`cta_create`) ; aperçu de l'éditeur : mention visible, non cliquable (+27/11, auto)
+- [ ] Ancien faire-part (sans `credit`) : signature discrète inchangée, **aucune** mention cliquable, même après modification par le couple (+27/11, auto)
 - [ ] Anciens liens `invitation.html?f=…` toujours valides
 
 ### B6. Retours utilisateurs (+26/11)
@@ -143,6 +151,8 @@ Navigateur marqué `fp:admin`. Ne pas ouvrir de vrai faire-part (ça compterait 
 - [ ] Aperçu du lien dans WhatsApp (prénoms + date + image, jamais le lieu) : coller le lien du faire-part fictif de test dans une conversation (réel)
 - [ ] Migration SQL éventuelle appliquée en prod (fonctions identiques au schéma)
 - [ ] Logs Supabase de prod sans nouvelle erreur
+- [ ] Sauvegarde : dernier passage de « Sauvegarde nocturne » vert dans le dépôt privé `maison-meli-backups` ; toute migration SQL de prod lancée **juste après** une sauvegarde manuelle (Run workflow) (+27/11)
+- [ ] Sentinelle : Cloudflare > Workers > faire-part-mvp > Logs : exécutions planifiées sans erreur, aucun e-mail d'alerte (+27/11)
 - [ ] Ce qui ne se teste pas en recette (pas de clé Resend dans la base staging) : e-mail de nouveau retour, récap RSVP → vérifier au premier envoi réel ou par un test explicitement validé par Julien
 
 ## D. Historique des releases

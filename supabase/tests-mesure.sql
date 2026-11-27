@@ -39,7 +39,7 @@ begin
     then E'PASS track : événement hors liste blanche ignoré, sans erreur\n' else E'FAIL liste blanche\n' end;
   r := r || case when (select slug from private.events where id > n0 and event = 'cta_create') = v_s
       and (select slug from private.events where id > n0 and event = 'share') is null
-      and (select meta from private.events where id > n0 and event = 'share') = '{"channel":"whatsapp"}'::jsonb
+      and (select meta - 'device' from private.events where id > n0 and event = 'share') = '{"channel":"whatsapp"}'::jsonb
     then E'PASS track : faire-part existant rattaché, identifiant inconnu écarté\n' else E'FAIL rattachement au faire-part\n' end;
   r := r || case when (select visitor from private.events where id > n0 and event = 'landing_view') = encode(extensions.digest('203.0.113.9', 'sha256'), 'hex')
       and not exists (select 1 from private.events where id > n0 and (visitor like '%203.0.113%' or meta::text like '%203.0.113%'))
@@ -51,7 +51,7 @@ begin
   perform public.submit_rsvp(v_s, '{"name":"Ana","attendance":"no","rid":"abcdefghijkl1234","elapsed":999999}'::jsonb);
   perform public.submit_rsvp(v_s, '{"name":"Bob","attendance":"yes","elapsed":"vite"}'::jsonb);
   reset role;
-  v := (select jsonb_agg(meta order by id) from private.events where id > n0 and event = 'rsvp_submitted');
+  v := (select jsonb_agg(meta - 'device' order by id) from private.events where id > n0 and event = 'rsvp_submitted');
   r := r || case when v->0 = '{"attendance":"yes","edit":false,"seconds":37}'::jsonb and (v->1->>'edit')::boolean and not (v->1 ? 'seconds')
       and v->2 = '{"attendance":"yes","edit":false}'::jsonb
     then E'PASS réponse journalisée : présence, durée bornée, correction repérée\n' else 'FAIL journal des réponses : ' || coalesce(v::text, 'null') || E'\n' end;

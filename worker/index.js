@@ -41,7 +41,83 @@ function withHeaders(res) {
   return out;
 }
 
+// ---------------------------------------------------------------- Sentinelle (27/11/2026)
+// Tâche planifiée (triggers.crons de wrangler.jsonc). Production : toutes les 5 minutes.
+//   1. le site répond (accueil + page des faire-part) ;
+//   2. la base répond (rpc/health) — cet appel régulier empêche aussi la mise en pause de l'offre gratuite Supabase ;
+//   3. (prod) une sauvegarde nocturne a réussi il y a moins de 30 h.
+// Alerte par e-mail (Resend) après 2 contrôles ratés d'affilée, rappel toutes les 3 h, message de retour à la normale.
+// Destinataire : ALERT_TO (wrangler.jsonc, contact@maison-meli.com). Secret du Worker (Cloudflare > Workers > faire-part-mvp
+// > Settings > Variables, type « Secret ») : RESEND_API_KEY.
+// Sans ces secrets (préprod), la sentinelle ne fait que garder la base éveillée et écrire dans les journaux.
+async function probe(url, init) {
+  for (let i = 0; i < 2; i++) {
+    try {
+      const res = await fetch(url, { ...init, signal: AbortSignal.timeout(8000) });
+      if (res.ok) return { ok: true, res };
+      if (i) return { ok: false, why: "HTTP " + res.status };
+    } catch (e) { if (i) return { ok: false, why: String(e && e.message || e) }; }
+    await new Promise((r) => setTimeout(r, 3000));
+  }
+}
+
+async function checks(env) {
+  const site = env.SITE_URL || "https://maison-meli.com";
+  const out = [];
+  const home = await probe(site + "/");
+  if (!home.ok) out.push("Accueil " + site + " : " + home.why);
+  const inv = await probe(site + "/invitation.html");
+  if (!inv.ok) out.push("Page des faire-part : " + inv.why);
+  const db = await probe(env.SUPABASE_URL + "/rest/v1/rpc/health", {
+    method: "POST", body: "{}",
+    headers: { "Content-Type": "application/json", apikey: env.SUPABASE_ANON_KEY, Authorization: "Bearer " + env.SUPABASE_ANON_KEY },
+  });
+  if (!db.ok) out.push("Base Supabase (rpc/health) : " + db.why);
+  else if (env.CHECK_BACKUP === "1") {
+    let h = null;
+    try { h = await db.res.json(); } catch { h = null; }
+    const age = h && h.backup_age_h;
+    if (age == null) out.push("Aucune sauvegarde enregistrée (private.backups_log vide)");
+    else if (age > 30) out.push("Dernière sauvegarde réussie il y a " + age + " h (> 30 h)");
+  }
+  return out;
+}
+
+async function alert(env, subject, lines) {
+  if (!env.RESEND_API_KEY || !env.ALERT_TO) { console.log("sentinelle", subject, lines); return; }
+  const text = lines.join("\n") + "\n\nProcédure : claude/strategie-fiabilite-donnees.md (projet) et ops/sauvegarde/RESTAURATION.md (dépôt).";
+  await fetch("https://api.resend.com/emails", {
+    method: "POST", signal: AbortSignal.timeout(8000),
+    headers: { Authorization: "Bearer " + env.RESEND_API_KEY, "Content-Type": "application/json" },
+    body: JSON.stringify({ from: "Maison Meli Sentinelle <alerte@maison-meli.com>", to: [env.ALERT_TO], subject, text }),
+  });
+}
+
+async function sentinel(env) {
+  const problems = await checks(env);
+  const kv = env.SENTINEL;
+  const prev = kv ? JSON.parse((await kv.get("state")) || '{"fails":0,"alerted":0}') : { fails: 0, alerted: 0 };
+  const now = Date.now();
+  if (!problems.length) {
+    if (prev.alerted) await alert(env, "✅ Maison Meli : tout est rétabli", ["Tous les contrôles sont de nouveau verts."]);
+    if (kv && (prev.fails || prev.alerted)) await kv.put("state", JSON.stringify({ fails: 0, alerted: 0 }));
+    return;
+  }
+  const fails = prev.fails + 1;
+  let alerted = prev.alerted;
+  // Sans KV (préprod), pas de mémoire : alerte directe.
+  if (!kv || (fails >= 2 && now - alerted > 3 * 3600e3)) {
+    await alert(env, "🚨 Maison Meli : problème détecté", problems);
+    alerted = now;
+  }
+  if (kv) await kv.put("state", JSON.stringify({ fails, alerted, last: problems }));
+}
+
 export default {
+  async scheduled(event, env, ctx) {
+    ctx.waitUntil(sentinel(env));
+  },
+
   async fetch(request, env, ctx) {
     const url = new URL(request.url);
     if (url.pathname !== "/invitation.html" && url.pathname !== "/invitation") return env.ASSETS.fetch(request);

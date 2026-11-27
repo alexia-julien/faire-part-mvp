@@ -23,6 +23,9 @@ export type Config = {
     lodging: Section; practical: Section; gifts: Section;
   };
   rsvp: RsvpOptions;
+  /** Mention cliquable « Faire-part créé avec Maison Meli » en pied de page. Posée à la création (depuis le 27/11/2026) :
+   *  les faire-part plus anciens ne l'ont pas et ne la reçoivent jamais, même modifiés. */
+  credit?: true;
   meta?: { durationSec: number | null; updatedAt: string; src: string };
 };
 
@@ -250,6 +253,7 @@ export function sanitizeConfig(input: unknown): Config {
   rsvp.customLabel = str(r.customLabel, 80);
   rsvp.deadline = DATE_RE.test(str(r.deadline, 10)) ? (r.deadline as string) : "";
   out.rsvp = rsvp;
+  if (c.credit === true) out.credit = true; // jamais par défaut : un ancien faire-part reste sans mention
   if (c.meta) {
     const meta = obj(c.meta);
     out.meta = { durationSec: typeof meta.durationSec === "number" ? meta.durationSec : null, updatedAt: str(meta.updatedAt, 40),
